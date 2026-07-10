@@ -1,0 +1,85 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.white'
+version = '0.0.1-SNAPSHOT'
+description = 'HanDdam(한땀한땀) - 공예품 DIY 제작자 구독 플랫폼 백엔드'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	awsSdkVersion = '2.29.52'
+	jjwtVersion = '0.12.6'
+	dotenvVersion = '5.1.0'
+}
+
+dependencies {
+	// ---------- Web / API ----------
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket' // WebSocket/STOMP (chat)
+	implementation 'org.springframework.boot:spring-boot-starter-validation' // Bean Validation
+
+	// ---------- Security / Auth ----------
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+	runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+	runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
+
+	// ---------- Data ----------
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa' // JPA/Hibernate
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis' // Redis
+	runtimeOnly 'org.postgresql:postgresql'
+	runtimeOnly 'com.h2database:h2' // local/test profile
+
+	// ---------- Database Migration ----------
+	implementation 'org.flywaydb:flyway-core'
+	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+	// ---------- Email (SMTP) ----------
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+	// ---------- File Storage (AWS S3 / LocalStack) ----------
+	implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
+	implementation 'software.amazon.awssdk:s3'
+
+	// ---------- API Documentation ----------
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3' // Swagger UI (Spring Boot 4 / Spring Framework 7 호환)
+
+	// ---------- Monitoring ----------
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// ---------- .env 로컬 환경변수 로딩 ----------
+	implementation "me.paulschwarz:spring-dotenv:${dotenvVersion}" // backend/.env 자동 로딩
+
+	// ---------- Lombok ----------
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	// ---------- Test ----------
+	testImplementation 'org.springframework.boot:spring-boot-starter-test' // JUnit5, Mockito, MockMvc 포함
+	testImplementation 'org.springframework.security:spring-security-test'
+	testCompileOnly 'org.projectlombok:lombok'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

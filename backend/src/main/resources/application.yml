@@ -1,0 +1,200 @@
+spring:
+  application:
+    name: backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+# =====================================================================
+# local: 개인 PC + docker-compose(postgres/redis/localstack)
+# 값 출처: backend/.env (개인별, git 미추적)
+# 데이터 휘발성 OK, S3는 LocalStack, 기본값 있어도 무방
+# =====================================================================
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:handdam}
+    username: ${DB_USERNAME:handdam}
+    password: ${DB_PASSWORD:handdam1234_local_only}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+jwt:
+  secret: ${JWT_SECRET:local_dev_jwt_secret_change_me}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+cloud:
+  aws:
+    region: ${AWS_REGION:ap-northeast-2}
+    s3:
+      endpoint: ${AWS_S3_ENDPOINT:http://localhost:4566}
+      bucket: ${AWS_S3_BUCKET:handdam-local}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:test}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+
+toss:
+  client-key: ${TOSS_CLIENT_KEY:}
+  secret-key: ${TOSS_SECRET_KEY:}
+
+---
+# =====================================================================
+# test: ./gradlew build / gradlew test 전용
+# 값 출처: 이 파일에 고정 하드코딩 (진짜 비밀값 아님, 도커 불필요)
+# H2 인메모리, Flyway 비활성화 - CI/개인 PC 어디서든 즉시 실행 가능
+# =====================================================================
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:handdam;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+  flyway:
+    enabled: false
+
+jwt:
+  secret: test_secret_do_not_use_in_prod
+  access-expiration: 3600000
+  refresh-expiration: 1209600000
+
+cloud:
+  aws:
+    region: ap-northeast-2
+    s3:
+      endpoint: http://localhost:4566
+      bucket: handdam-test
+    credentials:
+      access-key: test
+      secret-key: test
+
+---
+# =====================================================================
+# prod: OCI 인스턴스 + GitHub Actions CI/CD 배포 전용
+# 값 출처: GitHub Actions Secrets → 배포 시점에 컨테이너 환경변수로 주입
+#          (이 프로필용 .env 파일은 어디에도 존재하지 않는다 - 개인 PC 포함)
+# DB는 실서비스 데이터 - 스키마는 Flyway로만 변경, ddl-auto는 절대 validate 고정
+# S3는 endpoint를 지정하지 않아 LocalStack이 아닌 실제 AWS S3를 사용
+# 민감값(DB_PASSWORD, JWT_SECRET, AWS 키, TOSS_SECRET_KEY)은 기본값을 두지 않는다
+#   -> 배포 시 값이 누락되면 애매하게 뜨는 대신 기동 자체가 즉시 실패해야 안전하다
+# =====================================================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:handdam}
+    username: ${DB_USERNAME:handdam}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+cloud:
+  aws:
+    region: ${AWS_REGION:ap-northeast-2}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+
+toss:
+  client-key: ${TOSS_CLIENT_KEY}
+  secret-key: ${TOSS_SECRET_KEY}
+
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
