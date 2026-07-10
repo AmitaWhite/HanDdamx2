@@ -1,0 +1,88 @@
+######################################
+# OS
+######################################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+######################################
+# Environment variables
+# (.env.sample 만 커밋 대상으로 남긴다)
+######################################
+.env
+.env.*
+!.env.sample
+
+######################################
+# IDE - VSCode
+######################################
+.vscode/
+!.vscode/extensions.json
+
+######################################
+# IDE - IntelliJ IDEA
+######################################
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+######################################
+# IDE - Eclipse
+######################################
+.project
+.classpath
+.settings/
+bin/
+.metadata/
+
+######################################
+# IDE - Cursor
+######################################
+.cursor/
+.cursorignore
+.cursorrules
+
+######################################
+# Backend - Java / Gradle / Spring Boot
+######################################
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+*.class
+HELP.md
+gradle-app.setting
+.gradletasknamecache
+backend/src/main/resources/application-local.yml
+backend/src/main/resources/application-local.yaml
+
+######################################
+# Frontend - React / Bun / Vite
+######################################
+node_modules/
+dist/
+.bun/
+.vite/
+coverage/
+*.local
+
+######################################
+# Logs
+######################################
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+######################################
+# Docker
+######################################
+docker-compose.override.yml

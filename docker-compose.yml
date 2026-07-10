@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: handdam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-handdam}
+      POSTGRES_USER: ${POSTGRES_USER:-handdam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-handdam1234}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-handdam} -d ${POSTGRES_DB:-handdam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - handdam-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: handdam-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - handdam-net
+
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: handdam-localstack
+    restart: unless-stopped
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=${AWS_REGION:-ap-northeast-2}
+      - PERSISTENCE=1
+      - DEBUG=0
+    ports:
+      - "${LOCALSTACK_PORT:-4566}:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - handdam-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  localstack_data:
+
+networks:
+  handdam-net:
+    driver: bridge
