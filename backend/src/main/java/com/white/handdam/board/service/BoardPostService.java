@@ -39,10 +39,33 @@ public class BoardPostService {
 		BoardPostStatus status,
 		Pageable pageable
 	) {
-		assertCanAccess(creatorId, requesterId);
+		assertCanAccessBoard(creatorId, requesterId);
 		return boardPostRepository
 			.findByCreator(creatorId, type, status, pageable)
 			.map(BoardPostConverter::toResponse);
+	}
+
+	/**
+	 * 유료 게시글 상세 조회.
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 권한 확인 — 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 * 3. 이미지 목록 조회 (order_index 오름차순)
+	 * 4. BoardPostResponse 반환
+	 * </pre>
+	 */
+	public BoardPostResponse getPost(Long postId, Long requesterId) {
+		//삭제되지 않은 게시글 조회
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		assertCanAccessPost(post, requesterId);
+
+		List<BoardPostImage> images =
+		//오름차순으로 가져옴 없으면 빈 리스트
+			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
+		return BoardPostConverter.toResponse(post, images);
 	}
 
 	/**
@@ -50,7 +73,7 @@ public class BoardPostService {
 	 *
 	 * <pre>
 	 * 흐름:
-	 * 1. assertCanAccess  — 크리에이터 본인 또는 활성 유료 구독자만 허용 (아니면 403)
+	 * 1. assertCanAccessBoard — 크리에이터 본인 또는 활성 유료 구독자만 허용 (아니면 403)
 	 * 2. BoardPost 생성   — title/type/content 반영, status 기본값 WAITING
 	 * 3. board_post 저장  — DB INSERT 후 id 발급 (이미지 FK에 필요)
 	 * 4. 이미지 처리      — 파일이 있으면 S3 업로드 + board_post_image 저장
@@ -69,27 +92,19 @@ public class BoardPostService {
 		CreateBoardPostRequest request,
 		List<MultipartFile> imageFiles
 	) {
-		// 1) 권한 검사: 통과하지 못하면 여기서 예외 → 아래 저장 로직 실행 안 됨
-		assertCanAccess(creatorId, requesterId);
+		assertCanAccessBoard(creatorId, requesterId);
 
-		// 2) 엔티티 조립 (아직 DB 반영 전, id 없음)
-		//    creatorId = 게시판 주인, memberId = 실제 작성자
 		BoardPost post = BoardPost.builder()
 			.creatorId(creatorId)
 			.memberId(requesterId)
 			.title(request.title())
 			.type(request.type())
 			.content(request.content())
-			.status(BoardPostStatus.WAITING) // 공식 답변 전: 답변 대기
+			.status(BoardPostStatus.WAITING)
 			.build();
 
-		// 3) board_post INSERT — 이 시점에 id / created_at / updated_at 이 채워짐
 		BoardPost saved = boardPostRepository.save(post);
-
-		// 4) 이미지 업로드·저장 (파일 없으면 빈 리스트)
 		List<BoardPostImage> images = uploadAndSaveImages(saved, creatorId, imageFiles);
-
-		// 5) 엔티티 → API 응답 DTO (글 + 이미지 목록)
 		return BoardPostConverter.toResponse(saved, images);
 	}
 
@@ -105,45 +120,52 @@ public class BoardPostService {
 	 *
 	 * order_index 는 업로드 순서(0, 1, 2...)로 부여한다.
 	 * created_at 은 엔티티 @PrePersist 에서 자동 설정된다.
+	 *
+	 * @param post        이미 저장된 board_post (id 필요 — 이미지 FK)
+	 * @param creatorId   S3 폴더 경로에 사용 (premium-board/{creatorId}/...)
+	 * @param imageFiles  multipart 이미지 목록 (null/빈 목록이면 이미지 없이 종료)
+	 * @return            DB에 저장된 BoardPostImage 목록 (없으면 빈 리스트)
 	 */
 	private List<BoardPostImage> uploadAndSaveImages(
 		BoardPost post,
 		Long creatorId,
 		List<MultipartFile> imageFiles
 	) {
-		// 첨부 없음 → 이미지 없이 글만 작성된 경우
+		// 첨부 없음 → 이미지 없이 글만 작성된 경우. DB/S3 작업 생략
 		if (imageFiles == null || imageFiles.isEmpty()) {
 			return List.of();
 		}
 
-		// S3 키 prefix. 예: premium-board/3/uuid_a.jpg
+		// S3 객체 키 prefix. 예: premium-board/3/uuid_a.jpg
 		String folder = "premium-board/" + creatorId;
+		// 업로드 성공한 이미지 엔티티를 모아둘 리스트
 		List<BoardPostImage> images = new ArrayList<>();
+		// 화면 노출 순서 시작값 (0부터 증가)
 		int orderIndex = 0;
 
 		for (MultipartFile file : imageFiles) {
-			// 비어 있는 part 는 건너뜀
+			// multipart 빈 part(파일 미선택 등)는 건너뜀
 			if (file == null || file.isEmpty()) {
 				continue;
 			}
 
-			// S3 업로드 결과: storageKey, url, originalName
+			// S3 업로드 → storageKey(객체 키), url(접근 URL), originalName 반환
 			StoredObject stored = objectStorage.upload(folder, file);
 
 			// ERD BOARD_POST_IMAGE 컬럼 매핑
 			BoardPostImage image = BoardPostImage.builder()
-				.boardPost(post)                 // FK → board_post.id
-				.url(stored.url())               // 접근 URL
-				.storageKey(stored.storageKey()) // S3 객체 키 (NOT NULL)
-				.originalName(stored.originalName())
-				.fileSize(file.getSize())        // byte
-				.mimeType(file.getContentType()) // 예: image/jpeg
-				.orderIndex(orderIndex++)        // 노출 순서
+				.boardPost(post)                     // FK → board_post.id
+				.url(stored.url())                   // 클라이언트 접근용 URL
+				.storageKey(stored.storageKey())     // S3 객체 키 (NOT NULL)
+				.originalName(stored.originalName()) // 원본 파일명
+				.fileSize(file.getSize())            // byte 단위 크기
+				.mimeType(file.getContentType())     // 예: image/jpeg
+				.orderIndex(orderIndex++)            // 노출 순서 (업로드 순)
 				.build();
 			images.add(image);
 		}
 
-		// 유효 파일이 하나도 없었으면 DB 저장 생략
+		// 유효 파일이 하나도 없었으면 INSERT 생략
 		if (images.isEmpty()) {
 			return List.of();
 		}
@@ -153,9 +175,9 @@ public class BoardPostService {
 	}
 
 	/**
-	 * ERD 정책: 해당 크리에이터의 활성 유료 구독자와 크리에이터만 접근 가능.
+	 * 게시판(크리에이터) 단위 접근: 크리에이터 본인 또는 활성 유료 구독자.
 	 */
-	void assertCanAccess(Long creatorId, Long requesterId) {
+	void assertCanAccessBoard(Long creatorId, Long requesterId) {
 		if (requesterId == null) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
 		}
@@ -163,6 +185,25 @@ public class BoardPostService {
 			return;
 		}
 		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
+			return;
+		}
+		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");
+	}
+
+	/**
+	 * 게시글 상세 접근: 게시판 크리에이터 / 작성자 / 활성 유료 구독자.
+	 */
+	void assertCanAccessPost(BoardPost post, Long requesterId) {
+		if (requesterId == null) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+		}
+		if (requesterId.equals(post.getCreatorId())) {
+			return;
+		}
+		if (requesterId.equals(post.getMemberId())) {
+			return;
+		}
+		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, post.getCreatorId())) {
 			return;
 		}
 		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");

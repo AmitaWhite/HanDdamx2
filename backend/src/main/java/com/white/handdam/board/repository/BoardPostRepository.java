@@ -3,6 +3,7 @@ package com.white.handdam.board.repository;
 import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface BoardPostRepository extends JpaRepository<BoardPost, Long> {
+
+	Optional<BoardPost> findByIdAndDeletedFalse(Long id);
 
 	@Query("""
 		SELECT p FROM BoardPost p
