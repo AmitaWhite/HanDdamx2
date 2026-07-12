@@ -2,6 +2,7 @@ package com.white.handdam.board.service;
 
 import com.white.handdam.board.converter.BoardPostConverter;
 import com.white.handdam.board.dto.request.CreateBoardPostRequest;
+import com.white.handdam.board.dto.request.UpdateBoardPostRequest;
 import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
@@ -64,6 +65,44 @@ public class BoardPostService {
 
 		List<BoardPostImage> images =
 		//오름차순으로 가져옴 없으면 빈 리스트
+			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
+		return BoardPostConverter.toResponse(post, images);
+	}
+
+	/**
+	 * 유료 게시글 수정 (공식 답변 전만).
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 작성자 권한 확인 (아니면 403)
+	 * 3. status == WAITING 확인 (아니면 409)
+	 * 4. title / type / content 갱신
+	 * 5. 이미지 포함 BoardPostResponse 반환
+	 * </pre>
+	 *
+	 * @param postId      수정할 게시글 ID
+	 * @param requesterId 요청자(작성자여야 함)
+	 * @param request     새 제목·유형·본문
+	 */
+	@Transactional
+	public BoardPostResponse updatePost(Long postId, Long requesterId, UpdateBoardPostRequest request) {
+		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		// 2) 작성자(member_id)만 수정 가능. 타인·비로그인 → 403
+		assertCanEditPost(post, requesterId);
+
+		// 3) ERD DECISION-006: 공식 답변 전(WAITING)만 수정 허용. ANSWERED → 409
+		if (post.getStatus() != BoardPostStatus.WAITING) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "공식 답변이 등록된 게시글은 수정할 수 없습니다.");
+		}
+
+		// 4) 엔티티 필드 갱신. updated_at 은 @PreUpdate 에서 자동 설정
+		post.update(request.title(), request.type(), request.content());
+
+		// 5) 기존 이미지는 그대로 두고, 글+이미지로 응답 DTO 구성
+		List<BoardPostImage> images =
 			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
 		return BoardPostConverter.toResponse(post, images);
 	}
@@ -207,5 +246,19 @@ public class BoardPostService {
 			return;
 		}
 		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");
+	}
+
+	/**
+	 * 게시글 수정: 작성자만 허용.
+	 * (작성자는 유료 구독자이거나 게시판 소유 크리에이터인 경우만 글을 쓸 수 있음)
+	 */
+	void assertCanEditPost(BoardPost post, Long requesterId) {
+		if (requesterId == null) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+		}
+		if (requesterId.equals(post.getMemberId())) {
+			return;
+		}
+		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "게시글을 수정할 권한이 없습니다.");
 	}
 }

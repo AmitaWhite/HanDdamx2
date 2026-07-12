@@ -90,4 +90,13 @@ public class BoardPost {
 	void onUpdate() {
 		this.updatedAt = Instant.now();
 	}
+
+	/**
+	 * 공식 답변 전(WAITING) 게시글의 제목·유형·본문 수정.
+	 */
+	public void update(String title, BoardPostType type, String content) {
+		this.title = title;
+		this.type = type;
+		this.content = content;
+	}
 }

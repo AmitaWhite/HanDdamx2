@@ -1,10 +1,14 @@
 package com.white.handdam.board.controller;
 
+import com.white.handdam.board.dto.request.UpdateBoardPostRequest;
 import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.service.BoardPostService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,5 +30,18 @@ public class BoardPostController {
 		@RequestHeader("X-Member-Id") Long memberId
 	) {
 		return boardPostService.getPost(postId, memberId);
+	}
+
+	/**
+	 * 유료 게시글 수정 (공식 답변 전만).
+	 * 권한: 작성자
+	 */
+	@PatchMapping("/{postId}")
+	public BoardPostResponse updatePost(
+		@PathVariable Long postId,
+		@RequestHeader("X-Member-Id") Long memberId,
+		@Valid @RequestBody UpdateBoardPostRequest request
+	) {
+		return boardPostService.updatePost(postId, memberId, request);
 	}
 }
