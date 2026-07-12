@@ -32,6 +32,9 @@ public class BoardPost {
 	@Column(name = "member_id", nullable = false)
 	private Long memberId;
 
+	@Column(name = "title", nullable = false, length = 255)
+	private String title;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "type", nullable = false, length = 50)
 	private BoardPostType type;
@@ -52,16 +55,21 @@ public class BoardPost {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
+
 	@Builder
 	private BoardPost(
 		Long creatorId,
 		Long memberId,
+		String title,
 		BoardPostType type,
 		String content,
 		BoardPostStatus status
 	) {
 		this.creatorId = creatorId;
 		this.memberId = memberId;
+		this.title = title;
 		this.type = type;
 		this.content = content;
 		this.status = status == null ? BoardPostStatus.WAITING : status;
