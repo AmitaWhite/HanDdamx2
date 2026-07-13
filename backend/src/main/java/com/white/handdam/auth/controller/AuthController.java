@@ -1,6 +1,7 @@
 package com.white.handdam.auth.controller;
 
 import com.white.handdam.auth.dto.response.EmailAvailabilityResponse;
+import com.white.handdam.auth.dto.response.NicknameAvailabilityResponse;
 import com.white.handdam.auth.service.AuthService;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -20,9 +21,18 @@ public class AuthController {
     private final AuthService authService;
 
     // TODO: 공통 응답(ApiResponse) 및 GlobalExceptionHandler 적용 후 수정 필요
+    // KSY-001
     @GetMapping("/email-availability")
     public EmailAvailabilityResponse checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
         return new EmailAvailabilityResponse(authService.isEmailAvailable(email));
     }
+
+    // KSY-002
+    @GetMapping("/nickname-availability")
+    public NicknameAvailabilityResponse checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
+        return new NicknameAvailabilityResponse(authService.isNicknameAvailable(nickname));
+    }
+
+
 
 }
