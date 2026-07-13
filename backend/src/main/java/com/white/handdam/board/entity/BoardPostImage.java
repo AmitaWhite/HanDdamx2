@@ -1,5 +1,6 @@
 package com.white.handdam.board.entity;
 
+import com.white.handdam.global.entity.BaseCreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -8,9 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "board_post_image")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class BoardPostImage {
+public class BoardPostImage extends BaseCreatedAtEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,9 +47,6 @@ public class BoardPostImage {
 	@Column(name = "order_index", nullable = false)
 	private int orderIndex;
 
-	@Column(name = "created_at", nullable = false)
-	private Instant createdAt;
-
 	@Builder
 	private BoardPostImage(
 		BoardPost boardPost,
@@ -68,10 +64,5 @@ public class BoardPostImage {
 		this.fileSize = fileSize;
 		this.mimeType = mimeType;
 		this.orderIndex = orderIndex;
-	}
-
-	@PrePersist
-	void onCreate() {
-		this.createdAt = Instant.now();
 	}
 }

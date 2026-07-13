@@ -38,8 +38,11 @@ public class BoardPostController {
 	 */
 	@PatchMapping("/{postId}")
 	public BoardPostResponse updatePost(
+		//어떤글을 수정할지
 		@PathVariable Long postId,
+		//누가 수정할지
 		@RequestHeader("X-Member-Id") Long memberId,
+		//수정할 내용
 		@Valid @RequestBody UpdateBoardPostRequest request
 	) {
 		return boardPostService.updatePost(postId, memberId, request);

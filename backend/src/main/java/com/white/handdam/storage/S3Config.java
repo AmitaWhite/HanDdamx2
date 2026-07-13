@@ -18,10 +18,17 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 @EnableConfigurationProperties(AwsProperties.class)
 public class S3Config {
 
+	/**
+	 * S3Client 빈 생성.
+	 * AwsProperties 의 region / credentials / endpoint 로 클라이언트를 조립한다.
+	 */
 	@Bean
 	public S3Client s3Client(AwsProperties awsProperties) {
+		// 기본: 리전 + 액세스 키로 S3 클라이언트 빌더 구성
 		var builder = S3Client.builder()
+			// 요청을 보낼 AWS 리전 (예: ap-northeast-2)
 			.region(Region.of(awsProperties.getRegion()))
+			// 인증: accessKey / secretKey 를 고정으로 사용
 			.credentialsProvider(StaticCredentialsProvider.create(
 				AwsBasicCredentials.create(
 					awsProperties.getCredentials().getAccessKey(),
@@ -33,13 +40,17 @@ public class S3Config {
 		String endpoint = awsProperties.getS3().getEndpoint();
 		if (endpoint != null && !endpoint.isBlank()) {
 			builder
+				// 예: http://localhost:4566 → LocalStack S3
 				.endpointOverride(URI.create(endpoint))
 				// LocalStack은 path-style (endpoint/bucket/key) 이 필요
+				// virtual-hosted 방식(bucket.endpoint/...)은 LocalStack에서 자주 깨짐
 				.serviceConfiguration(S3Configuration.builder()
 					.pathStyleAccessEnabled(true)
 					.build());
 		}
+		// endpoint 가 비어 있으면 AWS 기본 S3 엔드포인트 사용 (prod)
 
+		// 설정이 끝난 클라이언트를 Spring 빈으로 등록
 		return builder.build();
 	}
 }

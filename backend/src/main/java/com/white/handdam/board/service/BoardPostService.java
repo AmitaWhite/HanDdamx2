@@ -33,6 +33,25 @@ public class BoardPostService {
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
 	private final ObjectStorage objectStorage;
 
+	// -------------------------------------------------------------------------
+	// 목록 · 작성 (게시판 단위) — assertCanAccessBoard 공통
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 크리에이터별 유료 게시판 게시글 목록 조회.
+	 *
+	 * <pre>
+	 * 1. assertCanAccessBoard — 크리에이터 본인 또는 활성 유료 구독자 (아니면 403)
+	 * 2. findByCreator      — 삭제되지 않은 글만, type/status 선택 필터 + 페이지네이션
+	 * 3. toResponse         — 엔티티 → BoardPostResponse (목록은 이미지 미포함)
+	 * </pre>
+	 *
+	 * @param creatorId   게시판 소유 크리에이터 ID
+	 * @param requesterId 요청자 ID
+	 * @param type        선택 필터 (없으면 null → 전체 유형)
+	 * @param status      선택 필터 (없으면 null → 전체 상태)
+	 * @param pageable    페이지·정렬 정보
+	 */
 	public Page<BoardPostResponse> getPostsByCreator(
 		Long creatorId,
 		Long requesterId,
@@ -40,71 +59,12 @@ public class BoardPostService {
 		BoardPostStatus status,
 		Pageable pageable
 	) {
+		// 1) 게시판 접근 권한: 크리에이터 또는 활성 유료 구독자
 		assertCanAccessBoard(creatorId, requesterId);
+		// 2) 조건에 맞는 글 페이지 조회 후 DTO로 변환
 		return boardPostRepository
 			.findByCreator(creatorId, type, status, pageable)
 			.map(BoardPostConverter::toResponse);
-	}
-
-	/**
-	 * 유료 게시글 상세 조회.
-	 *
-	 * <pre>
-	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
-	 * 2. 권한 확인 — 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
-	 * 3. 이미지 목록 조회 (order_index 오름차순)
-	 * 4. BoardPostResponse 반환
-	 * </pre>
-	 */
-	public BoardPostResponse getPost(Long postId, Long requesterId) {
-		//삭제되지 않은 게시글 조회
-		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
-
-		assertCanAccessPost(post, requesterId);
-
-		List<BoardPostImage> images =
-		//오름차순으로 가져옴 없으면 빈 리스트
-			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
-		return BoardPostConverter.toResponse(post, images);
-	}
-
-	/**
-	 * 유료 게시글 수정 (공식 답변 전만).
-	 *
-	 * <pre>
-	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
-	 * 2. 작성자 권한 확인 (아니면 403)
-	 * 3. status == WAITING 확인 (아니면 409)
-	 * 4. title / type / content 갱신
-	 * 5. 이미지 포함 BoardPostResponse 반환
-	 * </pre>
-	 *
-	 * @param postId      수정할 게시글 ID
-	 * @param requesterId 요청자(작성자여야 함)
-	 * @param request     새 제목·유형·본문
-	 */
-	@Transactional
-	public BoardPostResponse updatePost(Long postId, Long requesterId, UpdateBoardPostRequest request) {
-		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
-		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
-
-		// 2) 작성자(member_id)만 수정 가능. 타인·비로그인 → 403
-		assertCanEditPost(post, requesterId);
-
-		// 3) ERD DECISION-006: 공식 답변 전(WAITING)만 수정 허용. ANSWERED → 409
-		if (post.getStatus() != BoardPostStatus.WAITING) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "공식 답변이 등록된 게시글은 수정할 수 없습니다.");
-		}
-
-		// 4) 엔티티 필드 갱신. updated_at 은 @PreUpdate 에서 자동 설정
-		post.update(request.title(), request.type(), request.content());
-
-		// 5) 기존 이미지는 그대로 두고, 글+이미지로 응답 DTO 구성
-		List<BoardPostImage> images =
-			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
-		return BoardPostConverter.toResponse(post, images);
 	}
 
 	/**
@@ -148,7 +108,7 @@ public class BoardPostService {
 	}
 
 	/**
-	 * 게시글 이미지 처리.
+	 * 게시글 이미지 처리. (`createPost`에서 호출)
 	 *
 	 * <pre>
 	 * 각 파일마다:
@@ -158,7 +118,7 @@ public class BoardPostService {
 	 * </pre>
 	 *
 	 * order_index 는 업로드 순서(0, 1, 2...)로 부여한다.
-	 * created_at 은 엔티티 @PrePersist 에서 자동 설정된다.
+	 * created_at 은 JPA Auditing(`BaseCreatedAtEntity`)에서 자동 설정된다.
 	 *
 	 * @param post        이미 저장된 board_post (id 필요 — 이미지 FK)
 	 * @param creatorId   S3 폴더 경로에 사용 (premium-board/{creatorId}/...)
@@ -215,6 +175,7 @@ public class BoardPostService {
 
 	/**
 	 * 게시판(크리에이터) 단위 접근: 크리에이터 본인 또는 활성 유료 구독자.
+	 * 목록·작성에서 공통 사용.
 	 */
 	void assertCanAccessBoard(Long creatorId, Long requesterId) {
 		if (requesterId == null) {
@@ -227,6 +188,34 @@ public class BoardPostService {
 			return;
 		}
 		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");
+	}
+
+	// -------------------------------------------------------------------------
+	// 상세 조회 — assertCanAccessPost
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 유료 게시글 상세 조회.
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 권한 확인 — 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 * 3. 이미지 목록 조회 (order_index 오름차순)
+	 * 4. BoardPostResponse 반환
+	 * </pre>
+	 */
+	public BoardPostResponse getPost(Long postId, Long requesterId) {
+		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		// 2) 게시판 크리에이터 / 작성자 / 활성 유료 구독자
+		assertCanAccessPost(post, requesterId);
+
+		// 3) 이미지 order_index 오름차순 (없으면 빈 리스트)
+		List<BoardPostImage> images =
+			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
+		return BoardPostConverter.toResponse(post, images);
 	}
 
 	/**
@@ -246,6 +235,48 @@ public class BoardPostService {
 			return;
 		}
 		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");
+	}
+
+	// -------------------------------------------------------------------------
+	// 수정 — assertCanEditPost
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 유료 게시글 수정 (공식 답변 전만).
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 작성자 권한 확인 (아니면 403)
+	 * 3. status == WAITING 확인 (아니면 409)
+	 * 4. title / type / content 갱신
+	 * 5. 이미지 포함 BoardPostResponse 반환
+	 * </pre>
+	 *
+	 * @param postId      수정할 게시글 ID
+	 * @param requesterId 요청자(작성자여야 함)
+	 * @param request     새 제목·유형·본문
+	 */
+	@Transactional
+	public BoardPostResponse updatePost(Long postId, Long requesterId, UpdateBoardPostRequest request) {
+		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		// 2) 작성자(member_id)만 수정 가능. 타인·비로그인 → 403
+		assertCanEditPost(post, requesterId);
+
+		// 3) ERD DECISION-006: 공식 답변 전(WAITING)만 수정 허용. ANSWERED → 409
+		if (post.getStatus() != BoardPostStatus.WAITING) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "공식 답변이 등록된 게시글은 수정할 수 없습니다.");
+		}
+
+		// 4) 엔티티 필드 갱신. updated_at 은 JPA Auditing(`@LastModifiedDate`)에서 자동 설정
+		post.update(request.title(), request.type(), request.content());
+
+		// 5) 기존 이미지는 그대로 두고, 글+이미지로 응답 DTO 구성
+		List<BoardPostImage> images =
+			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
+		return BoardPostConverter.toResponse(post, images);
 	}
 
 	/**

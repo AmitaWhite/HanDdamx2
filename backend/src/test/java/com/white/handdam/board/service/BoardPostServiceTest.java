@@ -137,14 +137,14 @@ class BoardPostServiceTest {
 		given(boardPostRepository.save(any(BoardPost.class))).willAnswer(invocation -> {
 			BoardPost post = invocation.getArgument(0);
 			ReflectionTestUtils.setField(post, "id", 10L);
-			ReflectionTestUtils.setField(post, "createdAt", java.time.Instant.parse("2026-07-12T00:00:00Z"));
-			ReflectionTestUtils.setField(post, "updatedAt", java.time.Instant.parse("2026-07-12T00:00:00Z"));
+			ReflectionTestUtils.setField(post, "createdAt", java.time.LocalDateTime.parse("2026-07-12T00:00:00"));
+			ReflectionTestUtils.setField(post, "updatedAt", java.time.LocalDateTime.parse("2026-07-12T00:00:00"));
 			return post;
 		});
 		given(boardPostImageRepository.saveAll(anyList())).willAnswer(invocation -> {
 			List<BoardPostImage> images = invocation.getArgument(0);
 			ReflectionTestUtils.setField(images.getFirst(), "id", 100L);
-			ReflectionTestUtils.setField(images.getFirst(), "createdAt", java.time.Instant.parse("2026-07-12T00:00:00Z"));
+			ReflectionTestUtils.setField(images.getFirst(), "createdAt", java.time.LocalDateTime.parse("2026-07-12T00:00:00"));
 			return images;
 		});
 
@@ -220,7 +220,7 @@ class BoardPostServiceTest {
 			.orderIndex(0)
 			.build();
 		ReflectionTestUtils.setField(image, "id", 100L);
-		ReflectionTestUtils.setField(image, "createdAt", java.time.Instant.parse("2026-07-12T00:00:00Z"));
+		ReflectionTestUtils.setField(image, "createdAt", java.time.LocalDateTime.parse("2026-07-12T00:00:00"));
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(java.util.Optional.of(post));
 		given(paidSubscriptionChecker.hasActivePaidSubscription(subscriberId, creatorId)).willReturn(true);
@@ -347,8 +347,8 @@ class BoardPostServiceTest {
 			.status(BoardPostStatus.WAITING)
 			.build();
 		ReflectionTestUtils.setField(post, "id", 10L);
-		ReflectionTestUtils.setField(post, "createdAt", java.time.Instant.parse("2026-07-11T00:00:00Z"));
-		ReflectionTestUtils.setField(post, "updatedAt", java.time.Instant.parse("2026-07-11T00:00:00Z"));
+		ReflectionTestUtils.setField(post, "createdAt", java.time.LocalDateTime.parse("2026-07-11T00:00:00"));
+		ReflectionTestUtils.setField(post, "updatedAt", java.time.LocalDateTime.parse("2026-07-11T00:00:00"));
 		return post;
 	}
 }

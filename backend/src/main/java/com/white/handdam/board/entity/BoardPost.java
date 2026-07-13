@@ -1,5 +1,6 @@
 package com.white.handdam.board.entity;
 
+import com.white.handdam.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -7,10 +8,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "board_post")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class BoardPost {
+public class BoardPost extends BaseTimeEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,14 +48,8 @@ public class BoardPost {
 	@Column(name = "is_deleted", nullable = false)
 	private boolean deleted;
 
-	@Column(name = "created_at", nullable = false)
-	private Instant createdAt;
-
-	@Column(name = "updated_at", nullable = false)
-	private Instant updatedAt;
-
 	@Column(name = "deleted_at")
-	private Instant deletedAt;
+	private LocalDateTime deletedAt;
 
 	@Builder
 	private BoardPost(
@@ -74,21 +67,6 @@ public class BoardPost {
 		this.content = content;
 		this.status = status == null ? BoardPostStatus.WAITING : status;
 		this.deleted = false;
-	}
-
-	@PrePersist
-	void onCreate() {
-		Instant now = Instant.now();
-		this.createdAt = now;
-		this.updatedAt = now;
-		if (this.status == null) {
-			this.status = BoardPostStatus.WAITING;
-		}
-	}
-
-	@PreUpdate
-	void onUpdate() {
-		this.updatedAt = Instant.now();
 	}
 
 	/**
