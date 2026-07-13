@@ -238,7 +238,7 @@ public class BoardPostService {
 	}
 
 	// -------------------------------------------------------------------------
-	// 수정 — assertCanEditPost
+	// 수정 · 삭제 — assertCanEditPost (작성자)
 	// -------------------------------------------------------------------------
 
 	/**
@@ -280,7 +280,29 @@ public class BoardPostService {
 	}
 
 	/**
-	 * 게시글 수정: 작성자만 허용.
+	 * 유료 게시글 소프트 삭제.
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 작성자 권한 확인 (아니면 403)
+	 * 3. is_deleted=true, deleted_at 설정
+	 * </pre>
+	 */
+	@Transactional
+	public void deletePost(Long postId, Long requesterId) {
+		// 1) 아직 삭제되지 않은 글만. 없거나 이미 삭제됨 → 404
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		// 2) 작성자만 삭제 가능
+		assertCanEditPost(post, requesterId);
+
+		// 3) 소프트 삭제 (행은 유지, 목록·상세에서 제외)
+		post.softDelete();
+	}
+
+	/**
+	 * 게시글 수정·삭제: 작성자만 허용.
 	 * (작성자는 유료 구독자이거나 게시판 소유 크리에이터인 경우만 글을 쓸 수 있음)
 	 */
 	void assertCanEditPost(BoardPost post, Long requesterId) {

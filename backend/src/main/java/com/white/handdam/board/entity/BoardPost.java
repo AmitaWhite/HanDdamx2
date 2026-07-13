@@ -77,4 +77,12 @@ public class BoardPost extends BaseTimeEntity {
 		this.type = type;
 		this.content = content;
 	}
+
+	/**
+	 * 소프트 삭제: is_deleted=true, deleted_at 기록.
+	 */
+	public void softDelete() {
+		this.deleted = true;
+		this.deletedAt = LocalDateTime.now();
+	}
 }

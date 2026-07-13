@@ -5,12 +5,15 @@ import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.service.BoardPostService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -46,5 +49,19 @@ public class BoardPostController {
 		@Valid @RequestBody UpdateBoardPostRequest request
 	) {
 		return boardPostService.updatePost(postId, memberId, request);
+	}
+
+	/**
+	 * 유료 게시글 소프트 삭제.
+	 * 권한: 작성자
+	 */
+	@DeleteMapping("/{postId}")
+	//성고시 204 반환
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void deletePost(
+		@PathVariable Long postId,
+		@RequestHeader("X-Member-Id") Long memberId
+	) {
+		boardPostService.deletePost(postId, memberId);
 	}
 }
