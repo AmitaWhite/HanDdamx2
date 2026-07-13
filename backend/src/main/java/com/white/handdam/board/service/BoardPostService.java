@@ -67,6 +67,33 @@ public class BoardPostService {
 			.map(BoardPostConverter::toResponse);
 	}
 
+	// -------------------------------------------------------------------------
+	// 마이페이지 — 내가 작성한 글
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 내가 작성한 유료 게시판 글 목록 조회.
+	 *
+	 * <pre>
+	 * 1. 로그인 확인 (memberId null → 403)
+	 * 2. findByMember — member_id = 나, 삭제글 제외, type/status 필터 + 페이지네이션
+	 * 3. toResponse
+	 * </pre>
+	 */
+	public Page<BoardPostResponse> getMyPosts(
+		Long memberId,
+		BoardPostType type,
+		BoardPostStatus status,
+		Pageable pageable
+	) {
+		if (memberId == null) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+		}
+		return boardPostRepository
+			.findByMember(memberId, type, status, pageable)
+			.map(BoardPostConverter::toResponse);
+	}
+
 	/**
 	 * 유료 게시판 게시글 작성.
 	 *
@@ -290,7 +317,6 @@ public class BoardPostService {
 	 */
 	@Transactional
 	public void deletePost(Long postId, Long requesterId) {
-		// 1) 아직 삭제되지 않은 글만. 없거나 이미 삭제됨 → 404
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
 

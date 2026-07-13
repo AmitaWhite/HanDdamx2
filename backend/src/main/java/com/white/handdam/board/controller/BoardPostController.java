@@ -56,7 +56,7 @@ public class BoardPostController {
 	 * 권한: 작성자
 	 */
 	@DeleteMapping("/{postId}")
-	//성고시 204 반환
+	//성공시 204 반환
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deletePost(
 		@PathVariable Long postId,
