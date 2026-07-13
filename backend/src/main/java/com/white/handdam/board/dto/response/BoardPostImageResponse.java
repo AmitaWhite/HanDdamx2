@@ -1,6 +1,6 @@
 package com.white.handdam.board.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record BoardPostImageResponse(
 	Long id,
@@ -10,6 +10,6 @@ public record BoardPostImageResponse(
 	Long fileSize,
 	String mimeType,
 	int orderIndex,
-	LocalDateTime createdAt
+	Instant createdAt
 ) {
 }

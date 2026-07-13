@@ -9,7 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -49,7 +49,7 @@ public class BoardPost extends BaseTimeEntity {
 	private boolean deleted;
 
 	@Column(name = "deleted_at")
-	private LocalDateTime deletedAt;
+	private Instant deletedAt;
 
 	@Builder
 	private BoardPost(
@@ -83,6 +83,6 @@ public class BoardPost extends BaseTimeEntity {
 	 */
 	public void softDelete() {
 		this.deleted = true;
-		this.deletedAt = LocalDateTime.now();
+		this.deletedAt = Instant.now();
 	}
 }

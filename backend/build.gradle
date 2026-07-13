@@ -66,8 +66,9 @@ dependencies {
 	// ---------- Monitoring ----------
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-	// ---------- .env 로컬 환경변수 로딩 ----------
-	implementation "me.paulschwarz:spring-dotenv:${dotenvVersion}" // backend/.env 자동 로딩
+	// ---------- .env 로컬 환경변수 로딩 (Spring Boot 4 전용 모듈) ----------
+	implementation platform("me.paulschwarz:spring-dotenv-bom:${dotenvVersion}")
+	implementation 'me.paulschwarz:springboot4-dotenv' // backend/.env 자동 로딩
 
 	// ---------- Lombok ----------
 	compileOnly 'org.projectlombok:lombok'

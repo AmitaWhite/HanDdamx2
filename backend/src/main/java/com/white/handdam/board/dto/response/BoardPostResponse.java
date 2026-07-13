@@ -2,7 +2,7 @@ package com.white.handdam.board.dto.response;
 
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public record BoardPostResponse(
@@ -13,9 +13,9 @@ public record BoardPostResponse(
 	BoardPostType type,
 	String content,
 	BoardPostStatus status,
-	LocalDateTime createdAt,
-	LocalDateTime updatedAt,
-	LocalDateTime deletedAt,
+	Instant createdAt,
+	Instant updatedAt,
+	Instant deletedAt,
 	List<BoardPostImageResponse> images
 ) {
 }
