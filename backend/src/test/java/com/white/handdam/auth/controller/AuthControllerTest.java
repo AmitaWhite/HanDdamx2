@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerTest {
 
     private static final String URL = "/api/v1/auth/email-availability";
+    private static final String NICKNAME_URL = "/api/v1/auth/nickname-availability";
 
     @Autowired
     private MockMvc mockMvc;
@@ -68,6 +69,46 @@ class AuthControllerTest {
     @Disabled("400 매핑은 전역 예외 핸들러 도입 후 활성화 예정 - 현재는 500 발생")
     void shouldReturnBadRequestWhenEmailIsBlank() throws Exception {
         mockMvc.perform(get(URL).param("email", "   "))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("사용 가능한 닉네임이면 available=true와 200 반환")
+    void shouldReturnAvailableTrueWhenNicknameDoesNotExist() throws Exception {
+        given(authService.isNicknameAvailable("newNickname"))
+                .willReturn(true);
+
+        mockMvc.perform(get(NICKNAME_URL)
+                        .param("nickname", "newNickname"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
+    @DisplayName("이미 존재하는 닉네임이면 available=false와 200 반환")
+    void shouldReturnAvailableFalseWhenNicknameExists() throws Exception {
+        given(authService.isNicknameAvailable("takenNickname"))
+                .willReturn(false);
+
+        mockMvc.perform(get(NICKNAME_URL)
+                        .param("nickname", "takenNickname"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
+    @Test
+    @Disabled("400 매핑은 전역 예외 핸들러 도입 후 활성화 예정 - 현재는 500 발생")
+    @DisplayName("닉네임이 공백이면 400 반환")
+    void shouldReturnBadRequestWhenNicknameIsBlank() throws Exception {
+        mockMvc.perform(get(NICKNAME_URL)
+                        .param("nickname", "   "))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("닉네임 파라미터가 없으면 400 반환")
+    void shouldReturnBadRequestWhenNicknameParameterIsMissing() throws Exception {
+        mockMvc.perform(get(NICKNAME_URL))
                 .andExpect(status().isBadRequest());
     }
 

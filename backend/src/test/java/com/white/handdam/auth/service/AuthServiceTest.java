@@ -40,4 +40,25 @@ class AuthServiceTest {
         assertThat(available).isFalse();
     }
 
+    @Test
+    @DisplayName("사용 가능한 닉네임이면 true 반환")
+    void shouldReturnTrueWhenNicknameDoesNotExist() {
+        given(memberRepository.existsByNickname("newNickname"))
+                .willReturn(false);
+
+        boolean available = authService.isNicknameAvailable("newNickname");
+
+        assertThat(available).isTrue();
+    }
+
+    @Test
+    @DisplayName("이미 존재하는 닉네임이면 false 반환")
+    void shouldReturnFalseWhenNicknameExists() {
+        given(memberRepository.existsByNickname("takenNickname"))
+                .willReturn(true);
+
+        boolean available = authService.isNicknameAvailable("takenNickname");
+
+        assertThat(available).isFalse();
+    }
 }
