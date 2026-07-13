@@ -1,4 +1,4 @@
-package com.white.handdam.auth.entity;
+package com.white.handdam.member.entity;
 
 public enum OAuthProvider {
     NONE,

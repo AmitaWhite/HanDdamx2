@@ -1,6 +1,6 @@
-package com.white.handdam.auth.repository;
+package com.white.handdam.member.repository;
 
-import com.white.handdam.auth.entity.Member;
+import com.white.handdam.member.entity.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

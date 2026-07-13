@@ -1,4 +1,4 @@
-package com.white.handdam.auth.entity;
+package com.white.handdam.member.entity;
 
 import com.white.handdam.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;

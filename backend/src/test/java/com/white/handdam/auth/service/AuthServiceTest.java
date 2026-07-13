@@ -1,6 +1,6 @@
 package com.white.handdam.auth.service;
 
-import com.white.handdam.auth.repository.MemberRepository;
+import com.white.handdam.member.repository.MemberRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

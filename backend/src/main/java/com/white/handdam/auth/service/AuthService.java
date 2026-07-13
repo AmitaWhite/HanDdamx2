@@ -1,6 +1,6 @@
 package com.white.handdam.auth.service;
 
-import com.white.handdam.auth.repository.MemberRepository;
+import com.white.handdam.member.repository.MemberRepository;
 import com.white.handdam.auth.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
