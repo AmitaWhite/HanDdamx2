@@ -75,6 +75,7 @@ dependencies {
 
 	// ---------- Test ----------
 	testImplementation 'org.springframework.boot:spring-boot-starter-test' // JUnit5, Mockito, MockMvc 포함
+	testImplementation 'org.springframework.boot:spring-boot-webmvc-test' // @WebMvcTest
 	testImplementation 'org.springframework.security:spring-security-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
