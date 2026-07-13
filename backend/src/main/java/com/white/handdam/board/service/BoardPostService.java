@@ -3,6 +3,7 @@ package com.white.handdam.board.service;
 import com.white.handdam.board.converter.BoardPostConverter;
 import com.white.handdam.board.dto.request.CreateBoardPostRequest;
 import com.white.handdam.board.dto.request.UpdateBoardPostRequest;
+import com.white.handdam.board.dto.response.BoardPostImageResponse;
 import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
@@ -130,12 +131,60 @@ public class BoardPostService {
 			.build();
 
 		BoardPost saved = boardPostRepository.save(post);
-		List<BoardPostImage> images = uploadAndSaveImages(saved, creatorId, imageFiles);
+		List<BoardPostImage> images = uploadAndSaveImages(saved, creatorId, imageFiles, 0);
 		return BoardPostConverter.toResponse(saved, images);
 	}
 
+	// -------------------------------------------------------------------------
+	// 이미지 추가 — assertCanEditPost (작성자) + WAITING
+	// -------------------------------------------------------------------------
+
 	/**
-	 * 게시글 이미지 처리. (`createPost`에서 호출)
+	 * 기존 게시글에 이미지 추가.
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 작성자 권한 확인 (아니면 403)
+	 * 3. status == WAITING 확인 (아니면 409) — 공식 답변 전만 수정·이미지 추가
+	 * 4. 유효 이미지 파일 확인 (없으면 400)
+	 * 5. 기존 max(order_index)+1 부터 이어 붙여 S3 업로드 + DB 저장
+	 * 6. 추가된 이미지 DTO 목록 반환
+	 * </pre>
+	 */
+	@Transactional
+	public List<BoardPostImageResponse> addImages(
+		Long postId,
+		Long requesterId,
+		List<MultipartFile> imageFiles
+	) {
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		assertCanEditPost(post, requesterId);
+
+		if (post.getStatus() != BoardPostStatus.WAITING) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "공식 답변이 등록된 게시글은 이미지를 추가할 수 없습니다.");
+		}
+
+		int nextOrderIndex = boardPostImageRepository.findMaxOrderIndexByBoardPostId(postId)
+			.map(max -> max + 1)
+			.orElse(0);
+
+		List<BoardPostImage> saved = uploadAndSaveImages(
+			post,
+			post.getCreatorId(),
+			imageFiles,
+			nextOrderIndex
+		);
+		if (saved.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 이미지가 없습니다.");
+		}
+
+		return saved.stream().map(BoardPostConverter::toImageResponse).toList();
+	}
+
+	/**
+	 * 게시글 이미지 처리. (`createPost` / `addImages`에서 호출)
 	 *
 	 * <pre>
 	 * 각 파일마다:
@@ -144,18 +193,20 @@ public class BoardPostService {
 	 * 3. saveAll               — board_post_image 테이블에 일괄 INSERT
 	 * </pre>
 	 *
-	 * order_index 는 업로드 순서(0, 1, 2...)로 부여한다.
+	 * order_index 는 startOrderIndex 부터 업로드 순으로 부여한다.
 	 * created_at 은 JPA Auditing(`BaseCreatedAtEntity`)에서 자동 설정된다.
 	 *
-	 * @param post        이미 저장된 board_post (id 필요 — 이미지 FK)
-	 * @param creatorId   S3 폴더 경로에 사용 (premium-board/{creatorId}/...)
-	 * @param imageFiles  multipart 이미지 목록 (null/빈 목록이면 이미지 없이 종료)
-	 * @return            DB에 저장된 BoardPostImage 목록 (없으면 빈 리스트)
+	 * @param post             이미 저장된 board_post (id 필요 — 이미지 FK)
+	 * @param creatorId        S3 폴더 경로에 사용 (premium-board/{creatorId}/...)
+	 * @param imageFiles       multipart 이미지 목록 (null/빈 목록이면 이미지 없이 종료)
+	 * @param startOrderIndex  첫 이미지의 order_index
+	 * @return                 DB에 저장된 BoardPostImage 목록 (없으면 빈 리스트)
 	 */
 	private List<BoardPostImage> uploadAndSaveImages(
 		BoardPost post,
 		Long creatorId,
-		List<MultipartFile> imageFiles
+		List<MultipartFile> imageFiles,
+		int startOrderIndex
 	) {
 		// 첨부 없음 → 이미지 없이 글만 작성된 경우. DB/S3 작업 생략
 		if (imageFiles == null || imageFiles.isEmpty()) {
@@ -166,8 +217,8 @@ public class BoardPostService {
 		String folder = "premium-board/" + creatorId;
 		// 업로드 성공한 이미지 엔티티를 모아둘 리스트
 		List<BoardPostImage> images = new ArrayList<>();
-		// 화면 노출 순서 시작값 (0부터 증가)
-		int orderIndex = 0;
+		// 화면 노출 순서 (기존 이미지가 있으면 max+1부터 이어 붙임)
+		int orderIndex = startOrderIndex;
 
 		for (MultipartFile file : imageFiles) {
 			// multipart 빈 part(파일 미선택 등)는 건너뜀
