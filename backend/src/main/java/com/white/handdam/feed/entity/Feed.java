@@ -39,6 +39,7 @@ public class Feed extends BaseTimeEntity {
     @Column(name = "like_count", nullable = false)
     private long likeCount = 0;
 
+    // [LYJ-001] 피드 생성
     public static Feed create(Long projectId, String title, String content, Visibility visibility) {
         Feed f = new Feed();
         f.projectId = projectId;
@@ -46,5 +47,12 @@ public class Feed extends BaseTimeEntity {
         f.content = content;
         f.visibility = visibility;
         return f;
+    }
+
+    // [LYJ-003] 피드 수정
+    public void update(String title, String content, Visibility visibility) {
+        this.title = title;
+        this.content = content;
+        this.visibility = visibility;
     }
 }

@@ -1,6 +1,7 @@
 package com.white.handdam.feed.controller;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedIdResponse;
 import com.white.handdam.feed.service.FeedService;
@@ -41,5 +42,15 @@ public class FeedController {
             @RequestHeader(value = "X-Member-Id", required = false) Long memberId
     ) {
         return ApiResponse.success(feedService.getFeed(feedId, memberId));
+    }
+
+    // [LYJ-003] PATCH /api/feeds/{feedId}
+    @PatchMapping("/{feedId}")
+    public ApiResponse<FeedIdResponse> updateFeed(
+            @PathVariable Long feedId,
+            @RequestHeader("X-Member-Id") Long memberId,
+            @Valid @RequestBody FeedUpdateRequest request
+    ) {
+        return ApiResponse.success(new FeedIdResponse(feedService.updateFeed(feedId, memberId, request)));
     }
 }

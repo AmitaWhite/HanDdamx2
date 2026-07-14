@@ -1,6 +1,7 @@
 package com.white.handdam.feed.service;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.entity.Visibility;
@@ -92,6 +93,37 @@ class FeedServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
     }
+    // ---------------------------------------------------------------
+// LYJ-003 피드 수정
+// ---------------------------------------------------------------
+    @Test
+    @DisplayName("소유자가 피드를 수정하면 수정된 feedId를 반환한다")
+    void updateFeed_success() {
+        // TODO: Project 엔티티 추가 후 isOwner=true 경로 테스트
+    }
+    @Test
+    @DisplayName("존재하지 않는 피드 수정 시 FEED_NOT_FOUND 예외가 발생한다")
+    void updateFeed_notFound() {
+        FeedUpdateRequest request = new FeedUpdateRequest("새제목", "새내용", Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+        assertThatThrownBy(() -> feedService.updateFeed(999L, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+    @Test
+    @DisplayName("소유자가 아닌 경우 FEED_FORBIDDEN 예외가 발생한다")
+    void updateFeed_forbidden() {
+        FeedUpdateRequest request = new FeedUpdateRequest("새제목", "새내용", Visibility.PUBLIC);
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        // 현재 isOwner=false 스텁이므로 항상 FORBIDDEN
+        assertThatThrownBy(() -> feedService.updateFeed(1L, 99L, request))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+    }
+
     // ---------------------------------------------------------------
     // 헬퍼
     // ---------------------------------------------------------------

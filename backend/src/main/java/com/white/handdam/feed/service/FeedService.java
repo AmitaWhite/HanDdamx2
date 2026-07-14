@@ -1,6 +1,7 @@
 package com.white.handdam.feed.service;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.entity.Visibility;
@@ -45,5 +46,17 @@ public class FeedService {
             case FREE_SUBSCRIBER -> "FREE".equals(level) || "PAID".equals(level);
             case PAID_SUBSCRIBER -> "PAID".equals(level);
         };
+    }
+
+    // [LYJ-003] 피드 수정
+    @Transactional
+    public Long updateFeed(Long feedId, Long memberId, FeedUpdateRequest request) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        // TODO [LYJ-003] Project 엔티티 생성 후 소유권 검증 활성화
+        boolean isOwner = false; // TODO: Project 추가 후 교체
+        if (!isOwner) throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        feed.update(request.title(), request.content(), request.visibility());
+        return feed.getId();
     }
 }
