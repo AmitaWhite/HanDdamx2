@@ -54,7 +54,7 @@ public class AuthService {
         }
 
         // 닉네임 중복 확인
-        if (memberRepository.existsByNickname(normalizedEmail)) {
+        if (memberRepository.existsByNickname(request.nickname())) {
             throw new CustomException(AuthErrorCode.DUPLICATE_NICKNAME);
         }
 
