@@ -87,4 +87,5 @@ public class Member extends BaseTimeEntity {
         return emailVerifiedAt != null;
     }
 
+    public void changeRoleToCreator() { this.role = Role.CREATOR; }
 }
