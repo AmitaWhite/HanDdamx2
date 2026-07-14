@@ -21,6 +21,7 @@ public class S3Config {
 	/**
 	 * S3Client 빈 생성.
 	 * AwsProperties 의 region / credentials / endpoint 로 클라이언트를 조립한다.
+	 * 어느 리전으로, 어떤 계정(키)으로 S3 API를 호출할지를 클라이언트에 박아 두는 단계
 	 */
 	@Bean
 	public S3Client s3Client(AwsProperties awsProperties) {
@@ -36,7 +37,7 @@ public class S3Config {
 				)
 			));
 
-		// LocalStack 등 커스텀 엔드포인트가 있으면 실제 AWS 대신 그 주소로 요청
+		// 설정에 endpoint가 있으면 로컬 가짜 S3로, 없으면 진짜 AWS로 같은 S3Client 코드를 쓰게 하는 부분
 		String endpoint = awsProperties.getS3().getEndpoint();
 		if (endpoint != null && !endpoint.isBlank()) {
 			builder
