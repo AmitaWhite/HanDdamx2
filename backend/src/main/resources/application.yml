@@ -118,6 +118,12 @@ spring:
   flyway:
     enabled: false
 
+  mail:
+    host: smtp.test.local
+    port: 587
+    username: test
+    password: test
+
 jwt:
   secret: test_secret_do_not_use_in_prod
   access-expiration: 3600000
