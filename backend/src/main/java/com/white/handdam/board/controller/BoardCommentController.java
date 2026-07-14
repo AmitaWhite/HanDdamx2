@@ -1,12 +1,18 @@
 package com.white.handdam.board.controller;
 
+import com.white.handdam.board.dto.request.CreateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.service.BoardCommentService;
 import com.white.handdam.global.response.ApiResponse;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,5 +34,19 @@ public class BoardCommentController {
 		@RequestHeader("X-Member-Id") Long memberId
 	) {
 		return ApiResponse.success(boardCommentService.getComments(postId, memberId));
+	}
+
+	/**
+	 * 일반 댓글 작성 (BOARD-013).
+	 * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 */
+	@PostMapping
+	public ResponseEntity<ApiResponse<BoardCommentResponse>> createComment(
+		@PathVariable Long postId,
+		@RequestHeader("X-Member-Id") Long memberId,
+		@Valid @RequestBody CreateBoardCommentRequest request
+	) {
+		BoardCommentResponse response = boardCommentService.createComment(postId, memberId, request);
+		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
 	}
 }

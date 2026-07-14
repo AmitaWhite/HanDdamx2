@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.white.handdam.board.dto.request.CreateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.entity.BoardComment;
 import com.white.handdam.board.entity.BoardPost;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -98,6 +100,122 @@ class BoardCommentServiceTest {
 			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
 
 		verify(boardCommentRepository, never()).findByBoardPostIdOrderByCreatedAtAsc(any());
+	}
+
+	@Test
+	@DisplayName("유료 구독자는 일반 댓글을 작성할 수 있다")
+	void paidSubscriberCanCreateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long subscriberId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		CreateBoardCommentRequest request = new CreateBoardCommentRequest("유료 구독자 댓글");
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, subscriberId);
+		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
+			BoardComment comment = invocation.getArgument(0);
+			ReflectionTestUtils.setField(comment, "id", 200L);
+			ReflectionTestUtils.setField(comment, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+			ReflectionTestUtils.setField(comment, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+			return comment;
+		});
+
+		BoardCommentResponse response = boardCommentService.createComment(10L, subscriberId, request);
+
+		assertThat(response.id()).isEqualTo(200L);
+		assertThat(response.boardPostId()).isEqualTo(10L);
+		assertThat(response.memberId()).isEqualTo(subscriberId);
+		assertThat(response.parentCommentId()).isNull();
+		assertThat(response.depth()).isEqualTo((short) 0);
+		assertThat(response.content()).isEqualTo("유료 구독자 댓글");
+		assertThat(response.replies()).isEmpty();
+
+		ArgumentCaptor<BoardComment> captor = ArgumentCaptor.forClass(BoardComment.class);
+		verify(boardCommentRepository).save(captor.capture());
+		assertThat(captor.getValue().getParentComment()).isNull();
+		assertThat(captor.getValue().getDepth()).isEqualTo((short) 0);
+	}
+
+	@Test
+	@DisplayName("글 작성자는 일반 댓글을 작성할 수 있다")
+	void authorCanCreateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		CreateBoardCommentRequest request = new CreateBoardCommentRequest("작성자 댓글");
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, authorId);
+		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
+			BoardComment comment = invocation.getArgument(0);
+			ReflectionTestUtils.setField(comment, "id", 201L);
+			ReflectionTestUtils.setField(comment, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+			ReflectionTestUtils.setField(comment, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+			return comment;
+		});
+
+		BoardCommentResponse response = boardCommentService.createComment(10L, authorId, request);
+
+		assertThat(response.memberId()).isEqualTo(authorId);
+		assertThat(response.content()).isEqualTo("작성자 댓글");
+		verify(boardPostService).assertCanAccessPost(post, authorId);
+	}
+
+	@Test
+	@DisplayName("게시판 크리에이터는 일반 댓글을 작성할 수 있다")
+	void creatorCanCreateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		CreateBoardCommentRequest request = new CreateBoardCommentRequest("크리에이터 댓글");
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, creatorId);
+		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
+			BoardComment comment = invocation.getArgument(0);
+			ReflectionTestUtils.setField(comment, "id", 202L);
+			ReflectionTestUtils.setField(comment, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+			ReflectionTestUtils.setField(comment, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+			return comment;
+		});
+
+		BoardCommentResponse response = boardCommentService.createComment(10L, creatorId, request);
+
+		assertThat(response.memberId()).isEqualTo(creatorId);
+		assertThat(response.content()).isEqualTo("크리에이터 댓글");
+		verify(boardPostService).assertCanAccessPost(post, creatorId);
+	}
+
+	@Test
+	@DisplayName("권한이 없으면 댓글을 작성할 수 없다")
+	void deniedCannotCreateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long strangerId = 7L;
+		BoardPost post = samplePost(creatorId, authorId);
+		CreateBoardCommentRequest request = new CreateBoardCommentRequest("권한 없는 댓글");
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		willThrow(new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED))
+			.given(boardPostService).assertCanAccessPost(post, strangerId);
+
+		assertThatThrownBy(() -> boardCommentService.createComment(10L, strangerId, request))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+
+		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("삭제된 게시글에는 댓글을 작성할 수 없다")
+	void deletedPostCannotCreateComment() {
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() ->
+			boardCommentService.createComment(10L, 1L, new CreateBoardCommentRequest("댓글"))
+		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+
+		verify(boardCommentRepository, never()).save(any());
 	}
 
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
