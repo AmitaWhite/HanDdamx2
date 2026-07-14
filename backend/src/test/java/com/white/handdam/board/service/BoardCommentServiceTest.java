@@ -15,6 +15,7 @@ import com.white.handdam.board.entity.BoardComment;
 import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardCommentRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
 import com.white.handdam.global.exception.CommonErrorCode;
@@ -213,6 +214,161 @@ class BoardCommentServiceTest {
 
 		assertThatThrownBy(() ->
 			boardCommentService.createComment(10L, 1L, new CreateBoardCommentRequest("댓글"))
+		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+
+		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("유료 구독자는 대댓글을 작성할 수 있다")
+	void paidSubscriberCanCreateReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long subscriberId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment parent = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+		CreateBoardCommentRequest request = new CreateBoardCommentRequest("유료 구독자 대댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, subscriberId);
+		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
+			BoardComment comment = invocation.getArgument(0);
+			ReflectionTestUtils.setField(comment, "id", 300L);
+			ReflectionTestUtils.setField(comment, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+			ReflectionTestUtils.setField(comment, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+			return comment;
+		});
+
+		BoardCommentResponse response = boardCommentService.createReply(100L, subscriberId, request);
+
+		assertThat(response.id()).isEqualTo(300L);
+		assertThat(response.boardPostId()).isEqualTo(10L);
+		assertThat(response.memberId()).isEqualTo(subscriberId);
+		assertThat(response.parentCommentId()).isEqualTo(100L);
+		assertThat(response.depth()).isEqualTo((short) 1);
+		assertThat(response.content()).isEqualTo("유료 구독자 대댓글");
+
+		ArgumentCaptor<BoardComment> captor = ArgumentCaptor.forClass(BoardComment.class);
+		verify(boardCommentRepository).save(captor.capture());
+		assertThat(captor.getValue().getParentComment().getId()).isEqualTo(100L);
+		assertThat(captor.getValue().getDepth()).isEqualTo((short) 1);
+	}
+
+	@Test
+	@DisplayName("글 작성자는 대댓글을 작성할 수 있다")
+	void authorCanCreateReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment parent = sampleComment(post, 100L, creatorId, null, (short) 0, "부모 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, authorId);
+		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
+			BoardComment comment = invocation.getArgument(0);
+			ReflectionTestUtils.setField(comment, "id", 301L);
+			ReflectionTestUtils.setField(comment, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+			ReflectionTestUtils.setField(comment, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+			return comment;
+		});
+
+		BoardCommentResponse response =
+			boardCommentService.createReply(100L, authorId, new CreateBoardCommentRequest("작성자 대댓글"));
+
+		assertThat(response.memberId()).isEqualTo(authorId);
+		assertThat(response.parentCommentId()).isEqualTo(100L);
+		verify(boardPostService).assertCanAccessPost(post, authorId);
+	}
+
+	@Test
+	@DisplayName("게시판 크리에이터는 대댓글을 작성할 수 있다")
+	void creatorCanCreateReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment parent = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, creatorId);
+		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
+			BoardComment comment = invocation.getArgument(0);
+			ReflectionTestUtils.setField(comment, "id", 302L);
+			ReflectionTestUtils.setField(comment, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+			ReflectionTestUtils.setField(comment, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+			return comment;
+		});
+
+		BoardCommentResponse response =
+			boardCommentService.createReply(100L, creatorId, new CreateBoardCommentRequest("크리에이터 대댓글"));
+
+		assertThat(response.memberId()).isEqualTo(creatorId);
+		assertThat(response.depth()).isEqualTo((short) 1);
+		verify(boardPostService).assertCanAccessPost(post, creatorId);
+	}
+
+	@Test
+	@DisplayName("권한이 없으면 대댓글을 작성할 수 없다")
+	void deniedCannotCreateReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long strangerId = 7L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment parent = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
+		willThrow(new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED))
+			.given(boardPostService).assertCanAccessPost(post, strangerId);
+
+		assertThatThrownBy(() ->
+			boardCommentService.createReply(100L, strangerId, new CreateBoardCommentRequest("대댓글"))
+		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+
+		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 부모 댓글에는 대댓글을 작성할 수 없다")
+	void missingParentCannotCreateReply() {
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() ->
+			boardCommentService.createReply(100L, 1L, new CreateBoardCommentRequest("대댓글"))
+		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+
+		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("대댓글에는 다시 답글을 달 수 없다")
+	void cannotReplyToReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment root = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+		BoardComment reply = sampleComment(post, 101L, creatorId, root, (short) 1, "대댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(101L)).willReturn(Optional.of(reply));
+
+		assertThatThrownBy(() ->
+			boardCommentService.createReply(101L, authorId, new CreateBoardCommentRequest("대대댓글"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_REPLY_DEPTH_EXCEEDED));
+
+		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("삭제된 게시글의 댓글에는 대댓글을 작성할 수 없다")
+	void deletedPostCannotCreateReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		post.softDelete();
+		BoardComment parent = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
+
+		assertThatThrownBy(() ->
+			boardCommentService.createReply(100L, authorId, new CreateBoardCommentRequest("대댓글"))
 		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
 
 		verify(boardCommentRepository, never()).save(any());
