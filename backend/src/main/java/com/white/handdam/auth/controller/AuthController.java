@@ -3,9 +3,11 @@ package com.white.handdam.auth.controller;
 import com.white.handdam.auth.dto.response.EmailAvailabilityResponse;
 import com.white.handdam.auth.dto.response.NicknameAvailabilityResponse;
 import com.white.handdam.auth.service.AuthService;
+import com.white.handdam.global.response.ApiResponse;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,16 +24,20 @@ public class AuthController {
 
     // KSY-001
     @GetMapping("/email-availability")
-    public EmailAvailabilityResponse checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
-        return new EmailAvailabilityResponse(authService.isEmailAvailable(email));
+    public ResponseEntity<ApiResponse<EmailAvailabilityResponse>> checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
+        EmailAvailabilityResponse response = new EmailAvailabilityResponse(
+                authService.isEmailAvailable(email)
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     // KSY-002
     @GetMapping("/nickname-availability")
-    public NicknameAvailabilityResponse checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
-        return new NicknameAvailabilityResponse(authService.isNicknameAvailable(nickname));
+    public ResponseEntity<ApiResponse<NicknameAvailabilityResponse>> checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
+        NicknameAvailabilityResponse response = new NicknameAvailabilityResponse(
+                authService.isNicknameAvailable(nickname)
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
-
-
 
 }
