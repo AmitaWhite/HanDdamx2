@@ -64,4 +64,23 @@ public class AuthService {
         return SignupResponse.from(member);
     }
 
+    // KSY-004
+    @Transactional
+    public void sendVerificationEmail(String email) {
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        memberRepository.findByEmail(normalizedEmail).ifPresent(member -> {
+            // 이미 인증된 회원이면 무시
+            if (member.isEmailVerified()) return;
+
+            emailVerificationService.issueAndSend(
+                    member.getId(),
+                    member.getEmail(),
+                    member.getNickname(),
+                    VerificationPurpose.SIGNUP
+            );
+
+        });
+    }
+
 }
