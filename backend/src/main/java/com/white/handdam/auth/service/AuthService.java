@@ -2,6 +2,7 @@ package com.white.handdam.auth.service;
 
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.SignupResponse;
+import com.white.handdam.auth.entity.EmailVerification;
 import com.white.handdam.auth.entity.VerificationPurpose;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.exception.CustomException;
@@ -81,6 +82,16 @@ public class AuthService {
             );
 
         });
+    }
+
+    // KSY-005
+    @Transactional
+    public void confirmSignupVerification(String rawToken) {
+        EmailVerification ev = emailVerificationService.confirm(rawToken, VerificationPurpose.SIGNUP);
+
+        memberRepository.findById(ev.getMemberId())
+                .orElseThrow(() -> new  CustomException(AuthErrorCode.MEMBER_NOT_FOUND))
+                .markEmailVerified();
     }
 
 }

@@ -1,5 +1,6 @@
 package com.white.handdam.auth.controller;
 
+import com.white.handdam.auth.dto.request.EmailVerificationConfirmRequest;
 import com.white.handdam.auth.dto.request.EmailVerificationRequest;
 import com.white.handdam.auth.service.AuthService;
 import com.white.handdam.global.response.ApiResponse;
@@ -22,6 +23,13 @@ public class EmailVerificationController {
     @PostMapping
     public ResponseEntity<ApiResponse<Void>> sendVerificationEmail(@Valid @RequestBody EmailVerificationRequest request) {
         authService.sendVerificationEmail(request.email());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    // KSY-005
+    @PostMapping("/confirm")
+    public ResponseEntity<ApiResponse<Void>> confirmVerificationEmail(@Valid @RequestBody EmailVerificationConfirmRequest request) {
+        authService.confirmSignupVerification(request.token());
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
