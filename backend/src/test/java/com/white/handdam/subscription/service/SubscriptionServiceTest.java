@@ -1,6 +1,8 @@
 package com.white.handdam.subscription.service;
 
-import com.white.handdam.global.exception.CommonErrorCode;
+import com.white.handdam.creator.entity.CreatorProfile;
+import com.white.handdam.creator.exception.CreatorErrorCode;
+import com.white.handdam.creator.repository.CreatorProfileRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.entity.Role;
@@ -13,9 +15,7 @@ import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
 import com.white.handdam.subscription.exception.SubscriptionErrorCode;
-import com.white.handdam.subscription.repository.SubscriptionPlanQueryRepository;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
-import com.white.handdam.subscription.repository.projection.CreatorSubscriptionPlanProjection;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,7 +58,7 @@ class SubscriptionServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
-    private SubscriptionPlanQueryRepository subscriptionPlanQueryRepository;
+    private CreatorProfileRepository creatorProfileRepository;
 
     @InjectMocks
     private SubscriptionService subscriptionService;
@@ -277,8 +277,8 @@ class SubscriptionServiceTest {
                 .isInstanceOfSatisfying(
                         CustomException.class,
                         exception -> {
-                            assertThat(exception.getErrorCode()).isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND);
-                            assertThat(exception).hasMessage("크리에이터를 찾을 수 없습니다.");
+                            assertThat(exception.getErrorCode()).isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND);
+                            assertThat(exception).hasMessage(CreatorErrorCode.CREATOR_NOT_FOUND.getMessage());
                         }
                 );
     }
@@ -335,7 +335,7 @@ class SubscriptionServiceTest {
                 .isInstanceOfSatisfying(
                         CustomException.class,
                         exception -> assertThat(exception.getErrorCode())
-                                .isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND)
+                                .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND)
                 );
     }
 
@@ -343,12 +343,8 @@ class SubscriptionServiceTest {
     @DisplayName("getSubscriptionPlans returns free and active paid plans")
     void getSubscriptionPlansReturnsFreeAndActivePaidPlans() {
         when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR)));
-        when(subscriptionPlanQueryRepository.findByCreatorId(CREATOR_ID))
-                .thenReturn(Optional.of(new CreatorSubscriptionPlanProjection(
-                        CREATOR_ID,
-                        10000,
-                        "monthly benefits"
-                )));
+        when(creatorProfileRepository.findByMemberId(CREATOR_ID))
+                .thenReturn(Optional.of(creatorProfile(CREATOR_ID, 10000, "monthly benefits")));
 
         List<SubscriptionPlanResponse> responses = subscriptionService.getSubscriptionPlans(CREATOR_ID);
 
@@ -367,8 +363,8 @@ class SubscriptionServiceTest {
     @DisplayName("getSubscriptionPlans includes an inactive paid plan when price is zero")
     void getSubscriptionPlansIncludesInactivePaidPlan() {
         when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR)));
-        when(subscriptionPlanQueryRepository.findByCreatorId(CREATOR_ID))
-                .thenReturn(Optional.of(new CreatorSubscriptionPlanProjection(CREATOR_ID, 0, null)));
+        when(creatorProfileRepository.findByMemberId(CREATOR_ID))
+                .thenReturn(Optional.of(creatorProfile(CREATOR_ID, 0, null)));
 
         List<SubscriptionPlanResponse> responses = subscriptionService.getSubscriptionPlans(CREATOR_ID);
 
@@ -380,19 +376,64 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    @DisplayName("getSubscriptionPlans rejects missing creator profile")
-    void getSubscriptionPlansRejectsMissingCreatorProfile() {
-        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR)));
-        when(subscriptionPlanQueryRepository.findByCreatorId(CREATOR_ID)).thenReturn(Optional.empty());
+    @DisplayName("getSubscriptionPlans rejects missing creator member")
+    void getSubscriptionPlansRejectsMissingCreatorMember() {
+        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> subscriptionService.getSubscriptionPlans(CREATOR_ID))
                 .isInstanceOfSatisfying(
                         CustomException.class,
                         exception -> {
-                            assertThat(exception.getErrorCode()).isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND);
-                            assertThat(exception).hasMessage("구독 플랜 정보를 찾을 수 없습니다.");
+                            assertThat(exception.getErrorCode()).isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND);
+                            assertThat(exception).hasMessage(CreatorErrorCode.CREATOR_NOT_FOUND.getMessage());
                         }
                 );
+        verify(creatorProfileRepository, never()).findByMemberId(any());
+    }
+
+    @Test
+    @DisplayName("getSubscriptionPlans rejects a non creator member")
+    void getSubscriptionPlansRejectsNonCreatorMember() {
+        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.USER)));
+
+        assertThatThrownBy(() -> subscriptionService.getSubscriptionPlans(CREATOR_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> {
+                            assertThat(exception.getErrorCode()).isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND);
+                            assertThat(exception).hasMessage(CreatorErrorCode.CREATOR_NOT_FOUND.getMessage());
+                        }
+                );
+        verify(creatorProfileRepository, never()).findByMemberId(any());
+    }
+
+    @Test
+    @DisplayName("getSubscriptionPlans rejects missing creator profile")
+    void getSubscriptionPlansRejectsMissingCreatorProfile() {
+        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR)));
+        when(creatorProfileRepository.findByMemberId(CREATOR_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.getSubscriptionPlans(CREATOR_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> {
+                            assertThat(exception.getErrorCode()).isEqualTo(
+                                    CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND
+                            );
+                            assertThat(exception).hasMessage(
+                                    CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND.getMessage()
+                            );
+                        }
+                );
+        verify(creatorProfileRepository).findByMemberId(CREATOR_ID);
+    }
+
+    private CreatorProfile creatorProfile(Long memberId, int subscriptionPrice, String benefitsDescription) {
+        return CreatorProfile.builder()
+                .memberId(memberId)
+                .subscriptionPrice(subscriptionPrice)
+                .benefitsDescription(benefitsDescription)
+                .build();
     }
 
     private Subscription freeSubscription(Long subscriptionId, Long creatorId, Instant startedAt) {

@@ -1,6 +1,6 @@
 package com.white.handdam.subscription.controller;
 
-import com.white.handdam.global.exception.CommonErrorCode;
+import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.GlobalExceptionHandler;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
@@ -249,18 +249,34 @@ class SubscriptionControllerTest {
     @DisplayName("GET subscription plans creator error returns common error response")
     void getSubscriptionPlansRejectsMissingCreator() throws Exception {
         when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
-                .thenThrow(new CustomException(
-                        CommonErrorCode.RESOURCE_NOT_FOUND,
-                        "크리에이터를 찾을 수 없습니다."
-                ));
+                .thenThrow(new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
 
         mockMvc.perform(get("/api/creators/{creatorId}/subscription-plans", CREATOR_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.data").value(nullValue()))
-                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"))
-                .andExpect(jsonPath("$.error.message").value("크리에이터를 찾을 수 없습니다."))
+                .andExpect(jsonPath("$.error.code").value("CREATOR_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message").value(CreatorErrorCode.CREATOR_NOT_FOUND.getMessage()))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(subscriptionService).getSubscriptionPlans(CREATOR_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription plans missing creator profile returns common error response")
+    void getSubscriptionPlansRejectsMissingCreatorProfile() throws Exception {
+        when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
+                .thenThrow(new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/creators/{creatorId}/subscription-plans", CREATOR_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("CREATOR_PROFILE_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message")
+                        .value(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND.getMessage()))
                 .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
 
         verify(subscriptionService).getSubscriptionPlans(CREATOR_ID);

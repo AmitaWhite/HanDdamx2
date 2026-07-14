@@ -1,6 +1,8 @@
 package com.white.handdam.subscription.service;
 
-import com.white.handdam.global.exception.CommonErrorCode;
+import com.white.handdam.creator.entity.CreatorProfile;
+import com.white.handdam.creator.exception.CreatorErrorCode;
+import com.white.handdam.creator.repository.CreatorProfileRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.entity.Role;
@@ -11,9 +13,7 @@ import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.exception.SubscriptionErrorCode;
-import com.white.handdam.subscription.repository.SubscriptionPlanQueryRepository;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
-import com.white.handdam.subscription.repository.projection.CreatorSubscriptionPlanProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +28,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SubscriptionService {
 
-    private static final String CREATOR_NOT_FOUND_MESSAGE = "크리에이터를 찾을 수 없습니다.";
-    private static final String SUBSCRIPTION_PLAN_NOT_FOUND_MESSAGE = "구독 플랜 정보를 찾을 수 없습니다.";
-
     private final SubscriptionRepository subscriptionRepository;
     private final MemberRepository memberRepository;
-    private final SubscriptionPlanQueryRepository subscriptionPlanQueryRepository;
+    private final CreatorProfileRepository creatorProfileRepository;
 
     @Transactional
     public FreeSubscriptionResponse createFreeSubscription(Long subscriberId, Long creatorId) {
@@ -121,15 +118,11 @@ public class SubscriptionService {
         validateRequired(creatorId, "creatorId");
         validateCreator(creatorId);
 
-        CreatorSubscriptionPlanProjection projection =
-                subscriptionPlanQueryRepository.findByCreatorId(creatorId)
-                        .orElseThrow(() -> new CustomException(
-                                CommonErrorCode.RESOURCE_NOT_FOUND,
-                                SUBSCRIPTION_PLAN_NOT_FOUND_MESSAGE
-                        ));
+        CreatorProfile creatorProfile = creatorProfileRepository.findByMemberId(creatorId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
 
-        Integer paidPrice = projection.subscriptionPrice();
-        boolean paidAvailable = paidPrice != null && paidPrice > 0;
+        int paidPrice = creatorProfile.getSubscriptionPrice();
+        boolean paidAvailable = paidPrice > 0;
 
         return List.of(
                 SubscriptionPlanResponse.free(creatorId),
@@ -137,20 +130,17 @@ public class SubscriptionService {
                         creatorId,
                         paidPrice,
                         paidAvailable,
-                        projection.benefitsDescription()
+                        creatorProfile.getBenefitsDescription()
                 )
         );
     }
 
     private Member validateCreator(Long creatorId) {
         Member creator = memberRepository.findById(creatorId)
-                .orElseThrow(() -> new CustomException(
-                        CommonErrorCode.RESOURCE_NOT_FOUND,
-                        CREATOR_NOT_FOUND_MESSAGE
-                ));
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
 
         if (creator.getRole() != Role.CREATOR) {
-            throw new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, CREATOR_NOT_FOUND_MESSAGE);
+            throw new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND);
         }
 
         return creator;
@@ -159,7 +149,7 @@ public class SubscriptionService {
     private Member findCreatorInMap(Long creatorId, Map<Long, Member> creatorsById) {
         Member creator = creatorsById.get(creatorId);
         if (creator == null) {
-            throw new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, CREATOR_NOT_FOUND_MESSAGE);
+            throw new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND);
         }
         return creator;
     }
