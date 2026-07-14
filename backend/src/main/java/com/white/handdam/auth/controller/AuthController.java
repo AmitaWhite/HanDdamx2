@@ -1,6 +1,5 @@
 package com.white.handdam.auth.controller;
 
-import com.white.handdam.auth.dto.request.EmailVerificationRequest;
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.AvailabilityResponse;
 import com.white.handdam.auth.dto.response.SignupResponse;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final EmailVerificationService emailVerificationService;
 
     // KSY-001
     @GetMapping("/email-availability")
@@ -50,14 +48,6 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
-    }
-
-    // KSY-004 : 인증 메일 발송 (신규 인증 요청 생성)
-    // - 이메일 변경, 비밀번호 재설정 최초 요청, 소셜 가입 후 이메일 검증 등...
-    @PostMapping("/email-verifications")
-    public ResponseEntity<ApiResponse<Void>> sendVerificationEmail(@Valid @RequestBody EmailVerificationRequest request) {
-        authService.sendVerificationEmail(request.email());
-        return ResponseEntity.ok(ApiResponse.noContent());
     }
 
 }
