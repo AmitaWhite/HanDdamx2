@@ -2,6 +2,7 @@ package com.white.handdam.auth.service;
 
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.SignupResponse;
+import com.white.handdam.auth.entity.EmailVerification;
 import com.white.handdam.auth.entity.VerificationPurpose;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.exception.CustomException;
@@ -15,6 +16,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -166,6 +171,59 @@ class AuthServiceTest {
         then(memberRepository).should(never()).save(any(Member.class));
         then(emailVerificationService).should(never())
                 .issueAndSend(any(), any(), any(), any());
+    }
+
+    // KSY-005
+    @Test
+    @DisplayName("가입 인증 토큰 유효하면 회원의 이메일 인증 처리")
+    void confirmSignupVerificationSuccess() {
+        Long memberId = 1L;
+        EmailVerification ev = EmailVerification.create(
+                memberId,
+                "test@handdam.com",
+                VerificationPurpose.SIGNUP,
+                "tokenHash",
+                Instant.now().plus(Duration.ofMinutes(10)));
+        Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
+
+        given(emailVerificationService.confirm("raw-token", VerificationPurpose.SIGNUP)).willReturn(ev);
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+
+        authService.confirmSignupVerification("raw-token");
+
+        assertThat(member.isEmailVerified()).isTrue();
+    }
+
+    @Test
+    @DisplayName("토큰 검증에 실패하면 예외를 그대로 전파하고 회원 조회 X")
+    void confirmSignupVerificationFailWhenTokenInvalid() {
+        given(emailVerificationService.confirm("raw-token", VerificationPurpose.SIGNUP))
+                .willThrow(new CustomException(AuthErrorCode.INVALID_VERIFICATION_TOKEN));
+
+        assertThatThrownBy(() -> authService.confirmSignupVerification("raw-token"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_VERIFICATION_TOKEN);
+
+        then(memberRepository).should(never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("토큰에 연결된 회원이 없으면 예외를 던짐")
+    void confirmSignupVerificationFailWhenMemberNotFound() {
+        Long memberId = 1L;
+        EmailVerification ev = EmailVerification.create(
+                memberId,
+                "test@handdam.com",
+                VerificationPurpose.SIGNUP,
+                "tokenHash",
+                Instant.now().plus(Duration.ofMinutes(10)));
+
+        given(emailVerificationService.confirm("raw-token", VerificationPurpose.SIGNUP)).willReturn(ev);
+        given(memberRepository.findById(memberId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.confirmSignupVerification("raw-token"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.MEMBER_NOT_FOUND);
     }
 
 }
