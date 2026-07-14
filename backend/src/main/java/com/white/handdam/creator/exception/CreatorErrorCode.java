@@ -18,6 +18,7 @@ public enum CreatorErrorCode implements ErrorCode {
 
     // 크리에이터 프로필
     CREATOR_NOT_FOUND(HttpStatus.NOT_FOUND, "크리에이터를 찾을 수 없습니다."),
+    CREATOR_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "크리에이터 프로필을 찾을 수 없습니다."),
 
     // 공통 권한
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "관리자만 접근할 수 있습니다."),
