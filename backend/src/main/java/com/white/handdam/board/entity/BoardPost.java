@@ -92,4 +92,11 @@ public class BoardPost extends BaseTimeEntity {
 	public void markAnswered() {
 		this.status = BoardPostStatus.ANSWERED;
 	}
+
+	/**
+	 * 공식 답변 삭제 후 상태를 WAITING으로 되돌린다.
+	 */
+	public void markWaiting() {
+		this.status = BoardPostStatus.WAITING;
+	}
 }

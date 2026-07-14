@@ -186,6 +186,44 @@ class BoardAnswerServiceTest {
 			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
 	}
 
+	@Test
+	@DisplayName("답변 작성 크리에이터는 공식 답변을 소프트 삭제할 수 있다")
+	void creatorCanSoftDeleteAnswer() {
+		Long creatorId = 1L;
+		BoardAnswer answer = sampleAnswer(creatorId);
+		ReflectionTestUtils.setField(answer.getBoardPost(), "status", BoardPostStatus.ANSWERED);
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
+
+		boardAnswerService.deleteAnswer(50L, creatorId);
+
+		assertThat(answer.isDeleted()).isTrue();
+		assertThat(answer.getDeletedAt()).isNotNull();
+		assertThat(answer.getBoardPost().getStatus()).isEqualTo(BoardPostStatus.WAITING);
+	}
+
+	@Test
+	@DisplayName("답변 작성자가 아니면 공식 답변을 삭제할 수 없다")
+	void nonCreatorCannotDeleteAnswer() {
+		Long creatorId = 1L;
+		Long otherId = 99L;
+		BoardAnswer answer = sampleAnswer(creatorId);
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
+
+		assertThatThrownBy(() -> boardAnswerService.deleteAnswer(50L, otherId))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+
+		assertThat(answer.isDeleted()).isFalse();
+	}
+
+	@Test
+	@DisplayName("삭제된 공식 답변은 삭제 시 RESOURCE_NOT_FOUND를 반환한다")
+	void deletedAnswerCannotBeDeletedAgain() {
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> boardAnswerService.deleteAnswer(50L, 1L))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
