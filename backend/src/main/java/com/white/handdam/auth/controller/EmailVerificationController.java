@@ -19,7 +19,7 @@ public class EmailVerificationController {
     private final AuthService authService;
 
     // KSY-004 : 인증 메일 발송 (신규 인증 요청 생성)
-    @PostMapping("/email-verifications")
+    @PostMapping
     public ResponseEntity<ApiResponse<Void>> sendVerificationEmail(@Valid @RequestBody EmailVerificationRequest request) {
         authService.sendVerificationEmail(request.email());
         return ResponseEntity.ok(ApiResponse.noContent());
