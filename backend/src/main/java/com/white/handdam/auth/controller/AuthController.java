@@ -1,18 +1,19 @@
 package com.white.handdam.auth.controller;
 
+import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.EmailAvailabilityResponse;
 import com.white.handdam.auth.dto.response.NicknameAvailabilityResponse;
+import com.white.handdam.auth.dto.response.SignupResponse;
 import com.white.handdam.auth.service.AuthService;
 import com.white.handdam.global.response.ApiResponse;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Validated
 @RestController
@@ -38,6 +39,15 @@ public class AuthController {
                 authService.isNicknameAvailable(nickname)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // KSY-003
+    @PostMapping("/signup")
+    public ResponseEntity<ApiResponse<SignupResponse>> signup(@Valid @RequestBody SignupRequest request) {
+        SignupResponse response = authService.signup(request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response));
     }
 
 }
