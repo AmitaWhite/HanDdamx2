@@ -26,9 +26,14 @@ import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -539,9 +544,138 @@ class BoardPostServiceTest {
 		verifyNoInteractions(objectStorage);
 	}
 
+	@Test
+	@DisplayName("게시글 작성 시 이미지 원본 바이트가 스토리지에 실제로 저장된다")
+	void createPostActuallyUploadsImageBytes() {
+		RecordingObjectStorage realStorage = new RecordingObjectStorage();
+		BoardPostService service = new BoardPostService(
+			boardPostRepository,
+			boardPostImageRepository,
+			paidSubscriptionChecker,
+			realStorage
+		);
+
+		Long creatorId = 1L;
+		Long subscriberId = 99L;
+		byte[] imageBytes = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01, 0x02, 0x03};
+		MockMultipartFile image = new MockMultipartFile(
+			"images",
+			"real-upload.jpg",
+			"image/jpeg",
+			imageBytes
+		);
+		CreateBoardPostRequest request = new CreateBoardPostRequest(
+			"실제 업로드 테스트",
+			BoardPostType.QUESTION,
+			"바이트 검증"
+		);
+
+		given(paidSubscriptionChecker.hasActivePaidSubscription(subscriberId, creatorId)).willReturn(true);
+		given(boardPostRepository.save(any(BoardPost.class))).willAnswer(invocation -> {
+			BoardPost post = invocation.getArgument(0);
+			ReflectionTestUtils.setField(post, "id", 20L);
+			ReflectionTestUtils.setField(post, "createdAt", Instant.parse("2026-07-14T00:00:00Z"));
+			ReflectionTestUtils.setField(post, "updatedAt", Instant.parse("2026-07-14T00:00:00Z"));
+			return post;
+		});
+		given(boardPostImageRepository.saveAll(anyList())).willAnswer(invocation -> {
+			List<BoardPostImage> images = invocation.getArgument(0);
+			ReflectionTestUtils.setField(images.getFirst(), "id", 200L);
+			ReflectionTestUtils.setField(images.getFirst(), "createdAt", Instant.parse("2026-07-14T00:00:00Z"));
+			return images;
+		});
+
+		BoardPostResponse result = service.createPost(
+			creatorId,
+			subscriberId,
+			request,
+			List.of(image)
+		);
+
+		String storageKey = result.images().getFirst().storageKey();
+		assertThat(result.images()).hasSize(1);
+		assertThat(result.images().getFirst().originalName()).isEqualTo("real-upload.jpg");
+		assertThat(result.images().getFirst().fileSize()).isEqualTo(imageBytes.length);
+		assertThat(realStorage.size()).isEqualTo(1);
+		assertThat(realStorage.getBytes(storageKey)).isEqualTo(imageBytes);
+		assertThat(realStorage.getBytes(storageKey)).isNotEqualTo(new byte[] {1, 2, 3});
+	}
+
+	@Test
+	@DisplayName("이미지 추가 시 원본 바이트가 스토리지에 실제로 저장된다")
+	void addImagesActuallyUploadsImageBytes() {
+		RecordingObjectStorage realStorage = new RecordingObjectStorage();
+		BoardPostService service = new BoardPostService(
+			boardPostRepository,
+			boardPostImageRepository,
+			paidSubscriptionChecker,
+			realStorage
+		);
+
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		byte[] imageBytes = {10, 20, 30, 40, 50};
+		MockMultipartFile image = new MockMultipartFile(
+			"images",
+			"added.png",
+			"image/png",
+			imageBytes
+		);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findMaxOrderIndexByBoardPostId(10L))
+			.willReturn(Optional.empty());
+		given(boardPostImageRepository.saveAll(anyList())).willAnswer(invocation -> {
+			List<BoardPostImage> images = invocation.getArgument(0);
+			ReflectionTestUtils.setField(images.getFirst(), "id", 201L);
+			ReflectionTestUtils.setField(images.getFirst(), "createdAt", Instant.parse("2026-07-14T01:00:00Z"));
+			return images;
+		});
+
+		var result = service.addImages(10L, authorId, List.of(image));
+
+		String storageKey = result.getFirst().storageKey();
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().originalName()).isEqualTo("added.png");
+		assertThat(result.getFirst().fileSize()).isEqualTo(imageBytes.length);
+		assertThat(realStorage.getBytes(storageKey)).isEqualTo(imageBytes);
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
+	}
+
+	/**
+	 * mock URL 반환이 아니라, 업로드된 MultipartFile 바이트를 실제로 보관하는 테스트용 스토리지.
+	 */
+	private static final class RecordingObjectStorage implements ObjectStorage {
+
+		private final Map<String, byte[]> store = new ConcurrentHashMap<>();
+
+		@Override
+		public StoredObject upload(String folder, MultipartFile file) {
+			if (file == null || file.isEmpty()) {
+				throw new IllegalArgumentException("이미지 파일이 비어 있습니다.");
+			}
+			String originalName = file.getOriginalFilename() == null ? "image" : file.getOriginalFilename();
+			String storageKey = folder + "/" + UUID.randomUUID() + "_" + originalName;
+			try {
+				store.put(storageKey, file.getBytes());
+			} catch (IOException e) {
+				throw new IllegalStateException("이미지 업로드에 실패했습니다.", e);
+			}
+			return new StoredObject(storageKey, "http://memory/" + storageKey, originalName);
+		}
+
+		byte[] getBytes(String storageKey) {
+			return store.get(storageKey);
+		}
+
+		int size() {
+			return store.size();
+		}
 	}
 
 	private BoardPost samplePost(Long creatorId, Long memberId) {
