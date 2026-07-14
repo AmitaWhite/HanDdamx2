@@ -1,4 +1,4 @@
-package com.white.handdam.auth;
+package com.white.handdam.auth.repository;
 
 import com.white.handdam.auth.entity.EmailVerification;
 import org.springframework.data.jpa.repository.JpaRepository;
