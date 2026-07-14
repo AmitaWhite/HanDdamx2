@@ -18,8 +18,12 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
+import com.white.handdam.global.exception.CommonErrorCode;
+import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.global.exception.ErrorCode;
 import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
 import java.time.Instant;
@@ -39,7 +43,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class BoardPostServiceTest {
@@ -65,10 +68,6 @@ class BoardPostServiceTest {
 	void setUp() {
 		pageable = PageRequest.of(0, 20);
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-001 목록 조회
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("크리에이터 본인은 목록을 조회할 수 있다")
@@ -103,7 +102,7 @@ class BoardPostServiceTest {
 	}
 
 	@Test
-	@DisplayName("권한이 없으면 목록 조회 시 403 예외가 발생한다")
+	@DisplayName("권한이 없으면 목록 조회 시 SUBSCRIPTION_REQUIRED 예외가 발생한다")
 	void deniedWithoutPermission() {
 		Long creatorId = 1L;
 		Long strangerId = 7L;
@@ -111,14 +110,10 @@ class BoardPostServiceTest {
 
 		assertThatThrownBy(() ->
 			boardPostService.getPostsByCreator(creatorId, strangerId, null, null, pageable)
-		).isInstanceOf(ResponseStatusException.class);
+		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).findByCreator(any(), any(), any(), any());
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-002 작성 (+이미지)
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("유료 구독자는 제목·이미지와 함께 게시글을 작성할 수 있다")
@@ -216,15 +211,11 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.createPost(creatorId, strangerId, request, null))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).save(any());
 		verifyNoInteractions(objectStorage);
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-003 상세 조회
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 본인 게시글 상세를 조회할 수 있다")
@@ -289,13 +280,12 @@ class BoardPostServiceTest {
 	}
 
 	@Test
-	@DisplayName("삭제된 게시글은 상세 조회 시 404를 반환한다")
+	@DisplayName("삭제된 게시글은 상세 조회 시 RESOURCE_NOT_FOUND를 반환한다")
 	void deletedPostReturnsNotFound() {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, 1L))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("404");
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
@@ -311,14 +301,10 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, strangerId))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-004 수정
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 답변 대기 게시글을 수정할 수 있다")
@@ -357,8 +343,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, authorId, request))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("409");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
 	}
 
 	@Test
@@ -376,13 +361,13 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, subscriberId, request))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
 
 		assertThat(post.getTitle()).isEqualTo("테스트 제목");
 	}
 
 	@Test
-	@DisplayName("삭제된 게시글은 수정 시 404를 반환한다")
+	@DisplayName("삭제된 게시글은 수정 시 RESOURCE_NOT_FOUND를 반환한다")
 	void deletedPostCannotBeUpdated() {
 		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
 			"수정된 제목",
@@ -392,13 +377,8 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, 5L, request))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("404");
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-005 소프트 삭제
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 본인 게시글을 소프트 삭제할 수 있다")
@@ -424,24 +404,19 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, strangerId))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
 
 		assertThat(post.isDeleted()).isFalse();
 	}
 
 	@Test
-	@DisplayName("삭제된 게시글은 삭제 시 404를 반환한다")
+	@DisplayName("삭제된 게시글은 삭제 시 RESOURCE_NOT_FOUND를 반환한다")
 	void deletedPostCannotBeDeletedAgain() {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, 5L))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("404");
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-006 마이페이지 — 내가 작성한 글
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("로그인한 회원은 내가 작성한 글 목록을 조회할 수 있다")
@@ -462,14 +437,10 @@ class BoardPostServiceTest {
 	@DisplayName("비로그인은 내 작성글 목록을 조회할 수 없다")
 	void guestCannotGetMyPosts() {
 		assertThatThrownBy(() -> boardPostService.getMyPosts(null, null, null, pageable))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
 
 		verify(boardPostRepository, never()).findByMember(any(), any(), any(), any());
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-007 이미지 추가
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 본인 게시글에 이미지를 추가할 수 있다")
@@ -525,7 +496,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, subscriberId, List.of(image)))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
@@ -547,14 +518,13 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, authorId, List.of(image)))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("409");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
 
 		verifyNoInteractions(objectStorage);
 	}
 
 	@Test
-	@DisplayName("이미지 파일이 없으면 400을 반환한다")
+	@DisplayName("이미지 파일이 없으면 BOARD_POST_IMAGE_REQUIRED를 반환한다")
 	void emptyImagesRejected() {
 		Long creatorId = 1L;
 		Long authorId = 5L;
@@ -564,10 +534,14 @@ class BoardPostServiceTest {
 			.willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, authorId, List.of()))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("400");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_REQUIRED));
 
 		verifyNoInteractions(objectStorage);
+	}
+
+	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
+		assertThat(thrown).isInstanceOf(CustomException.class);
+		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
 	}
 
 	private BoardPost samplePost(Long creatorId, Long memberId) {

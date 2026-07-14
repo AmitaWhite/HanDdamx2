@@ -3,9 +3,9 @@ package com.white.handdam.board.controller;
 import com.white.handdam.board.dto.request.UpdateBoardPostRequest;
 import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.service.BoardPostService;
+import com.white.handdam.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,11 +27,11 @@ public class BoardPostController {
 	 * 권한: 게시판 크리에이터 / 작성자 / 활성 유료 구독자
 	 */
 	@GetMapping("/{postId}")
-	public BoardPostResponse getPost(
+	public ApiResponse<BoardPostResponse> getPost(
 		@PathVariable Long postId,
 		@RequestHeader("X-Member-Id") Long memberId
 	) {
-		return boardPostService.getPost(postId, memberId);
+		return ApiResponse.success(boardPostService.getPost(postId, memberId));
 	}
 
 	/**
@@ -40,15 +39,12 @@ public class BoardPostController {
 	 * 권한: 작성자
 	 */
 	@PatchMapping("/{postId}")
-	public BoardPostResponse updatePost(
-		//어떤글을 수정할지
+	public ApiResponse<BoardPostResponse> updatePost(
 		@PathVariable Long postId,
-		//누가 수정할지
 		@RequestHeader("X-Member-Id") Long memberId,
-		//수정할 내용
 		@Valid @RequestBody UpdateBoardPostRequest request
 	) {
-		return boardPostService.updatePost(postId, memberId, request);
+		return ApiResponse.success(boardPostService.updatePost(postId, memberId, request));
 	}
 
 	/**
@@ -56,12 +52,11 @@ public class BoardPostController {
 	 * 권한: 작성자
 	 */
 	@DeleteMapping("/{postId}")
-	//성공시 204 반환
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void deletePost(
+	public ApiResponse<Void> deletePost(
 		@PathVariable Long postId,
 		@RequestHeader("X-Member-Id") Long memberId
 	) {
 		boardPostService.deletePost(postId, memberId);
+		return ApiResponse.noContent();
 	}
 }

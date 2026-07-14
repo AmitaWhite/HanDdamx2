@@ -4,6 +4,7 @@ import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
 import com.white.handdam.board.service.BoardPostService;
+import com.white.handdam.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,12 +28,14 @@ public class MyBoardPostController {
 	 * 권한: 본인(로그인한 회원)만 조회
 	 */
 	@GetMapping
-	public Page<BoardPostResponse> getMyPosts(
+	public ApiResponse<Page<BoardPostResponse>> getMyPosts(
 		@RequestHeader("X-Member-Id") Long memberId,
 		@RequestParam(required = false) BoardPostType type,
 		@RequestParam(required = false) BoardPostStatus status,
 		@PageableDefault(size = 5, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
 	) {
-		return boardPostService.getMyPosts(memberId, type, status, pageable);
+		return ApiResponse.success(
+			boardPostService.getMyPosts(memberId, type, status, pageable)
+		);
 	}
 }
