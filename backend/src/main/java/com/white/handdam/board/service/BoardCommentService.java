@@ -5,6 +5,7 @@ import com.white.handdam.board.dto.request.CreateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.entity.BoardComment;
 import com.white.handdam.board.entity.BoardPost;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardCommentRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
 import com.white.handdam.global.exception.CommonErrorCode;
@@ -72,6 +73,49 @@ public class BoardCommentService {
 			.build();
 
 		BoardComment saved = boardCommentRepository.save(comment);
+		return BoardCommentConverter.toResponse(saved, List.of());
+	}
+
+	/**
+	 * 대댓글 작성 (BOARD-014 / LDJ-014).
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 부모 댓글 조회 (없으면 404)
+	 * 2. 부모는 최상위 댓글(depth=0)만 허용 (아니면 400)
+	 * 3. 부모 댓글이 속한 게시글이 삭제되지 않았는지 확인 (아니면 404)
+	 * 4. 작성 권한 — 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 * 5. depth=1 대댓글 저장 (parent_comment_id = 부모, board_post_id = 부모와 동일)
+	 * </pre>
+	 */
+	@Transactional
+	public BoardCommentResponse createReply(
+		Long commentId,
+		Long requesterId,
+		CreateBoardCommentRequest request
+	) {
+		BoardComment parent = boardCommentRepository.findByIdAndDeletedFalse(commentId)
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "댓글을 찾을 수 없습니다."));
+
+		if (parent.getDepth() != 0) {
+			throw new CustomException(BoardErrorCode.BOARD_COMMENT_REPLY_DEPTH_EXCEEDED);
+		}
+
+		BoardPost post = parent.getBoardPost();
+		if (post.isDeleted()) {
+			throw new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다.");
+		}
+
+		boardPostService.assertCanAccessPost(post, requesterId);
+
+		BoardComment reply = BoardComment.builder()
+			.boardPost(post)
+			.memberId(requesterId)
+			.parentComment(parent)
+			.depth((short) 1)
+			.content(request.content())
+			.build();
+
+		BoardComment saved = boardCommentRepository.save(reply);
 		return BoardCommentConverter.toResponse(saved, List.of());
 	}
 }

@@ -61,7 +61,9 @@ public final class BoardCommentConverter {
 		List<BoardCommentResponse> result = new ArrayList<>();
 		for (BoardCommentResponse root : roots.values()) {
 			List<BoardCommentResponse> replies = repliesByParent.getOrDefault(root.id(), List.of());
-			// 최상위 댓글에 모아 둔 replies를 붙여 최종 응답 생성, 새로운 BoardCommentResponse 객체 생성
+			// 최상위 댓글에 모아 둔 replies를 붙여 최종 응답 생성, 
+			// 새로운 BoardCommentResponse 객체 생성,
+			// 불변이라 replies만 바꿔 넣을 수 없어 새 객체 생성
 			result.add(new BoardCommentResponse(
 				root.id(),
 				root.boardPostId(),

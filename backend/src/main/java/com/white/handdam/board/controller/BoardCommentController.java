@@ -14,11 +14,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/premium-board/posts/{postId}/comments")
 @RequiredArgsConstructor
 public class BoardCommentController {
 
@@ -28,7 +26,7 @@ public class BoardCommentController {
 	 * 게시글 댓글·대댓글 목록 조회.
 	 * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
 	 */
-	@GetMapping
+	@GetMapping("/api/premium-board/posts/{postId}/comments")
 	public ApiResponse<List<BoardCommentResponse>> getComments(
 		@PathVariable Long postId,
 		@RequestHeader("X-Member-Id") Long memberId
@@ -40,13 +38,27 @@ public class BoardCommentController {
 	 * 일반 댓글 작성 (BOARD-013).
 	 * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
 	 */
-	@PostMapping
+	@PostMapping("/api/premium-board/posts/{postId}/comments")
 	public ResponseEntity<ApiResponse<BoardCommentResponse>> createComment(
 		@PathVariable Long postId,
 		@RequestHeader("X-Member-Id") Long memberId,
 		@Valid @RequestBody CreateBoardCommentRequest request
 	) {
 		BoardCommentResponse response = boardCommentService.createComment(postId, memberId, request);
+		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+	}
+
+	/**
+	 * 대댓글 작성 (BOARD-014).
+	 * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 */
+	@PostMapping("/api/board-comments/{commentId}/replies")
+	public ResponseEntity<ApiResponse<BoardCommentResponse>> createReply(
+		@PathVariable Long commentId,
+		@RequestHeader("X-Member-Id") Long memberId,
+		@Valid @RequestBody CreateBoardCommentRequest request
+	) {
+		BoardCommentResponse response = boardCommentService.createReply(commentId, memberId, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
 	}
 }
