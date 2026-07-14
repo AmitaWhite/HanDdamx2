@@ -1,0 +1,49 @@
+@baseUrl = http://localhost:8080
+@subscriberId = 1
+@creatorId = 2
+
+### Free subscription create
+# Run server with only the local profile.
+# Expected: 201 Created
+# Expected body:
+# {
+#   "success": true,
+#   "data": {
+#     "subscriptionId": 1,
+#     "creatorId": 2,
+#     "subscriptionLevel": "FREE",
+#     "status": "ACTIVE",
+#     "startedAt": "..."
+#   },
+#   "error": null
+# }
+# X-User-Id is temporary and is not real authentication.
+POST {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
+X-User-Id: {{subscriberId}}
+Accept: application/json
+
+### Duplicate free subscription create
+# Expected: 409 Conflict
+# Expected body: success=false, data=null, error.code=SUBSCRIPTION_ALREADY_EXISTS
+POST {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
+X-User-Id: {{subscriberId}}
+Accept: application/json
+
+### Free subscription cancel
+# Expected: 200 OK
+# Expected body:
+# {
+#   "success": true,
+#   "data": null,
+#   "error": null
+# }
+DELETE {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
+X-User-Id: {{subscriberId}}
+Accept: application/json
+
+### Cancel a missing free subscription again
+# Expected: 404 Not Found
+# Expected body: success=false, data=null, error.code=FREE_SUBSCRIPTION_NOT_FOUND
+DELETE {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
+X-User-Id: {{subscriberId}}
+Accept: application/json
