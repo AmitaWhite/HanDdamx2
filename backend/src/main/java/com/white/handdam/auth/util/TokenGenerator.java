@@ -13,14 +13,14 @@ public class TokenGenerator {
     // 난수 생성
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    // 토큰 생성
+    // rawToken 생성
     public static String generateOpaqueToken() {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes); // 배열에 랜덤값 채우기
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); // Base64 -> 문자열 -> 해시값 변경
     }
 
-    // 해시값 DB 저장용
+    // tokenHash 생성 - DB 저장용
     public static String hash(String rawToken) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
