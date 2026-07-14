@@ -3,6 +3,7 @@ package com.white.handdam.auth.entity;
 import com.white.handdam.global.entity.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -41,15 +42,44 @@ public class EmailVerification extends BaseCreatedAtEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Builder(access = AccessLevel.PRIVATE)
+    public EmailVerification(Long memberId, String email, VerificationPurpose purpose,
+                             String tokenHash, Instant expiresAt) {
+        this.memberId = memberId;
+        this.email = email;
+        this.purpose = purpose;
+        this.tokenHash = tokenHash;
+        this.expiresAt = expiresAt;
+    }
+
     public static EmailVerification create(Long memberId, String email, VerificationPurpose purpose,
                                            String tokenHash, Instant expiresAt) {
-        EmailVerification ev = new EmailVerification();
-        ev.memberId = memberId;
-        ev.email = email;
-        ev.purpose = purpose;
-        ev.tokenHash = tokenHash;
-        ev.expiresAt = expiresAt;
-        return ev;
+        return EmailVerification.builder()
+                .memberId(memberId)
+                .email(email)
+                .purpose(purpose)
+                .tokenHash(tokenHash)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    public void verify() {
+        if(this.status != VerificationStatus.PENDING) {
+            throw new IllegalStateException("이미 처리된 인증 토큰입니다.");
+        }
+        if(isExpired()) {
+            throw new IllegalStateException("만료된 인증 토큰입니다.");
+        }
+        this.status = VerificationStatus.VERIFIED;
+        this.usedAt = Instant.now();
+    }
+
+    public void expire() {
+        this.status = VerificationStatus.EXPIRED;
+    }
+
+    public boolean isExpired() {
+        return Instant.now().isAfter(this.expiresAt);
     }
 
 }
