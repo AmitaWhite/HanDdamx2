@@ -1,0 +1,27 @@
+﻿> Task :cleanTest
+> Task :compileJava
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources NO-SOURCE
+> Task :testClasses
+> Task :test FAILED
+./gradlew.bat : 
+위치 C:\Users\tlsdm\AppData\Local\Temp\ps-script-4c3152cf-f6ad-4fcd-a9f2-967938386ed7.ps1:112 문자:1
++ ./gradlew.bat cleanTest test --tests "com.white.handdam.board.service ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///C:/Users/tlsdm/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/HanDdamx2-main
+/backend/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+BUILD FAILED in 7s
+5 actionable tasks: 5 executed
