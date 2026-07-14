@@ -642,6 +642,128 @@ class BoardPostServiceTest {
 		assertThat(realStorage.getBytes(storageKey)).isEqualTo(imageBytes);
 	}
 
+	@Test
+	@DisplayName("이미지 삭제 시 스토리지에 저장된 원본 바이트가 실제로 제거된다")
+	void deleteImageActuallyRemovesStoredBytes() {
+		RecordingObjectStorage realStorage = new RecordingObjectStorage();
+		BoardPostService service = new BoardPostService(
+			boardPostRepository,
+			boardPostImageRepository,
+			paidSubscriptionChecker,
+			realStorage
+		);
+
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		byte[] imageBytes = {9, 8, 7, 6, 5};
+		MockMultipartFile file = new MockMultipartFile(
+			"images",
+			"to-delete.jpg",
+			"image/jpeg",
+			imageBytes
+		);
+
+		// 먼저 스토리지에 실제 바이트를 올려 두고
+		StoredObject stored = realStorage.upload("premium-board/1", file);
+		BoardPostImage image = BoardPostImage.builder()
+			.boardPost(post)
+			.url(stored.url())
+			.storageKey(stored.storageKey())
+			.originalName(stored.originalName())
+			.fileSize((long) imageBytes.length)
+			.mimeType("image/jpeg")
+			.orderIndex(0)
+			.build();
+		ReflectionTestUtils.setField(image, "id", 100L);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByIdAndBoardPostId(100L, 10L)).willReturn(Optional.of(image));
+
+		assertThat(realStorage.size()).isEqualTo(1);
+		assertThat(realStorage.getBytes(stored.storageKey())).isEqualTo(imageBytes);
+
+		service.deleteImage(10L, 100L, authorId);
+
+		assertThat(realStorage.getBytes(stored.storageKey())).isNull();
+		assertThat(realStorage.size()).isEqualTo(0);
+		verify(boardPostImageRepository).delete(image);
+	}
+
+	@Test
+	@DisplayName("작성자는 본인 게시글의 이미지를 삭제할 수 있다")
+	void authorCanDeleteImage() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardPostImage image = BoardPostImage.builder()
+			.boardPost(post)
+			.url("http://localhost:4566/handdam-local/a.jpg")
+			.storageKey("premium-board/1/uuid_a.jpg")
+			.originalName("a.jpg")
+			.fileSize(10L)
+			.mimeType("image/jpeg")
+			.orderIndex(0)
+			.build();
+		ReflectionTestUtils.setField(image, "id", 100L);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByIdAndBoardPostId(100L, 10L)).willReturn(Optional.of(image));
+
+		boardPostService.deleteImage(10L, 100L, authorId);
+
+		verify(objectStorage).delete("premium-board/1/uuid_a.jpg");
+		verify(boardPostImageRepository).delete(image);
+	}
+
+	@Test
+	@DisplayName("작성자가 아니면 이미지를 삭제할 수 없다")
+	void nonAuthorCannotDeleteImage() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long subscriberId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+
+		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, subscriberId))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+
+		verifyNoInteractions(objectStorage);
+		verify(boardPostImageRepository, never()).delete(any());
+	}
+
+	@Test
+	@DisplayName("공식 답변된 게시글의 이미지는 삭제할 수 없다")
+	void answeredPostCannotDeleteImage() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+
+		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
+
+		verifyNoInteractions(objectStorage);
+		verify(boardPostImageRepository, never()).delete(any());
+	}
+
+	@Test
+	@DisplayName("이미지가 없거나 다른 게시글 이미지면 RESOURCE_NOT_FOUND를 반환한다")
+	void missingImageCannotBeDeleted() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByIdAndBoardPostId(999L, 10L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 999L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+
+		verifyNoInteractions(objectStorage);
+		verify(boardPostImageRepository, never()).delete(any());
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
@@ -667,6 +789,11 @@ class BoardPostServiceTest {
 				throw new IllegalStateException("이미지 업로드에 실패했습니다.", e);
 			}
 			return new StoredObject(storageKey, "http://memory/" + storageKey, originalName);
+		}
+
+		@Override
+		public void delete(String storageKey) {
+			store.remove(storageKey);
 		}
 
 		byte[] getBytes(String storageKey) {

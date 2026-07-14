@@ -11,6 +11,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
@@ -79,6 +80,23 @@ public class S3ObjectStorage implements ObjectStorage {
 		}
 
 		return new StoredObject(storageKey, buildUrl(bucket, storageKey), originalName);
+	}
+
+	@Override
+	public void delete(String storageKey) {
+		if (storageKey == null || storageKey.isBlank()) {
+			throw new CustomException(CommonErrorCode.INVALID_REQUEST, "삭제할 저장소 키가 없습니다.");
+		}
+		try {
+			s3Client.deleteObject(
+				DeleteObjectRequest.builder()
+					.bucket(awsProperties.getS3().getBucket())
+					.key(storageKey)
+					.build()
+			);
+		} catch (Exception e) {
+			throw new CustomException(CommonErrorCode.INTERNAL_ERROR, "이미지 삭제에 실패했습니다.");
+		}
 	}
 
 	/**

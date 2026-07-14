@@ -16,4 +16,11 @@ public interface ObjectStorage {
 	 * @return 저장된 객체의 key, 접근 URL, 원본 파일명
 	 */
 	StoredObject upload(String folder, MultipartFile file);
+
+	/**
+	 * 스토리지에서 객체를 삭제한다.
+	 *
+	 * @param storageKey 삭제할 객체 키
+	 */
+	void delete(String storageKey);
 }

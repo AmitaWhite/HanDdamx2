@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -35,5 +36,19 @@ public class BoardPostImageController {
 	) {
 		List<BoardPostImageResponse> response = boardPostService.addImages(postId, memberId, images);
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+	}
+
+	/**
+	 * 게시글 이미지 삭제.
+	 * 권한: 작성자, 공식 답변 전(WAITING)만.
+	 */
+	@DeleteMapping("/{imageId}")
+	public ResponseEntity<ApiResponse<Void>> deleteImage(
+		@PathVariable Long postId,
+		@PathVariable Long imageId,
+		@RequestHeader("X-Member-Id") Long memberId
+	) {
+		boardPostService.deleteImage(postId, imageId, memberId);
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
 	}
 }

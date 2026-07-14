@@ -188,6 +188,38 @@ public class BoardPostService {
 	}
 
 	/**
+	 * 게시글 이미지 삭제.
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 작성자 권한 확인 (아니면 403)
+	 * 3. status == WAITING 확인 (아니면 409)
+	 * 4. 해당 게시글의 이미지 조회 (없거나 다른 글 이미지면 404)
+	 * 5. S3 객체 삭제 + board_post_image 행 삭제
+	 * </pre>
+	 */
+	@Transactional
+	public void deleteImage(Long postId, Long imageId, Long requesterId) {
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		assertCanEditPost(post, requesterId);
+
+		if (post.getStatus() != BoardPostStatus.WAITING) {
+			throw new CustomException(
+				BoardErrorCode.BOARD_POST_ALREADY_ANSWERED,
+				"공식 답변이 등록된 게시글은 이미지를 삭제할 수 없습니다."
+			);
+		}
+
+		BoardPostImage image = boardPostImageRepository.findByIdAndBoardPostId(imageId, postId)
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "이미지를 찾을 수 없습니다."));
+
+		objectStorage.delete(image.getStorageKey());
+		boardPostImageRepository.delete(image);
+	}
+
+	/**
 	 * 게시글 이미지 처리. (`createPost` / `addImages`에서 호출)
 	 *
 	 * <pre>
