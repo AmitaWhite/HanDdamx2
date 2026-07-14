@@ -31,7 +31,7 @@ public class FeedService {
         // TODO [LYJ-030] Project 엔티티 추가
 
         boolean isOwner = false; // TODO: Project 추가 후 교체
-        String level = "PAID";     // Stub이 null 반환 → 비구독 처리
+        String level = null;
         return canAccess(feed.getVisibility(), level, isOwner)
                 ? FeedDetailResponse.visible(feed)
                 : FeedDetailResponse.locked(feed);

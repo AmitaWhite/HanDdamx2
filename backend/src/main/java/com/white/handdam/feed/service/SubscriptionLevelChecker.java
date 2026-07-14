@@ -1,8 +1,23 @@
 package com.white.handdam.feed.service;
 
-// [LYJ-030] 구독 등급 조회 포트 — SUBSCRIPTION 도메인 연동 전 Stub으로 동작
-public interface SubscriptionLevelChecker {
-    // TODO 원건님 SUBSCRIPTION(ACTIVE/CANCEL_SCHEDULED) 조회로 교체
+import com.white.handdam.subscription.entity.SubscriptionStatus;
+import com.white.handdam.subscription.repository.SubscriptionRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+// TODO ACTIVE / CANCEL_SCHEDULED 둘 다 유효한 구독으로 처리 — 추후 만료일 체크 로직 확인
+@Component
+@RequiredArgsConstructor
+public class SubscriptionLevelChecker {
+    private final SubscriptionRepository subscriptionRepository;
+
     // 반환값: "FREE" | "PAID" | null(비구독)
-    String getLevel(Long memberId, Long creatorId);
+    public String getLevel(Long memberId, Long creatorId) {
+        return subscriptionRepository
+                .findBySubscriberIdAndCreatorId(memberId, creatorId)
+                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE
+                        || s.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED)
+                .map(s -> s.getSubscriptionLevel().name())
+                .orElse(null);
+    }
 }
