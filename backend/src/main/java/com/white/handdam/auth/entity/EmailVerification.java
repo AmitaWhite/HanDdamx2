@@ -52,4 +52,23 @@ public class EmailVerification extends BaseCreatedAtEntity {
         return ev;
     }
 
+    public void verify() {
+        if(this.status != VerificationStatus.PENDING) {
+            throw new IllegalStateException("이미 처리된 인증 토큰입니다.");
+        }
+        if(isExpired()) {
+            throw new IllegalStateException("만료된 인증 토큰입니다.");
+        }
+        this.status = VerificationStatus.VERIFIED;
+        this.usedAt = Instant.now();
+    }
+
+    public void expire() {
+        this.status = VerificationStatus.EXPIRED;
+    }
+
+    public boolean isExpired() {
+        return Instant.now().isAfter(this.expiresAt);
+    }
+
 }

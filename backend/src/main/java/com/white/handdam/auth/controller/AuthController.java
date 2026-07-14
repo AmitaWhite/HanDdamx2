@@ -20,7 +20,6 @@ public class AuthController {
 
     private final AuthService authService;
 
-    // TODO: 공통 응답(ApiResponse) 및 GlobalExceptionHandler 적용 후 수정 필요
     // KSY-001
     @GetMapping("/email-availability")
     public EmailAvailabilityResponse checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
