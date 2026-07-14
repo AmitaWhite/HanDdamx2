@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/premium-board/posts")
+@RequestMapping("/api/premium-board/posts")
 @RequiredArgsConstructor
 public class BoardPostController {
 

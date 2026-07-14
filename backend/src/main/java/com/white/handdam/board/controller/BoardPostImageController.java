@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/v1/premium-board/posts/{postId}/images")
+@RequestMapping("/api/premium-board/posts/{postId}/images")
 @RequiredArgsConstructor
 public class BoardPostImageController {
 

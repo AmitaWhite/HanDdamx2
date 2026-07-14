@@ -85,4 +85,11 @@ public class BoardPost extends BaseTimeEntity {
 		this.deleted = true;
 		this.deletedAt = Instant.now();
 	}
+
+	/**
+	 * 공식 답변 등록 후 상태를 ANSWERED로 변경.
+	 */
+	public void markAnswered() {
+		this.status = BoardPostStatus.ANSWERED;
+	}
 }
