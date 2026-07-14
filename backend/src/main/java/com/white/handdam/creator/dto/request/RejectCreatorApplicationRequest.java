@@ -8,6 +8,6 @@ import jakarta.validation.constraints.Size;
  * PATCH .../reject 거절요청
  */
 public record RejectCreatorApplicationRequest(
-        @NotBlank @Size(max = 500) String rejectReason  // 거절 사유 (필수)
+        @Size(max = 500) String rejectReason  // 거절 사유 (선택)
 ) {
 }
