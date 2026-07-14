@@ -2,6 +2,7 @@ package com.white.handdam.board.service;
 
 import com.white.handdam.board.converter.BoardAnswerConverter;
 import com.white.handdam.board.dto.request.CreateBoardAnswerRequest;
+import com.white.handdam.board.dto.request.UpdateBoardAnswerRequest;
 import com.white.handdam.board.dto.response.BoardAnswerResponse;
 import com.white.handdam.board.entity.BoardAnswer;
 import com.white.handdam.board.entity.BoardPost;
@@ -61,6 +62,7 @@ public class BoardAnswerService {
 		return BoardAnswerConverter.toResponse(saved);
 	}
 
+
 	/**
 	 * 공식 답변 작성: 게시판 소유 크리에이터만 허용.
 	 */
@@ -72,5 +74,43 @@ public class BoardAnswerService {
 			return;
 		}
 		throw new CustomException(CommonErrorCode.FORBIDDEN, "공식 답변을 작성할 권한이 없습니다.");
+	}
+
+	/**
+	 * 크리에이터 공식 답변 수정 (BOARD-011).
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 답변 조회 (없으면 404)
+	 * 2. 답변 작성 크리에이터만 허용 (아니면 403)
+	 * 3. content 갱신
+	 * </pre>
+	 */
+	@Transactional
+	public BoardAnswerResponse updateAnswer(
+		Long answerId,
+		Long requesterId,
+		UpdateBoardAnswerRequest request
+	) {
+		BoardAnswer answer = boardAnswerRepository.findByIdAndDeletedFalse(answerId)
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "공식 답변을 찾을 수 없습니다."));
+
+		// 2) 작성 크리에이터만 수정 허용 (아니면 403)
+		assertCanEditAnswer(answer, requesterId);
+		// 3) 요청 body의 content 로 본문 갱신
+		answer.updateContent(request.content());
+
+		return BoardAnswerConverter.toResponse(answer);
+	}
+	/**
+	 * 공식 답변 수정: 해당 답변을 작성한 크리에이터만 허용.
+	 */
+	void assertCanEditAnswer(BoardAnswer answer, Long requesterId) {
+		if (requesterId == null) {
+			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+		}
+		if (requesterId.equals(answer.getCreatorId())) {
+			return;
+		}
+		throw new CustomException(CommonErrorCode.FORBIDDEN, "공식 답변을 수정할 권한이 없습니다.");
 	}
 }

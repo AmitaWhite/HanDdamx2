@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.white.handdam.board.dto.request.CreateBoardAnswerRequest;
+import com.white.handdam.board.dto.request.UpdateBoardAnswerRequest;
 import com.white.handdam.board.dto.response.BoardAnswerResponse;
 import com.white.handdam.board.entity.BoardAnswer;
 import com.white.handdam.board.entity.BoardPost;
@@ -132,6 +133,59 @@ class BoardAnswerServiceTest {
 		verify(boardAnswerRepository, never()).save(any());
 	}
 
+	@Test
+	@DisplayName("답변 작성 크리에이터는 공식 답변을 수정할 수 있다")
+	void creatorCanUpdateAnswer() {
+		Long creatorId = 1L;
+		BoardAnswer answer = sampleAnswer(creatorId);
+		UpdateBoardAnswerRequest request = new UpdateBoardAnswerRequest("수정된 공식 답변");
+
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
+
+		BoardAnswerResponse result = boardAnswerService.updateAnswer(50L, creatorId, request);
+
+		assertThat(result.id()).isEqualTo(50L);
+		assertThat(result.content()).isEqualTo("수정된 공식 답변");
+		assertThat(answer.getContent()).isEqualTo("수정된 공식 답변");
+	}
+
+	@Test
+	@DisplayName("답변 작성자가 아니면 공식 답변을 수정할 수 없다")
+	void nonCreatorCannotUpdateAnswer() {
+		Long creatorId = 1L;
+		Long otherId = 99L;
+		BoardAnswer answer = sampleAnswer(creatorId);
+		UpdateBoardAnswerRequest request = new UpdateBoardAnswerRequest("수정된 공식 답변");
+
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
+
+		assertThatThrownBy(() -> boardAnswerService.updateAnswer(50L, otherId, request))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+
+		assertThat(answer.getContent()).isEqualTo("공식 답변입니다.");
+	}
+
+	@Test
+	@DisplayName("삭제된 공식 답변은 수정 시 RESOURCE_NOT_FOUND를 반환한다")
+	void deletedAnswerCannotBeUpdated() {
+		UpdateBoardAnswerRequest request = new UpdateBoardAnswerRequest("수정된 공식 답변");
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> boardAnswerService.updateAnswer(50L, 1L, request))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+	}
+
+	@Test
+	@DisplayName("비로그인은 공식 답변을 수정할 수 없다")
+	void guestCannotUpdateAnswer() {
+		BoardAnswer answer = sampleAnswer(1L);
+		UpdateBoardAnswerRequest request = new UpdateBoardAnswerRequest("수정된 공식 답변");
+		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
+
+		assertThatThrownBy(() -> boardAnswerService.updateAnswer(50L, null, request))
+			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
@@ -150,5 +204,18 @@ class BoardAnswerServiceTest {
 		ReflectionTestUtils.setField(post, "createdAt", Instant.parse("2026-07-11T00:00:00Z"));
 		ReflectionTestUtils.setField(post, "updatedAt", Instant.parse("2026-07-11T00:00:00Z"));
 		return post;
+	}
+
+	private BoardAnswer sampleAnswer(Long creatorId) {
+		BoardPost post = samplePost(creatorId, 5L);
+		BoardAnswer answer = BoardAnswer.builder()
+			.boardPost(post)
+			.creatorId(creatorId)
+			.content("공식 답변입니다.")
+			.build();
+		ReflectionTestUtils.setField(answer, "id", 50L);
+		ReflectionTestUtils.setField(answer, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+		ReflectionTestUtils.setField(answer, "updatedAt", Instant.parse("2026-07-15T00:00:00Z"));
+		return answer;
 	}
 }
