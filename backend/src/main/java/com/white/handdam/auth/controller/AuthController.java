@@ -2,8 +2,7 @@ package com.white.handdam.auth.controller;
 
 import com.white.handdam.auth.dto.request.EmailVerificationRequest;
 import com.white.handdam.auth.dto.request.SignupRequest;
-import com.white.handdam.auth.dto.response.EmailAvailabilityResponse;
-import com.white.handdam.auth.dto.response.NicknameAvailabilityResponse;
+import com.white.handdam.auth.dto.response.AvailabilityResponse;
 import com.white.handdam.auth.dto.response.SignupResponse;
 import com.white.handdam.auth.service.AuthService;
 import com.white.handdam.auth.service.EmailVerificationService;
@@ -28,8 +27,8 @@ public class AuthController {
 
     // KSY-001
     @GetMapping("/email-availability")
-    public ResponseEntity<ApiResponse<EmailAvailabilityResponse>> checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
-        EmailAvailabilityResponse response = new EmailAvailabilityResponse(
+    public ResponseEntity<ApiResponse<AvailabilityResponse>> checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
+        AvailabilityResponse response = new AvailabilityResponse(
                 authService.isEmailAvailable(email)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -37,8 +36,8 @@ public class AuthController {
 
     // KSY-002
     @GetMapping("/nickname-availability")
-    public ResponseEntity<ApiResponse<NicknameAvailabilityResponse>> checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
-        NicknameAvailabilityResponse response = new NicknameAvailabilityResponse(
+    public ResponseEntity<ApiResponse<AvailabilityResponse>> checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
+        AvailabilityResponse response = new AvailabilityResponse(
                 authService.isNicknameAvailable(nickname)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
