@@ -47,3 +47,36 @@ Accept: application/json
 DELETE {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
 X-User-Id: {{subscriberId}}
 Accept: application/json
+
+### Subscription status
+# Expected: 200 OK
+# Expected body when subscribed:
+# success=true, data.subscribed=true, data.subscriptionLevel=FREE or PAID, error=null
+# Expected body when not subscribed:
+# success=true, data.subscribed=false, nullable subscription fields are null, error=null
+# X-User-Id is temporary and is not real authentication.
+GET {{baseUrl}}/api/creators/{{creatorId}}/subscription-status
+X-User-Id: {{subscriberId}}
+Accept: application/json
+
+### My subscriptions
+# Expected: 200 OK
+# Expected body: success=true, data=[], error=null when there are no subscriptions
+# Existing subscription rows are returned in startedAt DESC order.
+# X-User-Id is temporary and is not real authentication.
+GET {{baseUrl}}/api/subscriptions/me
+X-User-Id: {{subscriberId}}
+Accept: application/json
+
+### Subscription plans
+# Expected: 200 OK
+# Expected body: success=true, data has FREE and PAID plans, error=null
+# This endpoint does not require X-User-Id.
+GET {{baseUrl}}/api/creators/{{creatorId}}/subscription-plans
+Accept: application/json
+
+### Subscription plans for invalid creator
+# Expected: 404 Not Found
+# Expected body: success=false, data=null, error.code=RESOURCE_NOT_FOUND
+GET {{baseUrl}}/api/creators/999999/subscription-plans
+Accept: application/json
