@@ -33,4 +33,11 @@ public class EmailVerificationController {
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
+    // KSY-006
+    @PostMapping("/resend")
+    public ResponseEntity<ApiResponse<Void>> resendVerificationEmail(@Valid @RequestBody EmailVerificationRequest request) {
+        authService.resendSignupVerificationEmail(request.email());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
 }

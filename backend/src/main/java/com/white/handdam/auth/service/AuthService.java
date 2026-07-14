@@ -68,20 +68,7 @@ public class AuthService {
     // KSY-004
     @Transactional
     public void sendVerificationEmail(String email) {
-        String normalizedEmail = EmailNormalizer.normalize(email);
-
-        memberRepository.findByEmail(normalizedEmail).ifPresent(member -> {
-            // 이미 인증된 회원이면 무시
-            if (member.isEmailVerified()) return;
-
-            emailVerificationService.issueAndSend(
-                    member.getId(),
-                    member.getEmail(),
-                    member.getNickname(),
-                    VerificationPurpose.SIGNUP
-            );
-
-        });
+        issueSignupVerificationEmail(email);
     }
 
     // KSY-005
@@ -92,6 +79,27 @@ public class AuthService {
         memberRepository.findById(ev.getMemberId())
                 .orElseThrow(() -> new  CustomException(AuthErrorCode.MEMBER_NOT_FOUND))
                 .markEmailVerified();
+    }
+
+    // KSY-006
+    // TODO : NFR-003 rate limit은 후속 작업
+    @Transactional
+    public void resendSignupVerificationEmail(String email) {
+        issueSignupVerificationEmail(email);
+    }
+
+    // KSY-004 , KSY-006 공통 메서드
+    private void issueSignupVerificationEmail(String email) {
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        memberRepository.findByEmail(normalizedEmail).ifPresent(member -> {
+            if (member.isEmailVerified()) return;
+            emailVerificationService.issueAndSend(
+                    member.getId(),
+                    normalizedEmail,
+                    member.getNickname(),
+                    VerificationPurpose.SIGNUP);
+        });
     }
 
 }

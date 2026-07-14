@@ -2,6 +2,7 @@ package com.white.handdam.auth.service;
 
 import com.white.handdam.auth.entity.EmailVerification;
 import com.white.handdam.auth.entity.VerificationPurpose;
+import com.white.handdam.auth.entity.VerificationStatus;
 import com.white.handdam.auth.event.VerificationEmailRequestedEvent;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.auth.repository.EmailVerificationRepository;
@@ -28,6 +29,9 @@ public class EmailVerificationService {
 
     @Transactional
     public void issueAndSend(Long memberId, String email, String nickname, VerificationPurpose purpose) {
+        // 이전 PENDING 정리 후 토큰 발급
+        expirePendingTokens(email, purpose);
+
         String rawToken = TokenGenerator.generateOpaqueToken();
         String tokenHash = TokenGenerator.hash(rawToken);
 
@@ -60,4 +64,10 @@ public class EmailVerificationService {
         return ev;
     }
 
+    // KSY-006
+    private void expirePendingTokens(String email, VerificationPurpose purpose) {
+        emailVerificationRepository.findAllByEmailAndPurposeAndStatus(
+                email, purpose, VerificationStatus.PENDING)
+                .forEach(EmailVerification::expire);
+    }
 }
