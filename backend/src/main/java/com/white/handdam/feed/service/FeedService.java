@@ -11,7 +11,6 @@ import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
