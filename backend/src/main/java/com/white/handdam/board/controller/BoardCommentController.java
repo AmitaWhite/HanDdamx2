@@ -10,6 +10,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -77,5 +78,18 @@ public class BoardCommentController {
 		return ApiResponse.success(
 			boardCommentService.updateComment(commentId, memberId, request)
 		);
+	}
+
+	/**
+	 * 댓글·대댓글 소프트 삭제 (LDJ-016).
+	 * 권한: 해당 댓글 작성자
+	 */
+	@DeleteMapping("/api/board-comments/{commentId}")
+	public ResponseEntity<ApiResponse<Void>> deleteComment(
+		@PathVariable Long commentId,
+		@RequestHeader("X-Member-Id") Long memberId
+	) {
+		boardCommentService.deleteComment(commentId, memberId);
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
 	}
 }

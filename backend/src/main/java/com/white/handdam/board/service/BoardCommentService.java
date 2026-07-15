@@ -142,17 +142,51 @@ public class BoardCommentService {
 
 		return BoardCommentConverter.toResponse(comment, List.of());
 	}
-
 	/**
 	 * 댓글·대댓글 수정: 해당 댓글 작성자만 허용.
 	 */
 	void assertCanEditComment(BoardComment comment, Long requesterId) {
+	
+		assertCommentAuthor(comment, requesterId, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN);
+	}
+
+	/**
+	 * 댓글·대댓글 소프트 삭제 (LDJ-016).
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 댓글 조회 (없으면 404)
+	 * 2. 작성자만 허용 (아니면 403)
+	 * 3. is_deleted=true, deleted_at 설정
+	 * </pre>
+	 */
+	@Transactional
+	public void deleteComment(Long commentId, Long requesterId) {
+		BoardComment comment = boardCommentRepository.findByIdAndDeletedFalse(commentId)
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
+
+		assertCanDeleteComment(comment, requesterId);
+		comment.softDelete();
+	}
+
+	/**
+	 * 댓글·대댓글 삭제: 해당 댓글 작성자만 허용.
+	 */
+	void assertCanDeleteComment(BoardComment comment, Long requesterId) {
+		assertCommentAuthor(comment, requesterId, BoardErrorCode.BOARD_COMMENT_DELETE_FORBIDDEN);
+	}
+
+	private void assertCommentAuthor(
+		BoardComment comment,
+		Long requesterId,
+		BoardErrorCode forbiddenCode
+	) {
 		if (requesterId == null) {
 			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
 		if (requesterId.equals(comment.getMemberId())) {
 			return;
 		}
-		throw new CustomException(BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN);
+		// 작성자가 아니면 예외 발생
+		throw new CustomException(forbiddenCode);
 	}
 }

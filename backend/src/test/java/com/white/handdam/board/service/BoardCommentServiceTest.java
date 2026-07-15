@@ -475,6 +475,94 @@ class BoardCommentServiceTest {
 		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
 	}
 
+	@Test
+	@DisplayName("작성자는 댓글을 소프트 삭제할 수 있다")
+	void authorCanDeleteComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "삭제할 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		boardCommentService.deleteComment(100L, authorId);
+
+		assertThat(comment.isDeleted()).isTrue();
+		assertThat(comment.getDeletedAt()).isNotNull();
+	}
+
+	@Test
+	@DisplayName("작성자는 대댓글을 소프트 삭제할 수 있다")
+	void authorCanDeleteReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment root = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+		BoardComment reply = sampleComment(post, 101L, creatorId, root, (short) 1, "삭제할 대댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(101L)).willReturn(Optional.of(reply));
+
+		boardCommentService.deleteComment(101L, creatorId);
+
+		assertThat(reply.isDeleted()).isTrue();
+		assertThat(reply.getDeletedAt()).isNotNull();
+	}
+
+	@Test
+	@DisplayName("작성자가 아니면 댓글을 삭제할 수 없다")
+	void nonAuthorCannotDeleteComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long strangerId = 7L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		assertThatThrownBy(() -> boardCommentService.deleteComment(100L, strangerId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_DELETE_FORBIDDEN));
+
+		assertThat(comment.isDeleted()).isFalse();
+	}
+
+	@Test
+	@DisplayName("유료 구독자라도 작성자가 아니면 댓글을 삭제할 수 없다")
+	void subscriberCannotDeleteOthersComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long subscriberId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		assertThatThrownBy(() -> boardCommentService.deleteComment(100L, subscriberId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_DELETE_FORBIDDEN));
+	}
+
+	@Test
+	@DisplayName("게시판 참여자(크리에이터)라도 작성자가 아니면 댓글을 삭제할 수 없다")
+	void participantCannotDeleteOthersComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		assertThatThrownBy(() -> boardCommentService.deleteComment(100L, creatorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_DELETE_FORBIDDEN));
+	}
+
+	@Test
+	@DisplayName("이미 삭제된 댓글은 다시 삭제할 수 없다")
+	void alreadyDeletedCommentCannotDelete() {
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> boardCommentService.deleteComment(100L, 5L))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
