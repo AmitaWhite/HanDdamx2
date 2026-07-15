@@ -1,6 +1,8 @@
 package com.white.handdam.auth.entity;
 
+import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.entity.BaseCreatedAtEntity;
+import com.white.handdam.global.exception.CustomException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -63,13 +65,22 @@ public class EmailVerification extends BaseCreatedAtEntity {
                 .build();
     }
 
+    // 토큰 사용 가능한지 확인
+    public void checkValid() {
+        if (this.status == VerificationStatus.EXPIRED) {
+            throw new CustomException(AuthErrorCode.EXPIRED_VERIFICATION_TOKEN);
+        }
+        if (this.status == VerificationStatus.VERIFIED) {
+            throw new CustomException(AuthErrorCode.ALREADY_PROCESSED_VERIFICATION);
+        }
+        if (isExpired()) {
+            throw new CustomException(AuthErrorCode.EXPIRED_VERIFICATION_TOKEN);
+        }
+    }
+
+    // 검증 후 토큰 사용 처리
     public void verify() {
-        if(this.status != VerificationStatus.PENDING) {
-            throw new IllegalStateException("이미 처리된 인증 토큰입니다.");
-        }
-        if(isExpired()) {
-            throw new IllegalStateException("만료된 인증 토큰입니다.");
-        }
+        checkValid();
         this.status = VerificationStatus.VERIFIED;
         this.usedAt = Instant.now();
     }

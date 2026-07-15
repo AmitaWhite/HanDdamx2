@@ -2,6 +2,7 @@ package com.white.handdam.auth.service;
 
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.SignupResponse;
+import com.white.handdam.auth.entity.EmailVerification;
 import com.white.handdam.auth.entity.VerificationPurpose;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.exception.CustomException;
@@ -67,19 +68,37 @@ public class AuthService {
     // KSY-004
     @Transactional
     public void sendVerificationEmail(String email) {
+        issueSignupVerificationEmail(email);
+    }
+
+    // KSY-005
+    @Transactional
+    public void confirmSignupVerification(String rawToken) {
+        EmailVerification ev = emailVerificationService.confirm(rawToken, VerificationPurpose.SIGNUP);
+
+        memberRepository.findById(ev.getMemberId())
+                .orElseThrow(() -> new  CustomException(AuthErrorCode.MEMBER_NOT_FOUND))
+                .markEmailVerified();
+    }
+
+    // KSY-006
+    // TODO : NFR-003 rate limit은 후속 작업
+    @Transactional
+    public void resendSignupVerificationEmail(String email) {
+        issueSignupVerificationEmail(email);
+    }
+
+    // KSY-004 , KSY-006 공통 메서드
+    private void issueSignupVerificationEmail(String email) {
         String normalizedEmail = EmailNormalizer.normalize(email);
 
         memberRepository.findByEmail(normalizedEmail).ifPresent(member -> {
-            // 이미 인증된 회원이면 무시
             if (member.isEmailVerified()) return;
-
             emailVerificationService.issueAndSend(
                     member.getId(),
-                    member.getEmail(),
+                    normalizedEmail,
                     member.getNickname(),
-                    VerificationPurpose.SIGNUP
-            );
-
+                    VerificationPurpose.SIGNUP);
         });
     }
 

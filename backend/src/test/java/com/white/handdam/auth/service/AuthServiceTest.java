@@ -2,6 +2,7 @@ package com.white.handdam.auth.service;
 
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.SignupResponse;
+import com.white.handdam.auth.entity.EmailVerification;
 import com.white.handdam.auth.entity.VerificationPurpose;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.exception.CustomException;
@@ -15,6 +16,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -166,6 +171,129 @@ class AuthServiceTest {
         then(memberRepository).should(never()).save(any(Member.class));
         then(emailVerificationService).should(never())
                 .issueAndSend(any(), any(), any(), any());
+    }
+
+    // KSY-004
+    @Test
+    @DisplayName("미인증 회원이면 인증 메일을 재발급")
+    void sendVerificationEmailSuccess() {
+        Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
+        given(memberRepository.findByEmail("test@handdam.com")).willReturn(Optional.of(member));
+
+        authService.sendVerificationEmail("test@handdam.com");
+
+        then(emailVerificationService).should()
+                .issueAndSend(member.getId(), "test@handdam.com", member.getNickname(), VerificationPurpose.SIGNUP);
+    }
+
+    @Test
+    @DisplayName("회원이 존재하지 않으면 아무 것도 하지 않음")
+    void sendVerificationEmailWhenMemberNotFound() {
+        given(memberRepository.findByEmail("nobody@handdam.com")).willReturn(Optional.empty());
+
+        authService.sendVerificationEmail("nobody@handdam.com");
+
+        then(emailVerificationService).should(never()).issueAndSend(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 인증된 회원이면 아무 것도 하지 않음")
+    void sendVerificationEmailWhenAlreadyVerified() {
+        Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
+        member.markEmailVerified();
+        given(memberRepository.findByEmail("test@handdam.com")).willReturn(Optional.of(member));
+
+        authService.sendVerificationEmail("test@handdam.com");
+
+        then(emailVerificationService).should(never()).issueAndSend(any(), any(), any(), any());
+    }
+
+    // KSY-005
+    @Test
+    @DisplayName("가입 인증 토큰 유효하면 회원의 이메일 인증 처리")
+    void confirmSignupVerificationSuccess() {
+        Long memberId = 1L;
+        EmailVerification ev = EmailVerification.create(
+                memberId,
+                "test@handdam.com",
+                VerificationPurpose.SIGNUP,
+                "tokenHash",
+                Instant.now().plus(Duration.ofMinutes(10)));
+        Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
+
+        given(emailVerificationService.confirm("raw-token", VerificationPurpose.SIGNUP)).willReturn(ev);
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+
+        authService.confirmSignupVerification("raw-token");
+
+        assertThat(member.isEmailVerified()).isTrue();
+    }
+
+    @Test
+    @DisplayName("토큰 검증에 실패하면 예외를 그대로 전파하고 회원 조회 X")
+    void confirmSignupVerificationFailWhenTokenInvalid() {
+        given(emailVerificationService.confirm("raw-token", VerificationPurpose.SIGNUP))
+                .willThrow(new CustomException(AuthErrorCode.INVALID_VERIFICATION_TOKEN));
+
+        assertThatThrownBy(() -> authService.confirmSignupVerification("raw-token"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_VERIFICATION_TOKEN);
+
+        then(memberRepository).should(never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("토큰에 연결된 회원이 없으면 예외를 던짐")
+    void confirmSignupVerificationFailWhenMemberNotFound() {
+        Long memberId = 1L;
+        EmailVerification ev = EmailVerification.create(
+                memberId,
+                "test@handdam.com",
+                VerificationPurpose.SIGNUP,
+                "tokenHash",
+                Instant.now().plus(Duration.ofMinutes(10)));
+
+        given(emailVerificationService.confirm("raw-token", VerificationPurpose.SIGNUP)).willReturn(ev);
+        given(memberRepository.findById(memberId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.confirmSignupVerification("raw-token"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.MEMBER_NOT_FOUND);
+    }
+
+    // KSY-006
+    @Test
+    @DisplayName("미인증 회원이면 인증 메일 재발급")
+    void resendSignupVerificationEmailSuccess() {
+        Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
+        given(memberRepository.findByEmail("test@handdam.com")).willReturn(Optional.of(member));
+
+        authService.resendSignupVerificationEmail("test@handdam.com");
+
+        then(emailVerificationService).should()
+                .issueAndSend(member.getId(), "test@handdam.com", member.getNickname(), VerificationPurpose.SIGNUP);
+    }
+
+    @Test
+    @DisplayName("회원이 존재하지 않으면 아무 것도 하지 않음")
+    void resendSignupVerificationEmailWhenMemberNotFound() {
+        given(memberRepository.findByEmail("nobody@handdam.com")).willReturn(Optional.empty());
+
+        authService.resendSignupVerificationEmail("nobody@handdam.com");
+
+        then(emailVerificationService).should(never()).issueAndSend(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 인증된 회원이면 아무 것도 하지 않음")
+    void resendSignupVerificationEmailWhenAlreadyVerified() {
+        Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
+        member.markEmailVerified();
+        given(memberRepository.findByEmail("test@handdam.com")).willReturn(Optional.of(member));
+
+        authService.resendSignupVerificationEmail("test@handdam.com");
+
+        then(emailVerificationService).should(never()).issueAndSend(any(), any(), any(), any());
     }
 
 }
