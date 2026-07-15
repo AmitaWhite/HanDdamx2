@@ -7,6 +7,7 @@ import com.white.handdam.creator.entity.CreatorProfile;
 import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.creator.repository.CreatorProfileRepository;
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.entity.Role;
 import com.white.handdam.member.repository.MemberRepository;
@@ -15,6 +16,9 @@ import com.white.handdam.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.white.handdam.storage.ObjectStorage;
+import com.white.handdam.storage.StoredObject;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 크리에이터 프로필 비즈니스 로직
@@ -27,6 +31,7 @@ public class CreatorProfileService {
     private final CreatorProfileRepository creatorProfileRepository;
     private final MemberRepository memberRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final ObjectStorage objectStorage;
 
     /**
      * 크리에이터 공개 프로필 조회
@@ -92,6 +97,85 @@ public class CreatorProfileService {
                 .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
 
         profile.updateProfile(request.introduction(), request.benefitsDescription());
+
+        long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
+        // Project 구현 후 projectCount, feedCount 교체
+        return CreatorProfileConverter.toResponse(
+                profile, creator, null, subscriberCount, 0L, 0L, true);
+    }
+
+    /**
+     * 대표 이미지 변경
+     */
+    @Transactional
+    public CreatorProfileResponse updateRepresentativeImage(Long memberId, MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+
+        Member creator = findCreatorMemberById(memberId);
+        CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        // S3 업로드 후 프로필 갱신
+        StoredObject stored = objectStorage.upload("creator-profiles/" + memberId, image);
+        profile.updateRepresentativeImage(stored.url(), stored.storageKey());
+
+        long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
+        // Project 구현 후 projectCount, feedCount 교체
+        return CreatorProfileConverter.toResponse(
+                profile, creator, null, subscriberCount, 0L, 0L, true);
+    }
+
+    /**
+     * 대표 이미지 제거
+     */
+    @Transactional
+    public CreatorProfileResponse clearRepresentativeImage(Long memberId) {
+        Member creator = findCreatorMemberById(memberId);
+        CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        profile.clearRepresentativeImage();
+
+        long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
+        // roject 구현 후 projectCount, feedCount 교체
+        return CreatorProfileConverter.toResponse(
+                profile, creator, null, subscriberCount, 0L, 0L, true);
+    }
+
+    /**
+     * 커버 이미지 변경
+     */
+    @Transactional
+    public CreatorProfileResponse updateCoverImage(Long memberId, MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+
+        Member creator = findCreatorMemberById(memberId);
+        CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        StoredObject stored = objectStorage.upload("creator-profiles/" + memberId, image);
+        profile.updateCoverImage(stored.url(), stored.storageKey());
+
+        long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
+        // Project 구현 후 projectCount, feedCount 교체
+        return CreatorProfileConverter.toResponse(
+                profile, creator, null, subscriberCount, 0L, 0L, true);
+    }
+
+    /**
+     * 커버 이미지 제거
+     */
+    @Transactional
+    public CreatorProfileResponse clearCoverImage(Long memberId) {
+        Member creator = findCreatorMemberById(memberId);
+        CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        profile.clearCoverImage();
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
         // Project 구현 후 projectCount, feedCount 교체
