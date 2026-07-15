@@ -1,30 +1,65 @@
 package com.white.handdam.global.config;
 
+import com.white.handdam.global.security.jwt.JwtAccessDeniedHandler;
+import com.white.handdam.global.security.jwt.JwtAuthenticationEntryPoint;
+import com.white.handdam.global.security.jwt.JwtAuthenticationFilter;
+import com.white.handdam.global.security.jwt.JwtProperties;
+import com.white.handdam.global.security.jwt.JwtTokenProvider;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(JwtProperties.class)
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll())
-                .build();
-    }
+        private final JwtTokenProvider jwtTokenProvider;
+        private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+        private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+        // auth 도메인에 로그인/재발급 등 신규 공개 엔드포인트가 추가되면 이 목록도 같이 갱신해야 한다.
+        private static final String[] PERMIT_ALL = {
+                        "/api/auth/signup",
+                        "/api/auth/email-availability",
+                        "/api/auth/nickname-availability",
+                        "/api/auth/email-verifications/**",
+                        "/swagger-ui/**", "/v3/api-docs/**",
+                        "/actuator/health"
+        };
+
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                return http.csrf(AbstractHttpConfigurer::disable)
+                                .cors(cors -> {
+                                })
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(PERMIT_ALL).permitAll()
+                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                                .anyRequest().authenticated())
+                                .exceptionHandling(ex -> ex
+                                                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                                                .accessDeniedHandler(jwtAccessDeniedHandler))
+                                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
+                                                UsernamePasswordAuthenticationFilter.class)
+                                .build();
+        }
+
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 
 }
