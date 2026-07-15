@@ -18,10 +18,10 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.event.FeedPublishedEvent;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import com.white.handdam.storage.ObjectStorage;
@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -63,6 +64,9 @@ class BoardPostServiceTest {
 
 	@Mock
 	private ObjectStorage objectStorage;
+
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private BoardPostService boardPostService;
@@ -115,7 +119,7 @@ class BoardPostServiceTest {
 
 		assertThatThrownBy(() ->
 			boardPostService.getPostsByCreator(creatorId, strangerId, null, null, pageable)
-		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).findByCreator(any(), any(), any(), any());
 	}
@@ -175,6 +179,13 @@ class BoardPostServiceTest {
 		verify(boardPostRepository).save(postCaptor.capture());
 		assertThat(postCaptor.getValue().getTitle()).isEqualTo("재료 질문");
 		verify(objectStorage).upload("premium-board/1", image);
+
+		ArgumentCaptor<FeedPublishedEvent> eventCaptor = ArgumentCaptor.forClass(FeedPublishedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue().postId()).isEqualTo(10L);
+		assertThat(eventCaptor.getValue().creatorId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().writerId()).isEqualTo(subscriberId);
+		assertThat(eventCaptor.getValue().title()).isEqualTo("재료 질문");
 	}
 
 	@Test
@@ -201,6 +212,13 @@ class BoardPostServiceTest {
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
 		verifyNoInteractions(paidSubscriptionChecker);
+
+		ArgumentCaptor<FeedPublishedEvent> eventCaptor = ArgumentCaptor.forClass(FeedPublishedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue().postId()).isEqualTo(11L);
+		assertThat(eventCaptor.getValue().creatorId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().writerId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().title()).isEqualTo("공지");
 	}
 
 	@Test
@@ -216,10 +234,11 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.createPost(creatorId, strangerId, request, null))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).save(any());
 		verifyNoInteractions(objectStorage);
+		verifyNoInteractions(eventPublisher);
 	}
 
 	@Test
@@ -290,7 +309,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, 1L))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
@@ -306,7 +325,7 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, strangerId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
@@ -317,6 +336,7 @@ class BoardPostServiceTest {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
 			"수정된 제목",
 			BoardPostType.GENERAL,
@@ -340,6 +360,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
 			"수정된 제목",
 			BoardPostType.GENERAL,
@@ -366,7 +387,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, subscriberId, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		assertThat(post.getTitle()).isEqualTo("테스트 제목");
 	}
@@ -382,7 +403,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, 5L, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 	}
 
 	@Test
@@ -392,6 +413,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 
 		boardPostService.deletePost(10L, authorId);
 
@@ -409,7 +431,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, strangerId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		assertThat(post.isDeleted()).isFalse();
 	}
@@ -420,7 +442,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, 5L))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 	}
 
 	@Test
@@ -442,7 +464,7 @@ class BoardPostServiceTest {
 	@DisplayName("비로그인은 내 작성글 목록을 조회할 수 없다")
 	void guestCannotGetMyPosts() {
 		assertThatThrownBy(() -> boardPostService.getMyPosts(null, null, null, pageable))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_LOGIN_REQUIRED));
 
 		verify(boardPostRepository, never()).findByMember(any(), any(), any(), any());
 	}
@@ -453,6 +475,7 @@ class BoardPostServiceTest {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		MockMultipartFile image = new MockMultipartFile(
 			"images",
 			"b.jpg",
@@ -501,7 +524,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, subscriberId, List.of(image)))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
@@ -514,6 +537,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		MockMultipartFile image = new MockMultipartFile(
 			"images",
 			"b.jpg",
@@ -523,7 +547,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, authorId, List.of(image)))
-			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_ADD_NOT_ALLOWED));
 
 		verifyNoInteractions(objectStorage);
 	}
@@ -535,6 +559,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		given(boardPostImageRepository.findMaxOrderIndexByBoardPostId(10L))
 			.willReturn(Optional.empty());
 
@@ -552,7 +577,8 @@ class BoardPostServiceTest {
 			boardPostRepository,
 			boardPostImageRepository,
 			paidSubscriptionChecker,
-			realStorage
+			realStorage,
+			eventPublisher
 		);
 
 		Long creatorId = 1L;
@@ -609,12 +635,14 @@ class BoardPostServiceTest {
 			boardPostRepository,
 			boardPostImageRepository,
 			paidSubscriptionChecker,
-			realStorage
+			realStorage,
+			eventPublisher
 		);
 
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		byte[] imageBytes = {10, 20, 30, 40, 50};
 		MockMultipartFile image = new MockMultipartFile(
 			"images",
@@ -650,12 +678,14 @@ class BoardPostServiceTest {
 			boardPostRepository,
 			boardPostImageRepository,
 			paidSubscriptionChecker,
-			realStorage
+			realStorage,
+			eventPublisher
 		);
 
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		byte[] imageBytes = {9, 8, 7, 6, 5};
 		MockMultipartFile file = new MockMultipartFile(
 			"images",
@@ -696,6 +726,7 @@ class BoardPostServiceTest {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		BoardPostImage image = BoardPostImage.builder()
 			.boardPost(post)
 			.url("http://localhost:4566/handdam-local/a.jpg")
@@ -726,7 +757,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, subscriberId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).delete(any());
@@ -738,11 +769,12 @@ class BoardPostServiceTest {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, authorId))
-			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_DELETE_NOT_ALLOWED));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).delete(any());
@@ -755,13 +787,95 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		given(boardPostImageRepository.findByIdAndBoardPostId(999L, 10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 999L, authorId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_IMAGE_NOT_FOUND));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).delete(any());
+	}
+
+
+	@Test
+	@DisplayName("구독 해지 후에도 본인 글 상세는 조회할 수 있다")
+	void expiredAuthorCanGetOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(10L)).willReturn(List.of());
+
+		BoardPostResponse result = boardPostService.getPost(10L, authorId);
+
+		assertThat(result.memberId()).isEqualTo(authorId);
+		verifyNoInteractions(paidSubscriptionChecker);
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 타인 글 상세를 조회할 수 없다")
+	void expiredUserCannotGetOthersPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long expiredId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(expiredId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.getPost(10L, expiredId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 글도 수정할 수 없다")
+	void expiredAuthorCannotUpdateOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
+			"수정된 제목",
+			BoardPostType.GENERAL,
+			"수정된 본문"
+		);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.updatePost(10L, authorId, request))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 글도 삭제할 수 없다")
+	void expiredAuthorCannotDeleteOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.deletePost(10L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		assertThat(post.isDeleted()).isFalse();
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 새 글을 작성할 수 없다")
+	void expiredUserCannotCreatePost() {
+		Long creatorId = 1L;
+		Long expiredId = 99L;
+		CreateBoardPostRequest request = new CreateBoardPostRequest(
+			"제목",
+			BoardPostType.QUESTION,
+			"본문"
+		);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(expiredId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.createPost(creatorId, expiredId, request, null))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		verify(boardPostRepository, never()).save(any());
 	}
 
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {

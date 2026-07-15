@@ -1,6 +1,7 @@
 package com.white.handdam.board.controller;
 
 import com.white.handdam.board.dto.request.CreateBoardCommentRequest;
+import com.white.handdam.board.dto.request.UpdateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.service.BoardCommentService;
 import com.white.handdam.global.response.ApiResponse;
@@ -9,7 +10,9 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,5 +63,33 @@ public class BoardCommentController {
 	) {
 		BoardCommentResponse response = boardCommentService.createReply(commentId, memberId, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+	}
+
+	/**
+	 * 댓글·대댓글 수정 (LDJ-015).
+	 * 권한: 해당 댓글 작성자
+	 */
+	@PatchMapping("/api/board-comments/{commentId}")
+	public ApiResponse<BoardCommentResponse> updateComment(
+		@PathVariable Long commentId,
+		@RequestHeader("X-Member-Id") Long memberId,
+		@Valid @RequestBody UpdateBoardCommentRequest request
+	) {
+		return ApiResponse.success(
+			boardCommentService.updateComment(commentId, memberId, request)
+		);
+	}
+
+	/**
+	 * 댓글·대댓글 소프트 삭제 (LDJ-016).
+	 * 권한: 해당 댓글 작성자
+	 */
+	@DeleteMapping("/api/board-comments/{commentId}")
+	public ResponseEntity<ApiResponse<Void>> deleteComment(
+		@PathVariable Long commentId,
+		@RequestHeader("X-Member-Id") Long memberId
+	) {
+		boardCommentService.deleteComment(commentId, memberId);
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
 	}
 }
