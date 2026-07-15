@@ -1,15 +1,23 @@
 package com.white.handdam.feed.controller;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
+import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedIdResponse;
+import com.white.handdam.feed.dto.response.FeedSummaryResponse;
 import com.white.handdam.feed.service.FeedService;
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.response.SliceResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -41,5 +49,43 @@ public class FeedController {
             @RequestHeader(value = "X-Member-Id", required = false) Long memberId
     ) {
         return ApiResponse.success(feedService.getFeed(feedId, memberId));
+    }
+
+    // [LYJ-003] PATCH /api/feeds/{feedId}
+    @PatchMapping("/{feedId}")
+    public ApiResponse<FeedIdResponse> updateFeed(
+            @PathVariable Long feedId,
+            @RequestHeader("X-Member-Id") Long memberId,
+            @Valid @RequestBody FeedUpdateRequest request
+    ) {
+        return ApiResponse.success(new FeedIdResponse(feedService.updateFeed(feedId, memberId, request)));
+    }
+
+    // [LYJ-004] PATCH /api/feeds/{feedId}/project
+    @PatchMapping("/{feedId}/project")
+    public ApiResponse<FeedIdResponse> moveFeedProject(
+            @PathVariable Long feedId,
+            @RequestHeader("X-Member-Id") Long memberId,
+            @Valid @RequestBody FeedMoveProjectRequest request
+    ){
+        return ApiResponse.success(new FeedIdResponse(feedService.moveFeedProject(feedId, memberId, request)));
+    }
+
+    // [LYJ-005] DELETE /api/feeds/{feedId}
+    @DeleteMapping("/{feedId}")
+    public ApiResponse<Void> deleteFeed(
+            @PathVariable Long feedId,
+            @RequestHeader("X-Member-Id") Long memberId
+    ){
+        feedService.deleteFeed(feedId, memberId);
+        return ApiResponse.noContent();
+    }
+
+    // [LYJ-006] GET /api/feeds/public
+    @GetMapping("/public")
+    public SliceResponse<FeedSummaryResponse> getPublicFeeds(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ){
+        return SliceResponse.from(feedService.getPublicFeeds(pageable));
     }
 }
