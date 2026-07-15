@@ -169,27 +169,21 @@ public class BoardCommentService {
 	 * 댓글·대댓글 수정: 해당 댓글 작성자만 허용.
 	 */
 	void assertCanEditComment(BoardComment comment, Long requesterId) {
-		assertCommentAuthor(comment, requesterId, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN);
+		BoardOwnershipAsserter.assertOwner(
+			comment.getMemberId(),
+			requesterId,
+			BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN
+		);
 	}
 
 	/**
 	 * 댓글·대댓글 삭제: 해당 댓글 작성자만 허용.
 	 */
 	void assertCanDeleteComment(BoardComment comment, Long requesterId) {
-		assertCommentAuthor(comment, requesterId, BoardErrorCode.BOARD_COMMENT_DELETE_FORBIDDEN);
-	}
-
-	private void assertCommentAuthor(
-		BoardComment comment,
-		Long requesterId,
-		BoardErrorCode forbiddenCode
-	) {
-		if (requesterId == null) {
-			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
-		}
-		if (requesterId.equals(comment.getMemberId())) {
-			return;
-		}
-		throw new CustomException(forbiddenCode);
+		BoardOwnershipAsserter.assertOwner(
+			comment.getMemberId(),
+			requesterId,
+			BoardErrorCode.BOARD_COMMENT_DELETE_FORBIDDEN
+		);
 	}
 }

@@ -66,13 +66,11 @@ public class BoardAnswerService {
 	 * 공식 답변 작성: 게시판 소유 크리에이터만 허용.
 	 */
 	void assertCanCreateAnswer(BoardPost post, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
-		}
-		if (requesterId.equals(post.getCreatorId())) {
-			return;
-		}
-		throw new CustomException(BoardErrorCode.BOARD_ANSWER_CREATE_FORBIDDEN);
+		BoardOwnershipAsserter.assertOwner(
+			post.getCreatorId(),
+			requesterId,
+			BoardErrorCode.BOARD_ANSWER_CREATE_FORBIDDEN
+		);
 	}
 
 	/**
@@ -125,12 +123,10 @@ public class BoardAnswerService {
 	 * 공식 답변 수정·삭제: 해당 답변을 작성한 크리에이터만 허용.
 	 */
 	void assertCanEditAnswer(BoardAnswer answer, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
-		}
-		if (requesterId.equals(answer.getCreatorId())) {
-			return;
-		}
-		throw new CustomException(BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN);
+		BoardOwnershipAsserter.assertOwner(
+			answer.getCreatorId(),
+			requesterId,
+			BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN
+		);
 	}
 }

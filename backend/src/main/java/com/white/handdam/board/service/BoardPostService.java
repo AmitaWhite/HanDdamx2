@@ -298,16 +298,7 @@ public class BoardPostService {
 	 * 목록 조회에서 사용. 구독 해지 후에는 게시판 전체 목록 조회 불가.
 	 */
 	void assertCanAccessBoard(Long creatorId, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
-		}
-		if (requesterId.equals(creatorId)) {
-			return;
-		}
-		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
-			return;
-		}
-		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
+		assertCreatorOrActiveSubscriber(creatorId, requesterId);
 	}
 
 	/**
@@ -315,16 +306,7 @@ public class BoardPostService {
 	 * 구독 해지 후에는 신규 작성 불가.
 	 */
 	void assertCanWriteOnBoard(Long creatorId, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
-		}
-		if (requesterId.equals(creatorId)) {
-			return;
-		}
-		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
-			return;
-		}
-		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
+		assertCreatorOrActiveSubscriber(creatorId, requesterId);
 	}
 
 	// -------------------------------------------------------------------------
@@ -363,16 +345,11 @@ public class BoardPostService {
 		if (requesterId == null) {
 			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
-		if (requesterId.equals(post.getCreatorId())) {
-			return;
-		}
+		// 본인 글은 구독 해지 후에도 조회 가능
 		if (requesterId.equals(post.getMemberId())) {
 			return;
 		}
-		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, post.getCreatorId())) {
-			return;
-		}
-		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
+		assertCreatorOrActiveSubscriber(post.getCreatorId(), requesterId);
 	}
 
 	/**
@@ -380,13 +357,20 @@ public class BoardPostService {
 	 * 글 작성자라도 구독이 해지되면 쓰기 불가.
 	 */
 	void assertCanWriteOnPost(BoardPost post, Long requesterId) {
+		assertCreatorOrActiveSubscriber(post.getCreatorId(), requesterId);
+	}
+
+	/**
+	 * 크리에이터 본인 또는 해당 크리에이터의 활성 유료 구독자인지 확인.
+	 */
+	private void assertCreatorOrActiveSubscriber(Long creatorId, Long requesterId) {
 		if (requesterId == null) {
 			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
-		if (requesterId.equals(post.getCreatorId())) {
+		if (requesterId.equals(creatorId)) {
 			return;
 		}
-		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, post.getCreatorId())) {
+		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
 			return;
 		}
 		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
@@ -463,12 +447,10 @@ public class BoardPostService {
 	 * (쓰기 가능 여부는 assertCanWriteOnPost에서 별도 검사)
 	 */
 	void assertCanEditPost(BoardPost post, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
-		}
-		if (requesterId.equals(post.getMemberId())) {
-			return;
-		}
-		throw new CustomException(BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN);
+		BoardOwnershipAsserter.assertOwner(
+			post.getMemberId(),
+			requesterId,
+			BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN
+		);
 	}
 }
