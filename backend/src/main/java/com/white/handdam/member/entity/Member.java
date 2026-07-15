@@ -87,5 +87,9 @@ public class Member extends BaseTimeEntity {
         return emailVerifiedAt != null;
     }
 
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     public void changeRoleToCreator() { this.role = Role.CREATOR; }
 }

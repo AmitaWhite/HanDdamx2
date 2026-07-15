@@ -24,7 +24,8 @@ public class VerificationEmailEventListener {
         try {
             MailContent content = verificationEmailContent.create(
                     event.nickname(),
-                    event.rawToken()
+                    event.rawToken(),
+                    event.purpose()
             );
 
             emailSender.send(

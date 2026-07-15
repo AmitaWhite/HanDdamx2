@@ -24,11 +24,15 @@ public class EmailVerificationService {
 
     private final EmailVerificationRepository emailVerificationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final RateLimitService rateLimitService;
 
     private static final Duration VERIFICATION_TOKEN_TTL = Duration.ofMinutes(10);
 
     @Transactional
     public void issueAndSend(Long memberId, String email, String nickname, VerificationPurpose purpose) {
+        rateLimitService.checkCooldown(email, purpose);
+        rateLimitService.increaseDailyCount(email, purpose);
+
         // 이전 PENDING 정리 후 토큰 발급
         expirePendingTokens(email, purpose);
 
@@ -48,7 +52,7 @@ public class EmailVerificationService {
                 new VerificationEmailRequestedEvent(email, nickname, rawToken, purpose));
     }
 
-    // KSY-005
+    // KSY-005 & KSY-013
     @Transactional
     public EmailVerification confirm(String rawToken, VerificationPurpose expectedPurpose) {
         String tokenHash = TokenGenerator.hash(rawToken);
@@ -70,4 +74,5 @@ public class EmailVerificationService {
                 email, purpose, VerificationStatus.PENDING)
                 .forEach(EmailVerification::expire);
     }
+
 }
