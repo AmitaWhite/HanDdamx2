@@ -82,7 +82,6 @@ public class AuthService {
     }
 
     // KSY-006
-    // TODO : NFR-003 rate limit은 후속 작업
     @Transactional
     public void resendSignupVerificationEmail(String email) {
         issueSignupVerificationEmail(email);

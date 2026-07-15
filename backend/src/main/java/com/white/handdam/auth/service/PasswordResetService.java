@@ -6,6 +6,7 @@ import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.auth.util.EmailNormalizer;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
+import com.white.handdam.member.entity.OAuthProvider;
 import com.white.handdam.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,7 +27,7 @@ public class PasswordResetService {
 
         memberRepository.findByEmail(normalizedEmail).ifPresent(member -> {
             // OAuth 전용 계정은 비밀번호 재설정 메일을 보내지 X
-            if (member.getOauthProvider() != null) {
+            if (member.getOauthProvider() != OAuthProvider.NONE) {
                 return;
             } // 항상 동일한 응답 위해 예외 던지지 X
 
