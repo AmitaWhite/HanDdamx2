@@ -12,7 +12,6 @@ import com.white.handdam.board.entity.BoardPostType;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
@@ -89,7 +88,7 @@ public class BoardPostService {
 		Pageable pageable
 	) {
 		if (memberId == null) {
-			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
 		return boardPostRepository
 			.findByMember(memberId, type, status, pageable)
@@ -159,15 +158,12 @@ public class BoardPostService {
 		List<MultipartFile> imageFiles
 	) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		assertCanEditPost(post, requesterId);
 
 		if (post.getStatus() != BoardPostStatus.WAITING) {
-			throw new CustomException(
-				BoardErrorCode.BOARD_POST_ALREADY_ANSWERED,
-				"공식 답변이 등록된 게시글은 이미지를 추가할 수 없습니다."
-			);
+			throw new CustomException(BoardErrorCode.BOARD_POST_IMAGE_ADD_NOT_ALLOWED);
 		}
 
 		int nextOrderIndex = boardPostImageRepository.findMaxOrderIndexByBoardPostId(postId)
@@ -201,19 +197,16 @@ public class BoardPostService {
 	@Transactional
 	public void deleteImage(Long postId, Long imageId, Long requesterId) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		assertCanEditPost(post, requesterId);
 
 		if (post.getStatus() != BoardPostStatus.WAITING) {
-			throw new CustomException(
-				BoardErrorCode.BOARD_POST_ALREADY_ANSWERED,
-				"공식 답변이 등록된 게시글은 이미지를 삭제할 수 없습니다."
-			);
+			throw new CustomException(BoardErrorCode.BOARD_POST_IMAGE_DELETE_NOT_ALLOWED);
 		}
 
 		BoardPostImage image = boardPostImageRepository.findByIdAndBoardPostId(imageId, postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "이미지를 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_IMAGE_NOT_FOUND));
 
 		objectStorage.delete(image.getStorageKey());
 		boardPostImageRepository.delete(image);
@@ -293,7 +286,7 @@ public class BoardPostService {
 	 */
 	void assertCanAccessBoard(Long creatorId, Long requesterId) {
 		if (requesterId == null) {
-			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
 		if (requesterId.equals(creatorId)) {
 			return;
@@ -301,7 +294,7 @@ public class BoardPostService {
 		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
 			return;
 		}
-		throw new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED);
+		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
 	}
 
 	// -------------------------------------------------------------------------
@@ -321,7 +314,7 @@ public class BoardPostService {
 	public BoardPostResponse getPost(Long postId, Long requesterId) {
 		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		// 2) 게시판 크리에이터 / 작성자 / 활성 유료 구독자
 		assertCanAccessPost(post, requesterId);
@@ -337,7 +330,7 @@ public class BoardPostService {
 	 */
 	void assertCanAccessPost(BoardPost post, Long requesterId) {
 		if (requesterId == null) {
-			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
 		if (requesterId.equals(post.getCreatorId())) {
 			return;
@@ -348,7 +341,7 @@ public class BoardPostService {
 		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, post.getCreatorId())) {
 			return;
 		}
-		throw new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED);
+		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
 	}
 
 	// -------------------------------------------------------------------------
@@ -374,7 +367,7 @@ public class BoardPostService {
 	public BoardPostResponse updatePost(Long postId, Long requesterId, UpdateBoardPostRequest request) {
 		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		// 2) 작성자(member_id)만 수정 가능. 타인·비로그인 → 403
 		assertCanEditPost(post, requesterId);
@@ -405,7 +398,7 @@ public class BoardPostService {
 	@Transactional
 	public void deletePost(Long postId, Long requesterId) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		// 2) 작성자만 삭제 가능
 		assertCanEditPost(post, requesterId);
@@ -420,11 +413,11 @@ public class BoardPostService {
 	 */
 	void assertCanEditPost(BoardPost post, Long requesterId) {
 		if (requesterId == null) {
-			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
 		if (requesterId.equals(post.getMemberId())) {
 			return;
 		}
-		throw new CustomException(CommonErrorCode.FORBIDDEN, "게시글을 수정할 권한이 없습니다.");
+		throw new CustomException(BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN);
 	}
 }

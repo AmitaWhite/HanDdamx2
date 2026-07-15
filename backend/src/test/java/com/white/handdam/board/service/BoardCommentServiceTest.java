@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.white.handdam.board.dto.request.CreateBoardCommentRequest;
+import com.white.handdam.board.dto.request.UpdateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.entity.BoardComment;
 import com.white.handdam.board.entity.BoardPost;
@@ -18,7 +19,6 @@ import com.white.handdam.board.entity.BoardPostType;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardCommentRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import java.time.Instant;
@@ -83,11 +83,11 @@ class BoardCommentServiceTest {
 		BoardPost post = samplePost(creatorId, authorId);
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		willThrow(new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED))
+		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
 			.given(boardPostService).assertCanAccessPost(post, strangerId);
 
 		assertThatThrownBy(() -> boardCommentService.getComments(10L, strangerId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardCommentRepository, never()).findByBoardPostIdOrderByCreatedAtAsc(any());
 	}
@@ -98,7 +98,7 @@ class BoardCommentServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardCommentService.getComments(10L, 1L))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardCommentRepository, never()).findByBoardPostIdOrderByCreatedAtAsc(any());
 	}
@@ -198,11 +198,11 @@ class BoardCommentServiceTest {
 		CreateBoardCommentRequest request = new CreateBoardCommentRequest("권한 없는 댓글");
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		willThrow(new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED))
+		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
 			.given(boardPostService).assertCanAccessPost(post, strangerId);
 
 		assertThatThrownBy(() -> boardCommentService.createComment(10L, strangerId, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardCommentRepository, never()).save(any());
 	}
@@ -214,7 +214,7 @@ class BoardCommentServiceTest {
 
 		assertThatThrownBy(() ->
 			boardCommentService.createComment(10L, 1L, new CreateBoardCommentRequest("댓글"))
-		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardCommentRepository, never()).save(any());
 	}
@@ -316,12 +316,12 @@ class BoardCommentServiceTest {
 		BoardComment parent = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
-		willThrow(new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED))
+		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
 			.given(boardPostService).assertCanAccessPost(post, strangerId);
 
 		assertThatThrownBy(() ->
 			boardCommentService.createReply(100L, strangerId, new CreateBoardCommentRequest("대댓글"))
-		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardCommentRepository, never()).save(any());
 	}
@@ -333,7 +333,7 @@ class BoardCommentServiceTest {
 
 		assertThatThrownBy(() ->
 			boardCommentService.createReply(100L, 1L, new CreateBoardCommentRequest("대댓글"))
-		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
 
 		verify(boardCommentRepository, never()).save(any());
 	}
@@ -369,9 +369,110 @@ class BoardCommentServiceTest {
 
 		assertThatThrownBy(() ->
 			boardCommentService.createReply(100L, authorId, new CreateBoardCommentRequest("대댓글"))
-		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("작성자는 댓글 내용을 수정할 수 있다")
+	void authorCanUpdateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "원본 댓글");
+		UpdateBoardCommentRequest request = new UpdateBoardCommentRequest("수정된 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		BoardCommentResponse response = boardCommentService.updateComment(100L, authorId, request);
+
+		assertThat(response.id()).isEqualTo(100L);
+		assertThat(response.content()).isEqualTo("수정된 댓글");
+		assertThat(response.depth()).isEqualTo((short) 0);
+		assertThat(comment.getContent()).isEqualTo("수정된 댓글");
+	}
+
+	@Test
+	@DisplayName("작성자는 대댓글 내용을 수정할 수 있다")
+	void authorCanUpdateReply() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment root = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
+		BoardComment reply = sampleComment(post, 101L, creatorId, root, (short) 1, "원본 대댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(101L)).willReturn(Optional.of(reply));
+
+		BoardCommentResponse response = boardCommentService.updateComment(
+			101L,
+			creatorId,
+			new UpdateBoardCommentRequest("수정된 대댓글")
+		);
+
+		assertThat(response.id()).isEqualTo(101L);
+		assertThat(response.parentCommentId()).isEqualTo(100L);
+		assertThat(response.depth()).isEqualTo((short) 1);
+		assertThat(response.content()).isEqualTo("수정된 대댓글");
+	}
+
+	@Test
+	@DisplayName("작성자가 아니면 댓글을 수정할 수 없다")
+	void nonAuthorCannotUpdateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long strangerId = 7L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "원본 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		assertThatThrownBy(() ->
+			boardCommentService.updateComment(100L, strangerId, new UpdateBoardCommentRequest("수정 시도"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN));
+
+		assertThat(comment.getContent()).isEqualTo("원본 댓글");
+	}
+
+	@Test
+	@DisplayName("유료 구독자라도 작성자가 아니면 댓글을 수정할 수 없다")
+	void subscriberCannotUpdateOthersComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long subscriberId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "원본 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		assertThatThrownBy(() ->
+			boardCommentService.updateComment(100L, subscriberId, new UpdateBoardCommentRequest("수정 시도"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN));
+	}
+
+	@Test
+	@DisplayName("게시판 참여자(크리에이터)라도 작성자가 아니면 댓글을 수정할 수 없다")
+	void participantCannotUpdateOthersComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "원본 댓글");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+
+		assertThatThrownBy(() ->
+			boardCommentService.updateComment(100L, creatorId, new UpdateBoardCommentRequest("수정 시도"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN));
+	}
+
+	@Test
+	@DisplayName("삭제된 댓글은 수정할 수 없다")
+	void deletedCommentCannotUpdate() {
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() ->
+			boardCommentService.updateComment(100L, 5L, new UpdateBoardCommentRequest("수정 시도"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
 	}
 
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {

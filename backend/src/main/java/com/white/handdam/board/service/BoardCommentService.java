@@ -2,13 +2,13 @@ package com.white.handdam.board.service;
 
 import com.white.handdam.board.converter.BoardCommentConverter;
 import com.white.handdam.board.dto.request.CreateBoardCommentRequest;
+import com.white.handdam.board.dto.request.UpdateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.entity.BoardComment;
 import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardCommentRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class BoardCommentService {
 	 */
 	public List<BoardCommentResponse> getComments(Long postId, Long requesterId) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		boardPostService.assertCanAccessPost(post, requesterId);
 
@@ -60,7 +60,7 @@ public class BoardCommentService {
 		CreateBoardCommentRequest request
 	) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		boardPostService.assertCanAccessPost(post, requesterId);
 
@@ -94,7 +94,7 @@ public class BoardCommentService {
 		CreateBoardCommentRequest request
 	) {
 		BoardComment parent = boardCommentRepository.findByIdAndDeletedFalse(commentId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "댓글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
 
 		if (parent.getDepth() != 0) {
 			throw new CustomException(BoardErrorCode.BOARD_COMMENT_REPLY_DEPTH_EXCEEDED);
@@ -102,7 +102,7 @@ public class BoardCommentService {
 
 		BoardPost post = parent.getBoardPost();
 		if (post.isDeleted()) {
-			throw new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다.");
+			throw new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND);
 		}
 
 		boardPostService.assertCanAccessPost(post, requesterId);
@@ -117,5 +117,42 @@ public class BoardCommentService {
 
 		BoardComment saved = boardCommentRepository.save(reply);
 		return BoardCommentConverter.toResponse(saved, List.of());
+	}
+
+	/**
+	 * 댓글·대댓글 수정 (LDJ-015).
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 댓글 조회 (없으면 404)
+	 * 2. 작성자만 허용 (아니면 403)
+	 * 3. content 갱신
+	 * </pre>
+	 */
+	@Transactional
+	public BoardCommentResponse updateComment(
+		Long commentId,
+		Long requesterId,
+		UpdateBoardCommentRequest request
+	) {
+		BoardComment comment = boardCommentRepository.findByIdAndDeletedFalse(commentId)
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
+
+		assertCanEditComment(comment, requesterId);
+		comment.updateContent(request.content());
+
+		return BoardCommentConverter.toResponse(comment, List.of());
+	}
+
+	/**
+	 * 댓글·대댓글 수정: 해당 댓글 작성자만 허용.
+	 */
+	void assertCanEditComment(BoardComment comment, Long requesterId) {
+		if (requesterId == null) {
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
+		}
+		if (requesterId.equals(comment.getMemberId())) {
+			return;
+		}
+		throw new CustomException(BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN);
 	}
 }

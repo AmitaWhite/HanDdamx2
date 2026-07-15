@@ -21,7 +21,6 @@ import com.white.handdam.board.entity.BoardPostType;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import com.white.handdam.storage.ObjectStorage;
@@ -115,7 +114,7 @@ class BoardPostServiceTest {
 
 		assertThatThrownBy(() ->
 			boardPostService.getPostsByCreator(creatorId, strangerId, null, null, pageable)
-		).satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).findByCreator(any(), any(), any(), any());
 	}
@@ -216,7 +215,7 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.createPost(creatorId, strangerId, request, null))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).save(any());
 		verifyNoInteractions(objectStorage);
@@ -290,7 +289,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, 1L))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
@@ -306,7 +305,7 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, strangerId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.SUBSCRIPTION_REQUIRED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
@@ -366,7 +365,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, subscriberId, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		assertThat(post.getTitle()).isEqualTo("테스트 제목");
 	}
@@ -382,7 +381,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, 5L, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 	}
 
 	@Test
@@ -409,7 +408,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, strangerId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		assertThat(post.isDeleted()).isFalse();
 	}
@@ -420,7 +419,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, 5L))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 	}
 
 	@Test
@@ -442,7 +441,7 @@ class BoardPostServiceTest {
 	@DisplayName("비로그인은 내 작성글 목록을 조회할 수 없다")
 	void guestCannotGetMyPosts() {
 		assertThatThrownBy(() -> boardPostService.getMyPosts(null, null, null, pageable))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_LOGIN_REQUIRED));
 
 		verify(boardPostRepository, never()).findByMember(any(), any(), any(), any());
 	}
@@ -501,7 +500,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, subscriberId, List.of(image)))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
@@ -523,7 +522,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, authorId, List.of(image)))
-			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_ADD_NOT_ALLOWED));
 
 		verifyNoInteractions(objectStorage);
 	}
@@ -726,7 +725,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, subscriberId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).delete(any());
@@ -742,7 +741,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, authorId))
-			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_DELETE_NOT_ALLOWED));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).delete(any());
@@ -758,7 +757,7 @@ class BoardPostServiceTest {
 		given(boardPostImageRepository.findByIdAndBoardPostId(999L, 10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 999L, authorId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_IMAGE_NOT_FOUND));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).delete(any());
