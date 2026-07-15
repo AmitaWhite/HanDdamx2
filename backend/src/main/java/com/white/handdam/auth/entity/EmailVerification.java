@@ -1,8 +1,11 @@
 package com.white.handdam.auth.entity;
 
+import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.entity.BaseCreatedAtEntity;
+import com.white.handdam.global.exception.CustomException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -41,15 +44,53 @@ public class EmailVerification extends BaseCreatedAtEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Builder(access = AccessLevel.PRIVATE)
+    public EmailVerification(Long memberId, String email, VerificationPurpose purpose,
+                             String tokenHash, Instant expiresAt) {
+        this.memberId = memberId;
+        this.email = email;
+        this.purpose = purpose;
+        this.tokenHash = tokenHash;
+        this.expiresAt = expiresAt;
+    }
+
     public static EmailVerification create(Long memberId, String email, VerificationPurpose purpose,
                                            String tokenHash, Instant expiresAt) {
-        EmailVerification ev = new EmailVerification();
-        ev.memberId = memberId;
-        ev.email = email;
-        ev.purpose = purpose;
-        ev.tokenHash = tokenHash;
-        ev.expiresAt = expiresAt;
-        return ev;
+        return EmailVerification.builder()
+                .memberId(memberId)
+                .email(email)
+                .purpose(purpose)
+                .tokenHash(tokenHash)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    // 토큰 사용 가능한지 확인
+    public void checkValid() {
+        if (this.status == VerificationStatus.EXPIRED) {
+            throw new CustomException(AuthErrorCode.EXPIRED_VERIFICATION_TOKEN);
+        }
+        if (this.status == VerificationStatus.VERIFIED) {
+            throw new CustomException(AuthErrorCode.ALREADY_PROCESSED_VERIFICATION);
+        }
+        if (isExpired()) {
+            throw new CustomException(AuthErrorCode.EXPIRED_VERIFICATION_TOKEN);
+        }
+    }
+
+    // 검증 후 토큰 사용 처리
+    public void verify() {
+        checkValid();
+        this.status = VerificationStatus.VERIFIED;
+        this.usedAt = Instant.now();
+    }
+
+    public void expire() {
+        this.status = VerificationStatus.EXPIRED;
+    }
+
+    public boolean isExpired() {
+        return Instant.now().isAfter(this.expiresAt);
     }
 
 }

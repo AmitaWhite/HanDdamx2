@@ -2,6 +2,7 @@ package com.white.handdam.creator.repository;
 
 import com.white.handdam.creator.entity.CreatorApplication;
 import com.white.handdam.creator.entity.CreatorApplicationStatus;
+import com.white.handdam.creator.entity.CreatorProfile;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -32,15 +33,16 @@ public interface CreatorApplicationRepository extends JpaRepository<CreatorAppli
     List<CreatorApplication> findByMemberIdOrderByAppliedAtDesc(Long memberId);
 
     /**
-     * 관리자용 전체 신청 목록.
+     * 관리자용 전체 신청 목록 — creator_profile LEFT JOIN으로 N+1 방지.
      * status가 null이면 전체 조회, 값이 있으면 해당 상태만 필터
      */
     @Query("""
-            SELECT a FROM CreatorApplication a
+            SELECT a, p FROM CreatorApplication a
+            LEFT JOIN CreatorProfile p ON p.memberId = a.memberId
             WHERE (:status IS NULL OR a.status = :status)
             ORDER BY a.appliedAt DESC
             """)
-    Page<CreatorApplication> findAllByStatus(
+    Page<Object[]> findAllByStatusWithProfile(
             @Param("status") CreatorApplicationStatus status,
             Pageable pageable
     );

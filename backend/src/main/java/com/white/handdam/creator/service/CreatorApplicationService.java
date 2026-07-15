@@ -23,8 +23,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 
 /**
  * 크리에이터 전환 신청 비즈니스 로직.
@@ -38,9 +36,6 @@ public class CreatorApplicationService {
     private final CreatorProfileRepository creatorProfileRepository;
     private final MemberRepository memberRepository;
     private final ObjectStorage objectStorage;
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     /**
      * 크리에이터 전환 신청
@@ -71,9 +66,7 @@ public class CreatorApplicationService {
         }
 
         // 1) 신청 이력 생성
-        CreatorApplication application = CreatorApplication.builder()
-                .memberId(memberId)
-                .build();
+        CreatorApplication application = CreatorApplication.create(memberId);
         creatorApplicationRepository.save(application);
 
         // 2) 크리에이터 프로필 초안 생성 또는 갱신
@@ -122,8 +115,14 @@ public class CreatorApplicationService {
             Long adminId, CreatorApplicationStatus status, Pageable pageable) {
         assertAdmin(adminId);
         return creatorApplicationRepository
-                .findAllByStatus(status, pageable)
-                .map(this::toResponseWithProfile);
+                .findAllByStatusWithProfile(status, pageable)
+                .map(row -> {
+                    CreatorApplication application = (CreatorApplication) row[0];
+                    CreatorProfile profile = (CreatorProfile) row[1]; // LEFT JOIN이라 null 가능
+                    String introduction = profile != null ? profile.getIntroduction() : null;
+                    String imageUrl = profile != null ? profile.getRepresentativeImageUrl() : null;
+                    return CreatorApplicationConverter.toResponse(application, introduction, imageUrl);
+                });
     }
 
     /**
@@ -131,7 +130,13 @@ public class CreatorApplicationService {
      */
     public CreatorApplicationResponse getApplicationDetail(Long adminId, Long applicationId) {
         assertAdmin(adminId);
-        return toResponseWithProfile(findApplicationById(applicationId));
+        CreatorApplication application = findApplicationById(applicationId);
+        return creatorProfileRepository.findByMemberId(application.getMemberId())
+                .map(profile -> CreatorApplicationConverter.toResponse(
+                        application,
+                        profile.getIntroduction(),
+                        profile.getRepresentativeImageUrl()))
+                .orElse(CreatorApplicationConverter.toResponse(application));
     }
 
     /**
@@ -144,11 +149,9 @@ public class CreatorApplicationService {
         CreatorApplication application = findApplicationById(applicationId);
         assertPending(application);
 
-        // 1) role CREATOR로 변경
-        entityManager.createQuery("UPDATE Member m SET m.role = :role WHERE m.id = :memberId")
-                .setParameter("role", Role.CREATOR)
-                .setParameter("memberId", application.getMemberId())
-                .executeUpdate();
+        // 1) role CREATOR로 변경 — memberRepository로 엔티티 조회 후 도메인 메서드 호출
+        Member member = findMemberById(application.getMemberId());
+        member.changeRoleToCreator();
 
         // 2) 신청 상태 APPROVED
         application.approve(adminId);
@@ -193,13 +196,5 @@ public class CreatorApplicationService {
             throw new CustomException(CreatorErrorCode.APPLICATION_NOT_PENDING);
         }
     }
-    /** 신청 응답에 creator_profile의 소개글·이미지를 포함해 반환 */
-    private CreatorApplicationResponse toResponseWithProfile(CreatorApplication application) {
-        return creatorProfileRepository.findByMemberId(application.getMemberId())
-                .map(profile -> CreatorApplicationConverter.toResponse(
-                        application,
-                        profile.getIntroduction(),
-                        profile.getRepresentativeImageUrl()))
-                .orElse(CreatorApplicationConverter.toResponse(application));
-    }
+
 }

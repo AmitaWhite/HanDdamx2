@@ -49,9 +49,10 @@ public class CreatorApplication {
         this.status = CreatorApplicationStatus.PENDING;
     }
 
-    @Builder
-    private CreatorApplication(Long memberId) {
-        this.memberId = memberId;
+    public static CreatorApplication create(Long memberId) {
+        CreatorApplication application = new CreatorApplication();
+        application.memberId = memberId;
+        return application;
     }
 
     /**

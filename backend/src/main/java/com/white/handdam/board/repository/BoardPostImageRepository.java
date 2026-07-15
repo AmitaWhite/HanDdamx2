@@ -11,6 +11,8 @@ public interface BoardPostImageRepository extends JpaRepository<BoardPostImage, 
 
 	List<BoardPostImage> findByBoardPostIdOrderByOrderIndexAsc(Long boardPostId);
 
+	Optional<BoardPostImage> findByIdAndBoardPostId(Long id, Long boardPostId);
+
 	@Query("select max(i.orderIndex) from BoardPostImage i where i.boardPost.id = :boardPostId")
 	Optional<Integer> findMaxOrderIndexByBoardPostId(@Param("boardPostId") Long boardPostId);
 }

@@ -9,8 +9,11 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
+import com.white.handdam.global.exception.CommonErrorCode;
+import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
 import java.util.ArrayList;
@@ -18,11 +21,9 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -88,7 +89,7 @@ public class BoardPostService {
 		Pageable pageable
 	) {
 		if (memberId == null) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
 		}
 		return boardPostRepository
 			.findByMember(memberId, type, status, pageable)
@@ -158,12 +159,15 @@ public class BoardPostService {
 		List<MultipartFile> imageFiles
 	) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
 
 		assertCanEditPost(post, requesterId);
 
 		if (post.getStatus() != BoardPostStatus.WAITING) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "공식 답변이 등록된 게시글은 이미지를 추가할 수 없습니다.");
+			throw new CustomException(
+				BoardErrorCode.BOARD_POST_ALREADY_ANSWERED,
+				"공식 답변이 등록된 게시글은 이미지를 추가할 수 없습니다."
+			);
 		}
 
 		int nextOrderIndex = boardPostImageRepository.findMaxOrderIndexByBoardPostId(postId)
@@ -177,10 +181,42 @@ public class BoardPostService {
 			nextOrderIndex
 		);
 		if (saved.isEmpty()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 이미지가 없습니다.");
+			throw new CustomException(BoardErrorCode.BOARD_POST_IMAGE_REQUIRED);
 		}
 
 		return saved.stream().map(BoardPostConverter::toImageResponse).toList();
+	}
+
+	/**
+	 * 게시글 이미지 삭제.
+	 *
+	 * <pre>
+	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
+	 * 2. 작성자 권한 확인 (아니면 403)
+	 * 3. status == WAITING 확인 (아니면 409)
+	 * 4. 해당 게시글의 이미지 조회 (없거나 다른 글 이미지면 404)
+	 * 5. S3 객체 삭제 + board_post_image 행 삭제
+	 * </pre>
+	 */
+	@Transactional
+	public void deleteImage(Long postId, Long imageId, Long requesterId) {
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+
+		assertCanEditPost(post, requesterId);
+
+		if (post.getStatus() != BoardPostStatus.WAITING) {
+			throw new CustomException(
+				BoardErrorCode.BOARD_POST_ALREADY_ANSWERED,
+				"공식 답변이 등록된 게시글은 이미지를 삭제할 수 없습니다."
+			);
+		}
+
+		BoardPostImage image = boardPostImageRepository.findByIdAndBoardPostId(imageId, postId)
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "이미지를 찾을 수 없습니다."));
+
+		objectStorage.delete(image.getStorageKey());
+		boardPostImageRepository.delete(image);
 	}
 
 	/**
@@ -257,7 +293,7 @@ public class BoardPostService {
 	 */
 	void assertCanAccessBoard(Long creatorId, Long requesterId) {
 		if (requesterId == null) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
 		}
 		if (requesterId.equals(creatorId)) {
 			return;
@@ -265,7 +301,7 @@ public class BoardPostService {
 		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
 			return;
 		}
-		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");
+		throw new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED);
 	}
 
 	// -------------------------------------------------------------------------
@@ -285,7 +321,7 @@ public class BoardPostService {
 	public BoardPostResponse getPost(Long postId, Long requesterId) {
 		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
 
 		// 2) 게시판 크리에이터 / 작성자 / 활성 유료 구독자
 		assertCanAccessPost(post, requesterId);
@@ -301,7 +337,7 @@ public class BoardPostService {
 	 */
 	void assertCanAccessPost(BoardPost post, Long requesterId) {
 		if (requesterId == null) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
 		}
 		if (requesterId.equals(post.getCreatorId())) {
 			return;
@@ -312,7 +348,7 @@ public class BoardPostService {
 		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, post.getCreatorId())) {
 			return;
 		}
-		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "유료 게시판에 접근할 권한이 없습니다.");
+		throw new CustomException(CommonErrorCode.SUBSCRIPTION_REQUIRED);
 	}
 
 	// -------------------------------------------------------------------------
@@ -338,14 +374,14 @@ public class BoardPostService {
 	public BoardPostResponse updatePost(Long postId, Long requesterId, UpdateBoardPostRequest request) {
 		// 1) 소프트 삭제되지 않은 글만 조회. 없거나 삭제됨 → 404
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
 
 		// 2) 작성자(member_id)만 수정 가능. 타인·비로그인 → 403
 		assertCanEditPost(post, requesterId);
 
 		// 3) ERD DECISION-006: 공식 답변 전(WAITING)만 수정 허용. ANSWERED → 409
 		if (post.getStatus() != BoardPostStatus.WAITING) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "공식 답변이 등록된 게시글은 수정할 수 없습니다.");
+			throw new CustomException(BoardErrorCode.BOARD_POST_ALREADY_ANSWERED);
 		}
 
 		// 4) 엔티티 필드 갱신. updated_at 은 JPA Auditing(`@LastModifiedDate`)에서 자동 설정
@@ -369,7 +405,7 @@ public class BoardPostService {
 	@Transactional
 	public void deletePost(Long postId, Long requesterId) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
 
 		// 2) 작성자만 삭제 가능
 		assertCanEditPost(post, requesterId);
@@ -384,11 +420,11 @@ public class BoardPostService {
 	 */
 	void assertCanEditPost(BoardPost post, Long requesterId) {
 		if (requesterId == null) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
 		}
 		if (requesterId.equals(post.getMemberId())) {
 			return;
 		}
-		throw new ResponseStatusException(HttpStatus.FORBIDDEN, "게시글을 수정할 권한이 없습니다.");
+		throw new CustomException(CommonErrorCode.FORBIDDEN, "게시글을 수정할 권한이 없습니다.");
 	}
 }

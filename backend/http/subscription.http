@@ -1,6 +1,7 @@
 @baseUrl = http://localhost:8080
 @subscriberId = 1
 @creatorId = 2
+@creatorWithoutProfileId = 3
 
 ### Free subscription create
 # Run server with only the local profile.
@@ -77,6 +78,14 @@ Accept: application/json
 
 ### Subscription plans for invalid creator
 # Expected: 404 Not Found
-# Expected body: success=false, data=null, error.code=RESOURCE_NOT_FOUND
+# Expected body: success=false, data=null, error.code=CREATOR_NOT_FOUND
 GET {{baseUrl}}/api/creators/999999/subscription-plans
+Accept: application/json
+
+### Subscription plans for creator without profile
+# Preconditions: member exists and has Role.CREATOR, but creator_profile row does not exist.
+# Expected: 404 Not Found
+# Expected body: success=false, data=null, error.code=CREATOR_PROFILE_NOT_FOUND
+# Expected message: 크리에이터 프로필을 찾을 수 없습니다.
+GET {{baseUrl}}/api/creators/{{creatorWithoutProfileId}}/subscription-plans
 Accept: application/json

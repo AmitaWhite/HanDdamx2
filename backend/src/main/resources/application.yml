@@ -90,6 +90,9 @@ toss:
   client-key: ${TOSS_CLIENT_KEY:}
   secret-key: ${TOSS_SECRET_KEY:}
 
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+
 ---
 # =====================================================================
 # test: ./gradlew build / gradlew test 전용
@@ -115,10 +118,19 @@ spring:
   flyway:
     enabled: false
 
+  mail:
+    host: smtp.test.local
+    port: 587
+    username: test
+    password: test
+
 jwt:
   secret: test_secret_do_not_use_in_prod
   access-expiration: 3600000
   refresh-expiration: 1209600000
+
+app:
+  frontend-base-url: http://localhost:3000
 
 cloud:
   aws:
@@ -185,6 +197,9 @@ jwt:
   secret: ${JWT_SECRET}
   access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL}
 
 cloud:
   aws:
