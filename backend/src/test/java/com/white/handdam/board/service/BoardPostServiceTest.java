@@ -18,13 +18,23 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.event.FeedPublishedEvent;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
+import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.global.exception.ErrorCode;
 import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,7 +49,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class BoardPostServiceTest {
@@ -56,6 +65,9 @@ class BoardPostServiceTest {
 	@Mock
 	private ObjectStorage objectStorage;
 
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
+
 	@InjectMocks
 	private BoardPostService boardPostService;
 
@@ -65,10 +77,6 @@ class BoardPostServiceTest {
 	void setUp() {
 		pageable = PageRequest.of(0, 20);
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-001 목록 조회
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("크리에이터 본인은 목록을 조회할 수 있다")
@@ -103,7 +111,7 @@ class BoardPostServiceTest {
 	}
 
 	@Test
-	@DisplayName("권한이 없으면 목록 조회 시 403 예외가 발생한다")
+	@DisplayName("권한이 없으면 목록 조회 시 SUBSCRIPTION_REQUIRED 예외가 발생한다")
 	void deniedWithoutPermission() {
 		Long creatorId = 1L;
 		Long strangerId = 7L;
@@ -111,14 +119,10 @@ class BoardPostServiceTest {
 
 		assertThatThrownBy(() ->
 			boardPostService.getPostsByCreator(creatorId, strangerId, null, null, pageable)
-		).isInstanceOf(ResponseStatusException.class);
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).findByCreator(any(), any(), any(), any());
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-002 작성 (+이미지)
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("유료 구독자는 제목·이미지와 함께 게시글을 작성할 수 있다")
@@ -175,6 +179,13 @@ class BoardPostServiceTest {
 		verify(boardPostRepository).save(postCaptor.capture());
 		assertThat(postCaptor.getValue().getTitle()).isEqualTo("재료 질문");
 		verify(objectStorage).upload("premium-board/1", image);
+
+		ArgumentCaptor<FeedPublishedEvent> eventCaptor = ArgumentCaptor.forClass(FeedPublishedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue().postId()).isEqualTo(10L);
+		assertThat(eventCaptor.getValue().creatorId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().writerId()).isEqualTo(subscriberId);
+		assertThat(eventCaptor.getValue().title()).isEqualTo("재료 질문");
 	}
 
 	@Test
@@ -201,6 +212,13 @@ class BoardPostServiceTest {
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
 		verifyNoInteractions(paidSubscriptionChecker);
+
+		ArgumentCaptor<FeedPublishedEvent> eventCaptor = ArgumentCaptor.forClass(FeedPublishedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue().postId()).isEqualTo(11L);
+		assertThat(eventCaptor.getValue().creatorId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().writerId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().title()).isEqualTo("공지");
 	}
 
 	@Test
@@ -216,15 +234,12 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.createPost(creatorId, strangerId, request, null))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostRepository, never()).save(any());
 		verifyNoInteractions(objectStorage);
+		verifyNoInteractions(eventPublisher);
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-003 상세 조회
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 본인 게시글 상세를 조회할 수 있다")
@@ -289,13 +304,12 @@ class BoardPostServiceTest {
 	}
 
 	@Test
-	@DisplayName("삭제된 게시글은 상세 조회 시 404를 반환한다")
+	@DisplayName("삭제된 게시글은 상세 조회 시 RESOURCE_NOT_FOUND를 반환한다")
 	void deletedPostReturnsNotFound() {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, 1L))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("404");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
@@ -311,14 +325,10 @@ class BoardPostServiceTest {
 		given(paidSubscriptionChecker.hasActivePaidSubscription(strangerId, creatorId)).willReturn(false);
 
 		assertThatThrownBy(() -> boardPostService.getPost(10L, strangerId))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
 
 		verify(boardPostImageRepository, never()).findByBoardPostIdOrderByOrderIndexAsc(any());
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-004 수정
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 답변 대기 게시글을 수정할 수 있다")
@@ -326,6 +336,7 @@ class BoardPostServiceTest {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
 			"수정된 제목",
 			BoardPostType.GENERAL,
@@ -349,6 +360,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
 			"수정된 제목",
 			BoardPostType.GENERAL,
@@ -357,8 +369,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, authorId, request))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("409");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_ALREADY_ANSWERED));
 	}
 
 	@Test
@@ -376,13 +387,13 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, subscriberId, request))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		assertThat(post.getTitle()).isEqualTo("테스트 제목");
 	}
 
 	@Test
-	@DisplayName("삭제된 게시글은 수정 시 404를 반환한다")
+	@DisplayName("삭제된 게시글은 수정 시 RESOURCE_NOT_FOUND를 반환한다")
 	void deletedPostCannotBeUpdated() {
 		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
 			"수정된 제목",
@@ -392,13 +403,8 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.updatePost(10L, 5L, request))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("404");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-005 소프트 삭제
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 본인 게시글을 소프트 삭제할 수 있다")
@@ -407,6 +413,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 
 		boardPostService.deletePost(10L, authorId);
 
@@ -424,24 +431,19 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, strangerId))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		assertThat(post.isDeleted()).isFalse();
 	}
 
 	@Test
-	@DisplayName("삭제된 게시글은 삭제 시 404를 반환한다")
+	@DisplayName("삭제된 게시글은 삭제 시 RESOURCE_NOT_FOUND를 반환한다")
 	void deletedPostCannotBeDeletedAgain() {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.deletePost(10L, 5L))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("404");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-006 마이페이지 — 내가 작성한 글
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("로그인한 회원은 내가 작성한 글 목록을 조회할 수 있다")
@@ -462,14 +464,10 @@ class BoardPostServiceTest {
 	@DisplayName("비로그인은 내 작성글 목록을 조회할 수 없다")
 	void guestCannotGetMyPosts() {
 		assertThatThrownBy(() -> boardPostService.getMyPosts(null, null, null, pageable))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_LOGIN_REQUIRED));
 
 		verify(boardPostRepository, never()).findByMember(any(), any(), any(), any());
 	}
-
-	// -------------------------------------------------------------------------
-	// LDJ-007 이미지 추가
-	// -------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("작성자는 본인 게시글에 이미지를 추가할 수 있다")
@@ -477,6 +475,7 @@ class BoardPostServiceTest {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		MockMultipartFile image = new MockMultipartFile(
 			"images",
 			"b.jpg",
@@ -525,7 +524,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, subscriberId, List.of(image)))
-			.isInstanceOf(ResponseStatusException.class);
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
 
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
@@ -538,6 +537,7 @@ class BoardPostServiceTest {
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		MockMultipartFile image = new MockMultipartFile(
 			"images",
 			"b.jpg",
@@ -547,27 +547,376 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, authorId, List.of(image)))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("409");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_ADD_NOT_ALLOWED));
 
 		verifyNoInteractions(objectStorage);
 	}
 
 	@Test
-	@DisplayName("이미지 파일이 없으면 400을 반환한다")
+	@DisplayName("이미지 파일이 없으면 BOARD_POST_IMAGE_REQUIRED를 반환한다")
 	void emptyImagesRejected() {
 		Long creatorId = 1L;
 		Long authorId = 5L;
 		BoardPost post = samplePost(creatorId, authorId);
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
 		given(boardPostImageRepository.findMaxOrderIndexByBoardPostId(10L))
 			.willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.addImages(10L, authorId, List.of()))
-			.isInstanceOf(ResponseStatusException.class)
-			.hasMessageContaining("400");
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_REQUIRED));
 
 		verifyNoInteractions(objectStorage);
+	}
+
+	@Test
+	@DisplayName("게시글 작성 시 이미지 원본 바이트가 스토리지에 실제로 저장된다")
+	void createPostActuallyUploadsImageBytes() {
+		RecordingObjectStorage realStorage = new RecordingObjectStorage();
+		BoardPostService service = new BoardPostService(
+			boardPostRepository,
+			boardPostImageRepository,
+			paidSubscriptionChecker,
+			realStorage,
+			eventPublisher
+		);
+
+		Long creatorId = 1L;
+		Long subscriberId = 99L;
+		byte[] imageBytes = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01, 0x02, 0x03};
+		MockMultipartFile image = new MockMultipartFile(
+			"images",
+			"real-upload.jpg",
+			"image/jpeg",
+			imageBytes
+		);
+		CreateBoardPostRequest request = new CreateBoardPostRequest(
+			"실제 업로드 테스트",
+			BoardPostType.QUESTION,
+			"바이트 검증"
+		);
+
+		given(paidSubscriptionChecker.hasActivePaidSubscription(subscriberId, creatorId)).willReturn(true);
+		given(boardPostRepository.save(any(BoardPost.class))).willAnswer(invocation -> {
+			BoardPost post = invocation.getArgument(0);
+			ReflectionTestUtils.setField(post, "id", 20L);
+			ReflectionTestUtils.setField(post, "createdAt", Instant.parse("2026-07-14T00:00:00Z"));
+			ReflectionTestUtils.setField(post, "updatedAt", Instant.parse("2026-07-14T00:00:00Z"));
+			return post;
+		});
+		given(boardPostImageRepository.saveAll(anyList())).willAnswer(invocation -> {
+			List<BoardPostImage> images = invocation.getArgument(0);
+			ReflectionTestUtils.setField(images.getFirst(), "id", 200L);
+			ReflectionTestUtils.setField(images.getFirst(), "createdAt", Instant.parse("2026-07-14T00:00:00Z"));
+			return images;
+		});
+
+		BoardPostResponse result = service.createPost(
+			creatorId,
+			subscriberId,
+			request,
+			List.of(image)
+		);
+
+		String storageKey = result.images().getFirst().storageKey();
+		assertThat(result.images()).hasSize(1);
+		assertThat(result.images().getFirst().originalName()).isEqualTo("real-upload.jpg");
+		assertThat(result.images().getFirst().fileSize()).isEqualTo(imageBytes.length);
+		assertThat(realStorage.size()).isEqualTo(1);
+		assertThat(realStorage.getBytes(storageKey)).isEqualTo(imageBytes);
+		assertThat(realStorage.getBytes(storageKey)).isNotEqualTo(new byte[] {1, 2, 3});
+	}
+
+	@Test
+	@DisplayName("이미지 추가 시 원본 바이트가 스토리지에 실제로 저장된다")
+	void addImagesActuallyUploadsImageBytes() {
+		RecordingObjectStorage realStorage = new RecordingObjectStorage();
+		BoardPostService service = new BoardPostService(
+			boardPostRepository,
+			boardPostImageRepository,
+			paidSubscriptionChecker,
+			realStorage,
+			eventPublisher
+		);
+
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
+		byte[] imageBytes = {10, 20, 30, 40, 50};
+		MockMultipartFile image = new MockMultipartFile(
+			"images",
+			"added.png",
+			"image/png",
+			imageBytes
+		);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findMaxOrderIndexByBoardPostId(10L))
+			.willReturn(Optional.empty());
+		given(boardPostImageRepository.saveAll(anyList())).willAnswer(invocation -> {
+			List<BoardPostImage> images = invocation.getArgument(0);
+			ReflectionTestUtils.setField(images.getFirst(), "id", 201L);
+			ReflectionTestUtils.setField(images.getFirst(), "createdAt", Instant.parse("2026-07-14T01:00:00Z"));
+			return images;
+		});
+
+		var result = service.addImages(10L, authorId, List.of(image));
+
+		String storageKey = result.getFirst().storageKey();
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().originalName()).isEqualTo("added.png");
+		assertThat(result.getFirst().fileSize()).isEqualTo(imageBytes.length);
+		assertThat(realStorage.getBytes(storageKey)).isEqualTo(imageBytes);
+	}
+
+	@Test
+	@DisplayName("이미지 삭제 시 스토리지에 저장된 원본 바이트가 실제로 제거된다")
+	void deleteImageActuallyRemovesStoredBytes() {
+		RecordingObjectStorage realStorage = new RecordingObjectStorage();
+		BoardPostService service = new BoardPostService(
+			boardPostRepository,
+			boardPostImageRepository,
+			paidSubscriptionChecker,
+			realStorage,
+			eventPublisher
+		);
+
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
+		byte[] imageBytes = {9, 8, 7, 6, 5};
+		MockMultipartFile file = new MockMultipartFile(
+			"images",
+			"to-delete.jpg",
+			"image/jpeg",
+			imageBytes
+		);
+
+		// 먼저 스토리지에 실제 바이트를 올려 두고
+		StoredObject stored = realStorage.upload("premium-board/1", file);
+		BoardPostImage image = BoardPostImage.builder()
+			.boardPost(post)
+			.url(stored.url())
+			.storageKey(stored.storageKey())
+			.originalName(stored.originalName())
+			.fileSize((long) imageBytes.length)
+			.mimeType("image/jpeg")
+			.orderIndex(0)
+			.build();
+		ReflectionTestUtils.setField(image, "id", 100L);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByIdAndBoardPostId(100L, 10L)).willReturn(Optional.of(image));
+
+		assertThat(realStorage.size()).isEqualTo(1);
+		assertThat(realStorage.getBytes(stored.storageKey())).isEqualTo(imageBytes);
+
+		service.deleteImage(10L, 100L, authorId);
+
+		assertThat(realStorage.getBytes(stored.storageKey())).isNull();
+		assertThat(realStorage.size()).isEqualTo(0);
+		verify(boardPostImageRepository).delete(image);
+	}
+
+	@Test
+	@DisplayName("작성자는 본인 게시글의 이미지를 삭제할 수 있다")
+	void authorCanDeleteImage() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
+		BoardPostImage image = BoardPostImage.builder()
+			.boardPost(post)
+			.url("http://localhost:4566/handdam-local/a.jpg")
+			.storageKey("premium-board/1/uuid_a.jpg")
+			.originalName("a.jpg")
+			.fileSize(10L)
+			.mimeType("image/jpeg")
+			.orderIndex(0)
+			.build();
+		ReflectionTestUtils.setField(image, "id", 100L);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByIdAndBoardPostId(100L, 10L)).willReturn(Optional.of(image));
+
+		boardPostService.deleteImage(10L, 100L, authorId);
+
+		verify(objectStorage).delete("premium-board/1/uuid_a.jpg");
+		verify(boardPostImageRepository).delete(image);
+	}
+
+	@Test
+	@DisplayName("작성자가 아니면 이미지를 삭제할 수 없다")
+	void nonAuthorCannotDeleteImage() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long subscriberId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+
+		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, subscriberId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_EDIT_FORBIDDEN));
+
+		verifyNoInteractions(objectStorage);
+		verify(boardPostImageRepository, never()).delete(any());
+	}
+
+	@Test
+	@DisplayName("공식 답변된 게시글의 이미지는 삭제할 수 없다")
+	void answeredPostCannotDeleteImage() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
+		ReflectionTestUtils.setField(post, "status", BoardPostStatus.ANSWERED);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+
+		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 100L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_IMAGE_DELETE_NOT_ALLOWED));
+
+		verifyNoInteractions(objectStorage);
+		verify(boardPostImageRepository, never()).delete(any());
+	}
+
+	@Test
+	@DisplayName("이미지가 없거나 다른 게시글 이미지면 RESOURCE_NOT_FOUND를 반환한다")
+	void missingImageCannotBeDeleted() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(true);
+		given(boardPostImageRepository.findByIdAndBoardPostId(999L, 10L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> boardPostService.deleteImage(10L, 999L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_IMAGE_NOT_FOUND));
+
+		verifyNoInteractions(objectStorage);
+		verify(boardPostImageRepository, never()).delete(any());
+	}
+
+
+	@Test
+	@DisplayName("구독 해지 후에도 본인 글 상세는 조회할 수 있다")
+	void expiredAuthorCanGetOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(10L)).willReturn(List.of());
+
+		BoardPostResponse result = boardPostService.getPost(10L, authorId);
+
+		assertThat(result.memberId()).isEqualTo(authorId);
+		verifyNoInteractions(paidSubscriptionChecker);
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 타인 글 상세를 조회할 수 없다")
+	void expiredUserCannotGetOthersPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		Long expiredId = 99L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(expiredId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.getPost(10L, expiredId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 글도 수정할 수 없다")
+	void expiredAuthorCannotUpdateOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		UpdateBoardPostRequest request = new UpdateBoardPostRequest(
+			"수정된 제목",
+			BoardPostType.GENERAL,
+			"수정된 본문"
+		);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.updatePost(10L, authorId, request))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 글도 삭제할 수 없다")
+	void expiredAuthorCannotDeleteOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		given(paidSubscriptionChecker.hasActivePaidSubscription(authorId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.deletePost(10L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		assertThat(post.isDeleted()).isFalse();
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 새 글을 작성할 수 없다")
+	void expiredUserCannotCreatePost() {
+		Long creatorId = 1L;
+		Long expiredId = 99L;
+		CreateBoardPostRequest request = new CreateBoardPostRequest(
+			"제목",
+			BoardPostType.QUESTION,
+			"본문"
+		);
+		given(paidSubscriptionChecker.hasActivePaidSubscription(expiredId, creatorId)).willReturn(false);
+
+		assertThatThrownBy(() -> boardPostService.createPost(creatorId, expiredId, request, null))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		verify(boardPostRepository, never()).save(any());
+	}
+
+	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
+		assertThat(thrown).isInstanceOf(CustomException.class);
+		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
+	}
+
+	/**
+	 * mock URL 반환이 아니라, 업로드된 MultipartFile 바이트를 실제로 보관하는 테스트용 스토리지.
+	 */
+	private static final class RecordingObjectStorage implements ObjectStorage {
+
+		private final Map<String, byte[]> store = new ConcurrentHashMap<>();
+
+		@Override
+		public StoredObject upload(String folder, MultipartFile file) {
+			if (file == null || file.isEmpty()) {
+				throw new IllegalArgumentException("이미지 파일이 비어 있습니다.");
+			}
+			String originalName = file.getOriginalFilename() == null ? "image" : file.getOriginalFilename();
+			String storageKey = folder + "/" + UUID.randomUUID() + "_" + originalName;
+			try {
+				store.put(storageKey, file.getBytes());
+			} catch (IOException e) {
+				throw new IllegalStateException("이미지 업로드에 실패했습니다.", e);
+			}
+			return new StoredObject(storageKey, "http://memory/" + storageKey, originalName);
+		}
+
+		@Override
+		public void delete(String storageKey) {
+			store.remove(storageKey);
+		}
+
+		byte[] getBytes(String storageKey) {
+			return store.get(storageKey);
+		}
+
+		int size() {
+			return store.size();
+		}
 	}
 
 	private BoardPost samplePost(Long creatorId, Long memberId) {

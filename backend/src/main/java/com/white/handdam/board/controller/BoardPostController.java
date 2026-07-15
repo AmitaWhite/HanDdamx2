@@ -3,21 +3,23 @@ package com.white.handdam.board.controller;
 import com.white.handdam.board.dto.request.UpdateBoardPostRequest;
 import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.service.BoardPostService;
+import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/premium-board/posts")
+@RequestMapping("/api/premium-board/posts")
 @RequiredArgsConstructor
 public class BoardPostController {
 
@@ -25,14 +27,14 @@ public class BoardPostController {
 
 	/**
 	 * 유료 게시글 상세 조회.
-	 * 권한: 게시판 크리에이터 / 작성자 / 활성 유료 구독자
+	 * 권한: 게시판 크리에이터 / 작성자 / 활성 유료 구독자 (JWT 인증 필요)
 	 */
 	@GetMapping("/{postId}")
-	public BoardPostResponse getPost(
+	public ApiResponse<BoardPostResponse> getPost(
 		@PathVariable Long postId,
-		@RequestHeader("X-Member-Id") Long memberId
+		@AuthenticationPrincipal AuthMember member
 	) {
-		return boardPostService.getPost(postId, memberId);
+		return ApiResponse.success(boardPostService.getPost(postId, member.id()));
 	}
 
 	/**
@@ -40,15 +42,12 @@ public class BoardPostController {
 	 * 권한: 작성자
 	 */
 	@PatchMapping("/{postId}")
-	public BoardPostResponse updatePost(
-		//어떤글을 수정할지
+	public ApiResponse<BoardPostResponse> updatePost(
 		@PathVariable Long postId,
-		//누가 수정할지
-		@RequestHeader("X-Member-Id") Long memberId,
-		//수정할 내용
+		@AuthenticationPrincipal AuthMember member,
 		@Valid @RequestBody UpdateBoardPostRequest request
 	) {
-		return boardPostService.updatePost(postId, memberId, request);
+		return ApiResponse.success(boardPostService.updatePost(postId, member.id(), request));
 	}
 
 	/**
@@ -56,12 +55,11 @@ public class BoardPostController {
 	 * 권한: 작성자
 	 */
 	@DeleteMapping("/{postId}")
-	//성공시 204 반환
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void deletePost(
+	public ResponseEntity<ApiResponse<Void>> deletePost(
 		@PathVariable Long postId,
-		@RequestHeader("X-Member-Id") Long memberId
+		@AuthenticationPrincipal AuthMember member
 	) {
-		boardPostService.deletePost(postId, memberId);
+		boardPostService.deletePost(postId, member.id());
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
 	}
 }

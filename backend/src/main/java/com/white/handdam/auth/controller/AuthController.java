@@ -1,10 +1,12 @@
 package com.white.handdam.auth.controller;
 
+import com.white.handdam.auth.dto.request.EmailVerificationRequest;
+import com.white.handdam.auth.dto.request.PasswordResetConfirmRequest;
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.AvailabilityResponse;
 import com.white.handdam.auth.dto.response.SignupResponse;
 import com.white.handdam.auth.service.AuthService;
-import com.white.handdam.auth.service.EmailVerificationService;
+import com.white.handdam.auth.service.PasswordResetService;
 import com.white.handdam.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
     // KSY-001
     @GetMapping("/email-availability")
@@ -48,6 +51,20 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
+    }
+
+    // KSY-012
+    @PostMapping("/password-reset")
+    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@Valid @RequestBody EmailVerificationRequest request) {
+        passwordResetService.requestPasswordReset(request.email());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    // KSY-013
+    @PatchMapping("/password-reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        passwordResetService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 
 }
