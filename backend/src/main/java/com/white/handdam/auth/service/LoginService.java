@@ -49,4 +49,8 @@ public class LoginService {
         return new LoginResult(accessToken, refreshToken, member.getId(), member.getNickname(), member.getRole());
     }
 
+    public void logout(Long memberId) {
+        refreshTokenRepository.deleteByMemberId(memberId); // redis에서 삭제
+    }
+
 }

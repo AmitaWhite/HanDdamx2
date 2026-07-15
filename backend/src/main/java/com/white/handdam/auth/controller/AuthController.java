@@ -12,6 +12,7 @@ import com.white.handdam.auth.service.AuthService;
 import com.white.handdam.auth.service.PasswordResetService;
 import com.white.handdam.auth.service.LoginService;
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.global.security.jwt.JwtProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -21,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -80,6 +82,15 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(ApiResponse.success(response));
 
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal AuthMember authMember) {
+        loginService.logout(authMember.id());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, createRefreshTokenCookie("", 0).toString()) // 브라우저 쿠키 삭제
+                .build();
     }
 
     private ResponseCookie createRefreshTokenCookie (String refreshToken, long maxAgeSeconds) {
