@@ -29,7 +29,7 @@ public class BoardCommentService {
 	 *
 	 * <pre>
 	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
-	 * 2. 게시판 접근 권한 — 크리에이터 / 작성자 / 유료 구독자
+	 * 2. 조회 권한 — 크리에이터 / 글 작성자 / 활성 유료 구독자 (구독 해지 후에도 본인 글은 조회 가능)
 	 * 3. 댓글 flat 조회 후 트리(댓글 + replies)로 변환
 	 * </pre>
 	 */
@@ -49,7 +49,7 @@ public class BoardCommentService {
 	 *
 	 * <pre>
 	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
-	 * 2. 작성 권한 — 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 * 2. 쓰기 권한 — 크리에이터 / 활성 유료 구독자 (구독 해지 시 작성 불가)
 	 * 3. depth=0 최상위 댓글 저장 (parent_comment_id = null)
 	 * </pre>
 	 */
@@ -62,7 +62,7 @@ public class BoardCommentService {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
-		boardPostService.assertCanAccessPost(post, requesterId);
+		boardPostService.assertCanWriteOnPost(post, requesterId);
 
 		BoardComment comment = BoardComment.builder()
 			.boardPost(post)
@@ -83,7 +83,7 @@ public class BoardCommentService {
 	 * 1. 삭제되지 않은 부모 댓글 조회 (없으면 404)
 	 * 2. 부모는 최상위 댓글(depth=0)만 허용 (아니면 400)
 	 * 3. 부모 댓글이 속한 게시글이 삭제되지 않았는지 확인 (아니면 404)
-	 * 4. 작성 권한 — 크리에이터 / 글 작성자 / 활성 유료 구독자
+	 * 4. 쓰기 권한 — 크리에이터 / 활성 유료 구독자 (구독 해지 시 작성 불가)
 	 * 5. depth=1 대댓글 저장 (parent_comment_id = 부모, board_post_id = 부모와 동일)
 	 * </pre>
 	 */
@@ -105,7 +105,7 @@ public class BoardCommentService {
 			throw new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND);
 		}
 
-		boardPostService.assertCanAccessPost(post, requesterId);
+		boardPostService.assertCanWriteOnPost(post, requesterId);
 
 		BoardComment reply = BoardComment.builder()
 			.boardPost(post)
@@ -125,7 +125,8 @@ public class BoardCommentService {
 	 * <pre>
 	 * 1. 삭제되지 않은 댓글 조회 (없으면 404)
 	 * 2. 작성자만 허용 (아니면 403)
-	 * 3. content 갱신
+	 * 3. 활성 유료 구독(또는 크리에이터) 확인 — 구독 해지 시 수정 불가
+	 * 4. content 갱신
 	 * </pre>
 	 */
 	@Transactional
@@ -138,16 +139,10 @@ public class BoardCommentService {
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
 
 		assertCanEditComment(comment, requesterId);
+		boardPostService.assertCanWriteOnPost(comment.getBoardPost(), requesterId);
 		comment.updateContent(request.content());
 
 		return BoardCommentConverter.toResponse(comment, List.of());
-	}
-	/**
-	 * 댓글·대댓글 수정: 해당 댓글 작성자만 허용.
-	 */
-	void assertCanEditComment(BoardComment comment, Long requesterId) {
-	
-		assertCommentAuthor(comment, requesterId, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN);
 	}
 
 	/**
@@ -156,7 +151,8 @@ public class BoardCommentService {
 	 * <pre>
 	 * 1. 삭제되지 않은 댓글 조회 (없으면 404)
 	 * 2. 작성자만 허용 (아니면 403)
-	 * 3. is_deleted=true, deleted_at 설정
+	 * 3. 활성 유료 구독(또는 크리에이터) 확인 — 구독 해지 시 삭제 불가
+	 * 4. is_deleted=true, deleted_at 설정
 	 * </pre>
 	 */
 	@Transactional
@@ -165,7 +161,15 @@ public class BoardCommentService {
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
 
 		assertCanDeleteComment(comment, requesterId);
+		boardPostService.assertCanWriteOnPost(comment.getBoardPost(), requesterId);
 		comment.softDelete();
+	}
+
+	/**
+	 * 댓글·대댓글 수정: 해당 댓글 작성자만 허용.
+	 */
+	void assertCanEditComment(BoardComment comment, Long requesterId) {
+		assertCommentAuthor(comment, requesterId, BoardErrorCode.BOARD_COMMENT_EDIT_FORBIDDEN);
 	}
 
 	/**
@@ -186,7 +190,6 @@ public class BoardCommentService {
 		if (requesterId.equals(comment.getMemberId())) {
 			return;
 		}
-		// 작성자가 아니면 예외 발생
 		throw new CustomException(forbiddenCode);
 	}
 }

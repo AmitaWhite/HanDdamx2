@@ -113,7 +113,7 @@ class BoardCommentServiceTest {
 		CreateBoardCommentRequest request = new CreateBoardCommentRequest("유료 구독자 댓글");
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		willDoNothing().given(boardPostService).assertCanAccessPost(post, subscriberId);
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, subscriberId);
 		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
 			BoardComment comment = invocation.getArgument(0);
 			ReflectionTestUtils.setField(comment, "id", 200L);
@@ -147,7 +147,7 @@ class BoardCommentServiceTest {
 		CreateBoardCommentRequest request = new CreateBoardCommentRequest("작성자 댓글");
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		willDoNothing().given(boardPostService).assertCanAccessPost(post, authorId);
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, authorId);
 		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
 			BoardComment comment = invocation.getArgument(0);
 			ReflectionTestUtils.setField(comment, "id", 201L);
@@ -160,7 +160,7 @@ class BoardCommentServiceTest {
 
 		assertThat(response.memberId()).isEqualTo(authorId);
 		assertThat(response.content()).isEqualTo("작성자 댓글");
-		verify(boardPostService).assertCanAccessPost(post, authorId);
+		verify(boardPostService).assertCanWriteOnPost(post, authorId);
 	}
 
 	@Test
@@ -172,7 +172,7 @@ class BoardCommentServiceTest {
 		CreateBoardCommentRequest request = new CreateBoardCommentRequest("크리에이터 댓글");
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		willDoNothing().given(boardPostService).assertCanAccessPost(post, creatorId);
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, creatorId);
 		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
 			BoardComment comment = invocation.getArgument(0);
 			ReflectionTestUtils.setField(comment, "id", 202L);
@@ -185,7 +185,7 @@ class BoardCommentServiceTest {
 
 		assertThat(response.memberId()).isEqualTo(creatorId);
 		assertThat(response.content()).isEqualTo("크리에이터 댓글");
-		verify(boardPostService).assertCanAccessPost(post, creatorId);
+		verify(boardPostService).assertCanWriteOnPost(post, creatorId);
 	}
 
 	@Test
@@ -199,7 +199,7 @@ class BoardCommentServiceTest {
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
-			.given(boardPostService).assertCanAccessPost(post, strangerId);
+			.given(boardPostService).assertCanWriteOnPost(post, strangerId);
 
 		assertThatThrownBy(() -> boardCommentService.createComment(10L, strangerId, request))
 			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
@@ -230,7 +230,7 @@ class BoardCommentServiceTest {
 		CreateBoardCommentRequest request = new CreateBoardCommentRequest("유료 구독자 대댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
-		willDoNothing().given(boardPostService).assertCanAccessPost(post, subscriberId);
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, subscriberId);
 		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
 			BoardComment comment = invocation.getArgument(0);
 			ReflectionTestUtils.setField(comment, "id", 300L);
@@ -263,7 +263,7 @@ class BoardCommentServiceTest {
 		BoardComment parent = sampleComment(post, 100L, creatorId, null, (short) 0, "부모 댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
-		willDoNothing().given(boardPostService).assertCanAccessPost(post, authorId);
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, authorId);
 		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
 			BoardComment comment = invocation.getArgument(0);
 			ReflectionTestUtils.setField(comment, "id", 301L);
@@ -277,7 +277,7 @@ class BoardCommentServiceTest {
 
 		assertThat(response.memberId()).isEqualTo(authorId);
 		assertThat(response.parentCommentId()).isEqualTo(100L);
-		verify(boardPostService).assertCanAccessPost(post, authorId);
+		verify(boardPostService).assertCanWriteOnPost(post, authorId);
 	}
 
 	@Test
@@ -289,7 +289,7 @@ class BoardCommentServiceTest {
 		BoardComment parent = sampleComment(post, 100L, authorId, null, (short) 0, "부모 댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
-		willDoNothing().given(boardPostService).assertCanAccessPost(post, creatorId);
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, creatorId);
 		given(boardCommentRepository.save(any(BoardComment.class))).willAnswer(invocation -> {
 			BoardComment comment = invocation.getArgument(0);
 			ReflectionTestUtils.setField(comment, "id", 302L);
@@ -303,7 +303,7 @@ class BoardCommentServiceTest {
 
 		assertThat(response.memberId()).isEqualTo(creatorId);
 		assertThat(response.depth()).isEqualTo((short) 1);
-		verify(boardPostService).assertCanAccessPost(post, creatorId);
+		verify(boardPostService).assertCanWriteOnPost(post, creatorId);
 	}
 
 	@Test
@@ -317,7 +317,7 @@ class BoardCommentServiceTest {
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(parent));
 		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
-			.given(boardPostService).assertCanAccessPost(post, strangerId);
+			.given(boardPostService).assertCanWriteOnPost(post, strangerId);
 
 		assertThatThrownBy(() ->
 			boardCommentService.createReply(100L, strangerId, new CreateBoardCommentRequest("대댓글"))
@@ -384,6 +384,7 @@ class BoardCommentServiceTest {
 		UpdateBoardCommentRequest request = new UpdateBoardCommentRequest("수정된 댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, authorId);
 
 		BoardCommentResponse response = boardCommentService.updateComment(100L, authorId, request);
 
@@ -403,6 +404,7 @@ class BoardCommentServiceTest {
 		BoardComment reply = sampleComment(post, 101L, creatorId, root, (short) 1, "원본 대댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(101L)).willReturn(Optional.of(reply));
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, creatorId);
 
 		BoardCommentResponse response = boardCommentService.updateComment(
 			101L,
@@ -484,6 +486,7 @@ class BoardCommentServiceTest {
 		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "삭제할 댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, authorId);
 
 		boardCommentService.deleteComment(100L, authorId);
 
@@ -501,6 +504,7 @@ class BoardCommentServiceTest {
 		BoardComment reply = sampleComment(post, 101L, creatorId, root, (short) 1, "삭제할 대댓글");
 
 		given(boardCommentRepository.findByIdAndDeletedFalse(101L)).willReturn(Optional.of(reply));
+		willDoNothing().given(boardPostService).assertCanWriteOnPost(post, creatorId);
 
 		boardCommentService.deleteComment(101L, creatorId);
 
@@ -561,6 +565,81 @@ class BoardCommentServiceTest {
 
 		assertThatThrownBy(() -> boardCommentService.deleteComment(100L, 5L))
 			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_COMMENT_NOT_FOUND));
+	}
+
+
+	@Test
+	@DisplayName("구독 해지 후에도 본인 글의 댓글 목록은 조회할 수 있다")
+	void expiredAuthorCanGetCommentsOnOwnPost() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment root = sampleComment(post, 100L, authorId, null, (short) 0, "내 댓글");
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		willDoNothing().given(boardPostService).assertCanAccessPost(post, authorId);
+		given(boardCommentRepository.findByBoardPostIdOrderByCreatedAtAsc(10L)).willReturn(List.of(root));
+
+		List<BoardCommentResponse> result = boardCommentService.getComments(10L, authorId);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().content()).isEqualTo("내 댓글");
+		verify(boardPostService).assertCanAccessPost(post, authorId);
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 글에도 댓글을 작성할 수 없다")
+	void expiredAuthorCannotCreateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
+		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
+			.given(boardPostService).assertCanWriteOnPost(post, authorId);
+
+		assertThatThrownBy(() ->
+			boardCommentService.createComment(10L, authorId, new CreateBoardCommentRequest("작성 시도"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		verify(boardCommentRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 댓글을 수정할 수 없다")
+	void expiredAuthorCannotUpdateComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "원본");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
+			.given(boardPostService).assertCanWriteOnPost(post, authorId);
+
+		assertThatThrownBy(() ->
+			boardCommentService.updateComment(100L, authorId, new UpdateBoardCommentRequest("수정 시도"))
+		).satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		assertThat(comment.getContent()).isEqualTo("원본");
+	}
+
+	@Test
+	@DisplayName("구독 해지 후에는 본인 댓글을 삭제할 수 없다")
+	void expiredAuthorCannotDeleteComment() {
+		Long creatorId = 1L;
+		Long authorId = 5L;
+		BoardPost post = samplePost(creatorId, authorId);
+		BoardComment comment = sampleComment(post, 100L, authorId, null, (short) 0, "원본");
+
+		given(boardCommentRepository.findByIdAndDeletedFalse(100L)).willReturn(Optional.of(comment));
+		willThrow(new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED))
+			.given(boardPostService).assertCanWriteOnPost(post, authorId);
+
+		assertThatThrownBy(() -> boardCommentService.deleteComment(100L, authorId))
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED));
+
+		assertThat(comment.isDeleted()).isFalse();
 	}
 
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {

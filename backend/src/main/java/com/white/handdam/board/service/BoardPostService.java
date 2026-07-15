@@ -100,7 +100,7 @@ public class BoardPostService {
 	 *
 	 * <pre>
 	 * 흐름:
-	 * 1. assertCanAccessBoard — 크리에이터 본인 또는 활성 유료 구독자만 허용 (아니면 403)
+	 * 1. assertCanWriteOnBoard — 크리에이터 본인 또는 활성 유료 구독자만 허용 (아니면 403)
 	 * 2. BoardPost 생성   — title/type/content 반영, status 기본값 WAITING
 	 * 3. board_post 저장  — DB INSERT 후 id 발급 (이미지 FK에 필요)
 	 * 4. 이미지 처리      — 파일이 있으면 S3 업로드 + board_post_image 저장
@@ -119,7 +119,7 @@ public class BoardPostService {
 		CreateBoardPostRequest request,
 		List<MultipartFile> imageFiles
 	) {
-		assertCanAccessBoard(creatorId, requesterId);
+		assertCanWriteOnBoard(creatorId, requesterId);
 
 		BoardPost post = BoardPost.builder()
 			.creatorId(creatorId)
@@ -161,6 +161,7 @@ public class BoardPostService {
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		assertCanEditPost(post, requesterId);
+		assertCanWriteOnPost(post, requesterId);
 
 		if (post.getStatus() != BoardPostStatus.WAITING) {
 			throw new CustomException(BoardErrorCode.BOARD_POST_IMAGE_ADD_NOT_ALLOWED);
@@ -200,6 +201,7 @@ public class BoardPostService {
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		assertCanEditPost(post, requesterId);
+		assertCanWriteOnPost(post, requesterId);
 
 		if (post.getStatus() != BoardPostStatus.WAITING) {
 			throw new CustomException(BoardErrorCode.BOARD_POST_IMAGE_DELETE_NOT_ALLOWED);
@@ -281,10 +283,27 @@ public class BoardPostService {
 	}
 
 	/**
-	 * 게시판(크리에이터) 단위 접근: 크리에이터 본인 또는 활성 유료 구독자.
-	 * 목록·작성에서 공통 사용.
+	 * 게시판(크리에이터) 단위 조회: 크리에이터 본인 또는 활성 유료 구독자.
+	 * 목록 조회에서 사용. 구독 해지 후에는 게시판 전체 목록 조회 불가.
 	 */
 	void assertCanAccessBoard(Long creatorId, Long requesterId) {
+		if (requesterId == null) {
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
+		}
+		if (requesterId.equals(creatorId)) {
+			return;
+		}
+		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, creatorId)) {
+			return;
+		}
+		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
+	}
+
+	/**
+	 * 게시판 단위 쓰기(글 작성): 크리에이터 본인 또는 활성 유료 구독자.
+	 * 구독 해지 후에는 신규 작성 불가.
+	 */
+	void assertCanWriteOnBoard(Long creatorId, Long requesterId) {
 		if (requesterId == null) {
 			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
@@ -326,7 +345,8 @@ public class BoardPostService {
 	}
 
 	/**
-	 * 게시글 상세 접근: 게시판 크리에이터 / 작성자 / 활성 유료 구독자.
+	 * 게시글 상세·댓글 목록 조회: 게시판 크리에이터 / 작성자 / 활성 유료 구독자.
+	 * 구독 해지 후에도 본인이 쓴 글은 조회 가능.
 	 */
 	void assertCanAccessPost(BoardPost post, Long requesterId) {
 		if (requesterId == null) {
@@ -344,8 +364,25 @@ public class BoardPostService {
 		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
 	}
 
+	/**
+	 * 게시글 단위 쓰기(수정·삭제·이미지·댓글 작성 등): 크리에이터 또는 활성 유료 구독자만.
+	 * 글 작성자라도 구독이 해지되면 쓰기 불가.
+	 */
+	void assertCanWriteOnPost(BoardPost post, Long requesterId) {
+		if (requesterId == null) {
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
+		}
+		if (requesterId.equals(post.getCreatorId())) {
+			return;
+		}
+		if (paidSubscriptionChecker.hasActivePaidSubscription(requesterId, post.getCreatorId())) {
+			return;
+		}
+		throw new CustomException(BoardErrorCode.BOARD_SUBSCRIPTION_REQUIRED);
+	}
+
 	// -------------------------------------------------------------------------
-	// 수정 · 삭제 — assertCanEditPost (작성자)
+	// 수정 · 삭제 — assertCanEditPost (작성자) + assertCanWriteOnPost (활성 구독)
 	// -------------------------------------------------------------------------
 
 	/**
@@ -354,9 +391,10 @@ public class BoardPostService {
 	 * <pre>
 	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
 	 * 2. 작성자 권한 확인 (아니면 403)
-	 * 3. status == WAITING 확인 (아니면 409)
-	 * 4. title / type / content 갱신
-	 * 5. 이미지 포함 BoardPostResponse 반환
+	 * 3. 활성 유료 구독(또는 크리에이터) 확인 — 구독 해지 시 수정 불가
+	 * 4. status == WAITING 확인 (아니면 409)
+	 * 5. title / type / content 갱신
+	 * 6. 이미지 포함 BoardPostResponse 반환
 	 * </pre>
 	 *
 	 * @param postId      수정할 게시글 ID
@@ -371,16 +409,18 @@ public class BoardPostService {
 
 		// 2) 작성자(member_id)만 수정 가능. 타인·비로그인 → 403
 		assertCanEditPost(post, requesterId);
+		// 3) 구독 해지 후에는 수정 불가
+		assertCanWriteOnPost(post, requesterId);
 
-		// 3) ERD DECISION-006: 공식 답변 전(WAITING)만 수정 허용. ANSWERED → 409
+		// 4) ERD DECISION-006: 공식 답변 전(WAITING)만 수정 허용. ANSWERED → 409
 		if (post.getStatus() != BoardPostStatus.WAITING) {
 			throw new CustomException(BoardErrorCode.BOARD_POST_ALREADY_ANSWERED);
 		}
 
-		// 4) 엔티티 필드 갱신. updated_at 은 JPA Auditing(`@LastModifiedDate`)에서 자동 설정
+		// 5) 엔티티 필드 갱신. updated_at 은 JPA Auditing(`@LastModifiedDate`)에서 자동 설정
 		post.update(request.title(), request.type(), request.content());
 
-		// 5) 기존 이미지는 그대로 두고, 글+이미지로 응답 DTO 구성
+		// 6) 기존 이미지는 그대로 두고, 글+이미지로 응답 DTO 구성
 		List<BoardPostImage> images =
 			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
 		return BoardPostConverter.toResponse(post, images);
@@ -392,7 +432,8 @@ public class BoardPostService {
 	 * <pre>
 	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
 	 * 2. 작성자 권한 확인 (아니면 403)
-	 * 3. is_deleted=true, deleted_at 설정
+	 * 3. 활성 유료 구독(또는 크리에이터) 확인 — 구독 해지 시 삭제 불가
+	 * 4. is_deleted=true, deleted_at 설정
 	 * </pre>
 	 */
 	@Transactional
@@ -400,16 +441,15 @@ public class BoardPostService {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
-		// 2) 작성자만 삭제 가능
 		assertCanEditPost(post, requesterId);
+		assertCanWriteOnPost(post, requesterId);
 
-		// 3) 소프트 삭제 (행은 유지, 목록·상세에서 제외)
 		post.softDelete();
 	}
 
 	/**
 	 * 게시글 수정·삭제: 작성자만 허용.
-	 * (작성자는 유료 구독자이거나 게시판 소유 크리에이터인 경우만 글을 쓸 수 있음)
+	 * (쓰기 가능 여부는 assertCanWriteOnPost에서 별도 검사)
 	 */
 	void assertCanEditPost(BoardPost post, Long requesterId) {
 		if (requesterId == null) {
