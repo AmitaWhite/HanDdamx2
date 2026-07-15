@@ -4,12 +4,16 @@ import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
+import com.white.handdam.feed.dto.response.FeedSummaryResponse;
 import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,6 +86,12 @@ public class FeedService {
         boolean isOwner = false; // TODO: Project 추가 후 교체
         if(!isOwner) throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
         feed.delete();
+    }
+
+    // [LYJ-006] 최근 PUBLIC 피드 목록
+    public Slice<FeedSummaryResponse> getPublicFeeds(Pageable pageable){
+        return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
+                .map(feed -> FeedSummaryResponse.from(feed));
     }
 
 }

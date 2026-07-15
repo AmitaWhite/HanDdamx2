@@ -5,10 +5,17 @@ import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedIdResponse;
+import com.white.handdam.feed.dto.response.FeedSummaryResponse;
 import com.white.handdam.feed.service.FeedService;
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.response.SliceResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -72,5 +79,13 @@ public class FeedController {
     ){
         feedService.deleteFeed(feedId, memberId);
         return ApiResponse.noContent();
+    }
+
+    // [LYJ-006] GET /api/feeds/public
+    @GetMapping("/public")
+    public SliceResponse<FeedSummaryResponse> getPublicFeeds(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ){
+        return SliceResponse.from(feedService.getPublicFeeds(pageable));
     }
 }
