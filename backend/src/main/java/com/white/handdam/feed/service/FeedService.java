@@ -10,17 +10,23 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.subscription.entity.SubscriptionLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FeedService {
     private final FeedRepository feedRepository;
+    private final SubscriptionLevelChecker subscriptionLevelChecker;
+
     // [LYJ-001] 피드 작성
     @Transactional
     public Long createFeed(Long memberId, FeedCreateRequest request) {
@@ -91,6 +97,30 @@ public class FeedService {
     public Slice<FeedSummaryResponse> getPublicFeeds(Pageable pageable){
         return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
                 .map(feed -> FeedSummaryResponse.from(feed));
+    }
+
+    // [LYJ-007] 회원 홈 피드 (구독 피드 + 카테고리 필터)
+    public Slice<FeedSummaryResponse> getHomeFeed(Long memberId, Long categoryId, Pageable pageable){
+        Map<Long, SubscriptionLevel> levelMap = subscriptionLevelChecker.getActiveSubscriptionLevels(memberId);
+        List<Long> paidCreatorIds = levelMap.entrySet().stream()
+                .filter(e -> e.getValue() == SubscriptionLevel.PAID)
+                .map(e -> e.getKey())
+                .toList();
+        List<Long> freeCreatorIds = levelMap.entrySet().stream()
+                .filter(e -> e.getValue() == SubscriptionLevel.FREE)
+                .map(e -> e.getKey())
+                .toList();
+        // IN() 빈 리스트 Hibernate 오류 방지
+        List<Long> safePaid = paidCreatorIds.isEmpty() ? List.of(-1L) : paidCreatorIds;
+        List<Long> safeFree = freeCreatorIds.isEmpty() ? List.of(-1L) : freeCreatorIds;
+        // TODO [LYJ-007] Project 엔티티 추가 후 수정
+        // return feedRepository.findHomeFeeds(
+        //          memberId, safePaid, safeFree, categoryId,
+        //         List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER), pageable
+        // ).map(feed -> FeedSummaryResponse.from(feed));
+        return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
+                .map(feed -> FeedSummaryResponse.from(feed));
+
     }
 
 }

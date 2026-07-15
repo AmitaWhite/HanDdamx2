@@ -91,4 +91,14 @@ public class FeedController {
     ){
         return SliceResponse.from(feedService.getPublicFeeds(pageable));
     }
+
+    // [LYJ-007] GET /api/feeds/home
+    @GetMapping("/home")
+    public SliceResponse<FeedSummaryResponse> getHomeFeed(
+            @AuthenticationPrincipal AuthMember member,
+            @RequestParam(required = false) Long categoryId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ){
+        return SliceResponse.from(feedService.getHomeFeed(member.id(), categoryId, pageable));
+    }
 }
