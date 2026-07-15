@@ -4,16 +4,17 @@ import com.white.handdam.board.dto.request.UpdateBoardPostRequest;
 import com.white.handdam.board.dto.response.BoardPostResponse;
 import com.white.handdam.board.service.BoardPostService;
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,14 +27,14 @@ public class BoardPostController {
 
 	/**
 	 * 유료 게시글 상세 조회.
-	 * 권한: 게시판 크리에이터 / 작성자 / 활성 유료 구독자
+	 * 권한: 게시판 크리에이터 / 작성자 / 활성 유료 구독자 (JWT 인증 필요)
 	 */
 	@GetMapping("/{postId}")
 	public ApiResponse<BoardPostResponse> getPost(
 		@PathVariable Long postId,
-		@RequestHeader("X-Member-Id") Long memberId
+		@AuthenticationPrincipal AuthMember member
 	) {
-		return ApiResponse.success(boardPostService.getPost(postId, memberId));
+		return ApiResponse.success(boardPostService.getPost(postId, member.id()));
 	}
 
 	/**
@@ -43,10 +44,10 @@ public class BoardPostController {
 	@PatchMapping("/{postId}")
 	public ApiResponse<BoardPostResponse> updatePost(
 		@PathVariable Long postId,
-		@RequestHeader("X-Member-Id") Long memberId,
+		@AuthenticationPrincipal AuthMember member,
 		@Valid @RequestBody UpdateBoardPostRequest request
 	) {
-		return ApiResponse.success(boardPostService.updatePost(postId, memberId, request));
+		return ApiResponse.success(boardPostService.updatePost(postId, member.id(), request));
 	}
 
 	/**
@@ -56,9 +57,9 @@ public class BoardPostController {
 	@DeleteMapping("/{postId}")
 	public ResponseEntity<ApiResponse<Void>> deletePost(
 		@PathVariable Long postId,
-		@RequestHeader("X-Member-Id") Long memberId
+		@AuthenticationPrincipal AuthMember member
 	) {
-		boardPostService.deletePost(postId, memberId);
+		boardPostService.deletePost(postId, member.id());
 		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
 	}
 }
