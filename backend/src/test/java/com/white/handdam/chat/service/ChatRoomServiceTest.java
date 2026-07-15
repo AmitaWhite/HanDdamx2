@@ -185,6 +185,91 @@ class ChatRoomServiceTest {
 			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_LOGIN_REQUIRED));
 	}
 
+	@Test
+	@DisplayName("멤버(참여자)는 채팅방 상세를 조회할 수 있다")
+	void memberCanGetChatRoomDetail() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = ChatRoom.builder().creatorId(creatorId).memberId(memberId).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		ReflectionTestUtils.setField(room, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(room, "updatedAt", Instant.parse("2026-07-16T00:00:00Z"));
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		ChatRoomResponse response = chatRoomService.getChatRoom(10L, memberId);
+
+		assertThat(response.id()).isEqualTo(10L);
+		assertThat(response.status()).isEqualTo(ChatRoomStatus.ACTIVE);
+		assertThat(response.creatorId()).isEqualTo(creatorId);
+		assertThat(response.memberId()).isEqualTo(memberId);
+		verify(paidSubscriptionChecker, never()).hasActivePaidSubscription(any(), any());
+	}
+
+	@Test
+	@DisplayName("크리에이터(작성자)는 채팅방 상세를 조회할 수 있다")
+	void creatorCanGetChatRoomDetail() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = ChatRoom.builder().creatorId(creatorId).memberId(memberId).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		ReflectionTestUtils.setField(room, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(room, "updatedAt", Instant.parse("2026-07-16T00:00:00Z"));
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		ChatRoomResponse response = chatRoomService.getChatRoom(10L, creatorId);
+
+		assertThat(response.id()).isEqualTo(10L);
+		assertThat(response.creatorId()).isEqualTo(creatorId);
+	}
+
+	@Test
+	@DisplayName("종료된 채팅방도 참여자는 상세를 조회할 수 있다")
+	void participantCanGetClosedChatRoomDetail() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = ChatRoom.builder().creatorId(creatorId).memberId(memberId).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		ReflectionTestUtils.setField(room, "status", ChatRoomStatus.CLOSED);
+		ReflectionTestUtils.setField(room, "closedBy", memberId);
+		ReflectionTestUtils.setField(room, "closedAt", Instant.parse("2026-07-16T12:00:00Z"));
+		ReflectionTestUtils.setField(room, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(room, "updatedAt", Instant.parse("2026-07-16T12:00:00Z"));
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		ChatRoomResponse response = chatRoomService.getChatRoom(10L, memberId);
+
+		assertThat(response.status()).isEqualTo(ChatRoomStatus.CLOSED);
+		assertThat(response.closedBy()).isEqualTo(memberId);
+		assertThat(response.closedAt()).isEqualTo(Instant.parse("2026-07-16T12:00:00Z"));
+	}
+
+	@Test
+	@DisplayName("참여자가 아니면 채팅방 상세를 조회할 수 없다")
+	void nonParticipantCannotGetChatRoomDetail() {
+		ChatRoom room = ChatRoom.builder().creatorId(1L).memberId(99L).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		assertThatThrownBy(() -> chatRoomService.getChatRoom(10L, 7L))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_NOT_PARTICIPANT));
+	}
+
+	@Test
+	@DisplayName("없는 채팅방은 NOT_FOUND를 반환한다")
+	void chatRoomNotFound() {
+		given(chatRoomRepository.findById(999L)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> chatRoomService.getChatRoom(999L, 1L))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_ROOM_NOT_FOUND));
+	}
+
+	@Test
+	@DisplayName("로그인이 없으면 채팅방 상세를 조회할 수 없다")
+	void detailLoginRequired() {
+		assertThatThrownBy(() -> chatRoomService.getChatRoom(10L, null))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_LOGIN_REQUIRED));
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);

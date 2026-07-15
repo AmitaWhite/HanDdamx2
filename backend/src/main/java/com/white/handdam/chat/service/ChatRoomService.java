@@ -96,8 +96,11 @@ public class ChatRoomService {
 		Map<Long, ChatMessage> lastMessages = chatMessageRepository.findLatestByChatRoomIdIn(roomIds)
 			.stream()
 			.collect(Collectors.toMap(
+				//chatRoomId =map의 키
 				ChatMessage::getChatRoomId,
+				//Map의 Value
 				Function.identity(),
+				//메세지 id가 더큰걸 선택함
 				(left, right) -> left.getId() >= right.getId() ? left : right
 			));
 
@@ -117,6 +120,32 @@ public class ChatRoomService {
 				unreadCounts.getOrDefault(room.getId(), 0L)
 			))
 			.toList();
+	}
+
+	/**
+	 * 채팅방 상세·상태 조회 (CHAT-009 / LDJ-019).
+	 *
+	 * <pre>
+	 * 1. 로그인 확인
+	 * 2. 채팅방 존재 확인 (없으면 404)
+	 * 3. creator 또는 member 참여자만 허용 (아니면 403)
+	 * 4. ACTIVE/CLOSED 상태와 종료 정보 포함해 반환
+	 *    (구독 만료여도 조회는 허용 — 전송 차단은 메시지 API 책임)
+	 * </pre>
+	 */
+	public ChatRoomResponse getChatRoom(Long chatRoomId, Long memberId) {
+		if (memberId == null) {
+			throw new CustomException(ChatErrorCode.CHAT_LOGIN_REQUIRED);
+		}
+
+		ChatRoom room = chatRoomRepository.findById(chatRoomId)
+			.orElseThrow(() -> new CustomException(ChatErrorCode.CHAT_ROOM_NOT_FOUND));
+
+		if (!room.isParticipant(memberId)) {
+			throw new CustomException(ChatErrorCode.CHAT_NOT_PARTICIPANT);
+		}
+
+		return ChatRoomConverter.toResponse(room);
 	}
 
 	/**

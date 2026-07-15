@@ -46,4 +46,16 @@ public class ChatRoomController {
 	) {
 		return ApiResponse.success(chatRoomService.getMyChatRooms(memberId));
 	}
+
+	/**
+	 * 채팅방 상세·상태 조회 (CHAT-009).
+	 * 권한: 해당 채팅방 참여자(creator 또는 member)
+	 */
+	@GetMapping("/api/chat-rooms/{chatRoomId}")
+	public ApiResponse<ChatRoomResponse> getChatRoom(
+		@PathVariable Long chatRoomId,
+		@RequestHeader("X-Member-Id") Long memberId
+	) {
+		return ApiResponse.success(chatRoomService.getChatRoom(chatRoomId, memberId));
+	}
 }

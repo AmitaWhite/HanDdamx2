@@ -22,6 +22,7 @@ import lombok.NoArgsConstructor;
 public class ChatRoom extends BaseTimeEntity {
 
 	@Id
+	//DB가 ID번호를 자동으로 만들어 준다
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
@@ -49,5 +50,13 @@ public class ChatRoom extends BaseTimeEntity {
 		this.creatorId = creatorId;
 		this.memberId = memberId;
 		this.status = ChatRoomStatus.ACTIVE;
+	}
+
+	/** 크리에이터 또는 멤버이면 참여자 */
+	public boolean isParticipant(Long memberId) {
+		if (memberId == null) {
+			return false;
+		}
+		return memberId.equals(creatorId) || memberId.equals(this.memberId);
 	}
 }
