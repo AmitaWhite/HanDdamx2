@@ -48,7 +48,7 @@ public class EmailVerificationService {
                 new VerificationEmailRequestedEvent(email, nickname, rawToken, purpose));
     }
 
-    // KSY-005
+    // KSY-005 & KSY-013
     @Transactional
     public EmailVerification confirm(String rawToken, VerificationPurpose expectedPurpose) {
         String tokenHash = TokenGenerator.hash(rawToken);
@@ -70,4 +70,5 @@ public class EmailVerificationService {
                 email, purpose, VerificationStatus.PENDING)
                 .forEach(EmailVerification::expire);
     }
+
 }

@@ -1,6 +1,7 @@
 package com.white.handdam.auth.controller;
 
 import com.white.handdam.auth.dto.request.EmailVerificationRequest;
+import com.white.handdam.auth.dto.request.PasswordResetConfirmRequest;
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.AvailabilityResponse;
 import com.white.handdam.auth.dto.response.SignupResponse;
@@ -56,6 +57,13 @@ public class AuthController {
     @PostMapping("/password-reset")
     public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@Valid @RequestBody EmailVerificationRequest request) {
         passwordResetService.requestPasswordReset(request.email());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    // KSY-013
+    @PatchMapping("/password-reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        passwordResetService.resetPassword(request.token(), request.newPassword());
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
