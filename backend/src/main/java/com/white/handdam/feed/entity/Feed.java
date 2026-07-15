@@ -55,4 +55,14 @@ public class Feed extends BaseTimeEntity {
         this.content = content;
         this.visibility = visibility;
     }
+
+    // [LYJ-004] 피드 프로젝트 이동
+    public void moveProject(Long projectId) {
+        this.projectId = projectId;
+    }
+
+    // [LYJ-005] 피드 소프트 삭제
+    public void delete(){
+        this.deleted = true;
+    }
 }

@@ -1,6 +1,7 @@
 package com.white.handdam.feed.service;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.entity.Feed;
@@ -59,4 +60,28 @@ public class FeedService {
         feed.update(request.title(), request.content(), request.visibility());
         return feed.getId();
     }
+
+    // [LYJ-004] 피드 프로젝트 이동
+    @Transactional
+    public Long moveFeedProject(Long feedId, Long memberId, FeedMoveProjectRequest request){
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        // TODO [LYJ-004] Project 엔티티 생성 후 소유권 검증 활성화
+        boolean isOwner = false; // TODO: Project 추가 후 교체
+        if(!isOwner) throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        feed.moveProject(request.projectId());
+        return feed.getId();
+    }
+
+    // [LYJ-005] 피드 소프트 삭제
+    @Transactional
+    public void deleteFeed(Long feedId, Long memberId){
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        // TODO [LYJ-005] Project 엔티티 생성 후 소유권 검증 활성화
+        boolean isOwner = false; // TODO: Project 추가 후 교체
+        if(!isOwner) throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        feed.delete();
+    }
+
 }

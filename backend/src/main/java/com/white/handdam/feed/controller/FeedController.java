@@ -1,6 +1,7 @@
 package com.white.handdam.feed.controller;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedIdResponse;
@@ -10,7 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -52,5 +52,25 @@ public class FeedController {
             @Valid @RequestBody FeedUpdateRequest request
     ) {
         return ApiResponse.success(new FeedIdResponse(feedService.updateFeed(feedId, memberId, request)));
+    }
+
+    // [LYJ-004] PATCH /api/feeds/{feedId}/project
+    @PatchMapping("/{feedId}/project")
+    public ApiResponse<FeedIdResponse> moveFeedProject(
+            @PathVariable Long feedId,
+            @RequestHeader("X-Member-Id") Long memberId,
+            @Valid @RequestBody FeedMoveProjectRequest request
+    ){
+        return ApiResponse.success(new FeedIdResponse(feedService.moveFeedProject(feedId, memberId, request)));
+    }
+
+    // [LYJ-005] DELETE /api/feeds/{feedId}
+    @DeleteMapping("/{feedId}")
+    public ApiResponse<Void> deleteFeed(
+            @PathVariable Long feedId,
+            @RequestHeader("X-Member-Id") Long memberId
+    ){
+        feedService.deleteFeed(feedId, memberId);
+        return ApiResponse.noContent();
     }
 }

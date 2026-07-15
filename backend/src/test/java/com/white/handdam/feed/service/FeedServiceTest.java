@@ -1,6 +1,7 @@
 package com.white.handdam.feed.service;
 
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
+import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.entity.Feed;
@@ -93,13 +94,20 @@ class FeedServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
     }
-    // ---------------------------------------------------------------
+// ---------------------------------------------------------------
 // LYJ-003 피드 수정
 // ---------------------------------------------------------------
     @Test
-    @DisplayName("소유자가 피드를 수정하면 수정된 feedId를 반환한다")
+    @DisplayName("피드를 수정하면 수정된 feedId를 반환하고 필드가 변경된다")
     void updateFeed_success() {
-        // TODO: Project 엔티티 추가 후 isOwner=true 경로 테스트
+        FeedUpdateRequest request = new FeedUpdateRequest("새제목", "새내용", Visibility.FREE_SUBSCRIBER);
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        Long result = feedService.updateFeed(1L, 1L, request);
+        assertThat(result).isEqualTo(1L);
+        assertThat(feed.getTitle()).isEqualTo("새제목");
+        assertThat(feed.getContent()).isEqualTo("새내용");
+        assertThat(feed.getVisibility()).isEqualTo(Visibility.FREE_SUBSCRIBER);
     }
     @Test
     @DisplayName("존재하지 않는 피드 수정 시 FEED_NOT_FOUND 예외가 발생한다")
@@ -111,19 +119,41 @@ class FeedServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
     }
+    // ---------------------------------------------------------------
+    // LYJ-004 피드 프로젝트 이동
+    // ---------------------------------------------------------------
     @Test
-    @DisplayName("소유자가 아닌 경우 FEED_FORBIDDEN 예외가 발생한다")
-    void updateFeed_forbidden() {
-        FeedUpdateRequest request = new FeedUpdateRequest("새제목", "새내용", Visibility.PUBLIC);
+    @DisplayName("피드의 프로젝트를 이동하면 feedId를 반환하고 projectId가 변경된다")
+    void moveFeedProject_success() {
+        FeedMoveProjectRequest request = new FeedMoveProjectRequest(2L);
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
-        // 현재 isOwner=false 스텁이므로 항상 FORBIDDEN
-        assertThatThrownBy(() -> feedService.updateFeed(1L, 99L, request))
+        Long result = feedService.moveFeedProject(1L, 1L, request);
+        assertThat(result).isEqualTo(1L);
+        assertThat(feed.getProjectId()).isEqualTo(2L);
+    }
+    @Test
+    @DisplayName("존재하지 않는 피드 프로젝트 이동 시 FEED_NOT_FOUND 예외가 발생한다")
+    void moveFeedProject_notFound() {
+        FeedMoveProjectRequest request = new FeedMoveProjectRequest(2L);
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+        assertThatThrownBy(() -> feedService.moveFeedProject(999L, 1L, request))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
-                        .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
     }
-
+    // ---------------------------------------------------------------
+    // LYJ-005 피드 소프트 삭제
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("존재하지 않는 피드 삭제 시 FEED_NOT_FOUND 예외가 발생한다")
+    void deleteFeed_notFound() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+        assertThatThrownBy(() -> feedService.deleteFeed(999L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
     // ---------------------------------------------------------------
     // 헬퍼
     // ---------------------------------------------------------------
