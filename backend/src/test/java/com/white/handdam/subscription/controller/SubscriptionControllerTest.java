@@ -1,8 +1,12 @@
 package com.white.handdam.subscription.controller;
 
+import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.GlobalExceptionHandler;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
+import com.white.handdam.subscription.dto.response.MySubscriptionResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
 import com.white.handdam.subscription.exception.SubscriptionErrorCode;
@@ -15,8 +19,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.doThrow;
@@ -24,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +42,7 @@ class SubscriptionControllerTest {
     private static final Long CREATOR_ID = 2L;
     private static final Long SUBSCRIPTION_ID = 10L;
     private static final Instant STARTED_AT = Instant.parse("2026-07-13T00:00:00Z");
+    private static final Instant PERIOD_END_AT = Instant.parse("2026-08-13T00:00:00Z");
 
     private SubscriptionService subscriptionService;
     private MockMvc mockMvc;
@@ -131,6 +139,150 @@ class SubscriptionControllerTest {
     }
 
     @Test
+    @DisplayName("GET subscription status returns 200 with ApiResponse")
+    void getSubscriptionStatus() throws Exception {
+        SubscriptionStatusResponse response = new SubscriptionStatusResponse(
+                CREATOR_ID,
+                true,
+                SubscriptionLevel.PAID,
+                SubscriptionStatus.CANCEL_SCHEDULED,
+                STARTED_AT,
+                PERIOD_END_AT
+        );
+        when(subscriptionService.getSubscriptionStatus(SUBSCRIBER_ID, CREATOR_ID))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/creators/{creatorId}/subscription-status", CREATOR_ID)
+                        .header("X-User-Id", SUBSCRIBER_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data.subscribed").value(true))
+                .andExpect(jsonPath("$.data.subscriptionLevel").value("PAID"))
+                .andExpect(jsonPath("$.data.status").value("CANCEL_SCHEDULED"))
+                .andExpect(jsonPath("$.data.startedAt").value("2026-07-13T00:00:00Z"))
+                .andExpect(jsonPath("$.data.currentPeriodEndAt").value("2026-08-13T00:00:00Z"))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).getSubscriptionStatus(SUBSCRIBER_ID, CREATOR_ID);
+    }
+
+    @Test
+    @DisplayName("GET my subscriptions returns a list with ApiResponse")
+    void getMySubscriptions() throws Exception {
+        MySubscriptionResponse response = new MySubscriptionResponse(
+                SUBSCRIPTION_ID,
+                CREATOR_ID,
+                "creator",
+                "https://image/creator.png",
+                SubscriptionLevel.FREE,
+                SubscriptionStatus.ACTIVE,
+                STARTED_AT,
+                null,
+                null
+        );
+        when(subscriptionService.getMySubscriptions(SUBSCRIBER_ID)).thenReturn(List.of(response));
+
+        mockMvc.perform(get("/api/subscriptions/me")
+                        .header("X-User-Id", SUBSCRIBER_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data[0].creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data[0].creatorNickname").value("creator"))
+                .andExpect(jsonPath("$.data[0].creatorProfileImageUrl").value("https://image/creator.png"))
+                .andExpect(jsonPath("$.data[0].subscriptionLevel").value("FREE"))
+                .andExpect(jsonPath("$.data[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).getMySubscriptions(SUBSCRIBER_ID);
+    }
+
+    @Test
+    @DisplayName("GET my subscriptions returns an empty list")
+    void getMySubscriptionsReturnsEmptyList() throws Exception {
+        when(subscriptionService.getMySubscriptions(SUBSCRIBER_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/subscriptions/me")
+                        .header("X-User-Id", SUBSCRIBER_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(0)))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).getMySubscriptions(SUBSCRIBER_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription plans returns free and paid plans without X-User-Id")
+    void getSubscriptionPlans() throws Exception {
+        when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
+                .thenReturn(List.of(
+                        SubscriptionPlanResponse.free(CREATOR_ID),
+                        SubscriptionPlanResponse.paid(CREATOR_ID, 10000, true, "monthly benefits")
+                ));
+
+        mockMvc.perform(get("/api/creators/{creatorId}/subscription-plans", CREATOR_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data[0].subscriptionLevel").value("FREE"))
+                .andExpect(jsonPath("$.data[0].price").value(0))
+                .andExpect(jsonPath("$.data[0].available").value(true))
+                .andExpect(jsonPath("$.data[0].benefitsDescription").value(nullValue()))
+                .andExpect(jsonPath("$.data[1].subscriptionLevel").value("PAID"))
+                .andExpect(jsonPath("$.data[1].price").value(10000))
+                .andExpect(jsonPath("$.data[1].available").value(true))
+                .andExpect(jsonPath("$.data[1].benefitsDescription").value("monthly benefits"))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).getSubscriptionPlans(CREATOR_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription plans creator error returns common error response")
+    void getSubscriptionPlansRejectsMissingCreator() throws Exception {
+        when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
+                .thenThrow(new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+
+        mockMvc.perform(get("/api/creators/{creatorId}/subscription-plans", CREATOR_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("CREATOR_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message").value(CreatorErrorCode.CREATOR_NOT_FOUND.getMessage()))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(subscriptionService).getSubscriptionPlans(CREATOR_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription plans missing creator profile returns common error response")
+    void getSubscriptionPlansRejectsMissingCreatorProfile() throws Exception {
+        when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
+                .thenThrow(new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/creators/{creatorId}/subscription-plans", CREATOR_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("CREATOR_PROFILE_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message")
+                        .value(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND.getMessage()))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(subscriptionService).getSubscriptionPlans(CREATOR_ID);
+    }
+
+    @Test
     @DisplayName("POST without X-User-Id follows current GlobalExceptionHandler fallback")
     void createFreeSubscriptionRejectsMissingUserIdHeader() throws Exception {
         mockMvc.perform(post("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
@@ -145,9 +297,9 @@ class SubscriptionControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE without X-User-Id follows current GlobalExceptionHandler fallback")
-    void cancelFreeSubscriptionRejectsMissingUserIdHeader() throws Exception {
-        mockMvc.perform(delete("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
+    @DisplayName("GET subscription status without X-User-Id follows current GlobalExceptionHandler fallback")
+    void getSubscriptionStatusRejectsMissingUserIdHeader() throws Exception {
+        mockMvc.perform(get("/api/creators/{creatorId}/subscription-status", CREATOR_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.success").value(false))

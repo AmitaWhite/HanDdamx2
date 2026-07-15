@@ -79,7 +79,7 @@ public class Member extends BaseTimeEntity {
                 .build();
     }
 
-    public void verifyEmail() {
+    public void markEmailVerified() {
         this.emailVerifiedAt = Instant.now();
     }
 
@@ -87,4 +87,5 @@ public class Member extends BaseTimeEntity {
         return emailVerifiedAt != null;
     }
 
+    public void changeRoleToCreator() { this.role = Role.CREATOR; }
 }
