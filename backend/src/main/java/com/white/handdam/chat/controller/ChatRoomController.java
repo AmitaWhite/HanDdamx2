@@ -1,12 +1,15 @@
 package com.white.handdam.chat.controller;
 
+import com.white.handdam.chat.dto.response.ChatRoomListItemResponse;
 import com.white.handdam.chat.dto.response.ChatRoomResponse;
 import com.white.handdam.chat.service.ChatRoomService;
 import com.white.handdam.chat.service.ChatRoomService.CreateOrGetResult;
 import com.white.handdam.global.response.ApiResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -28,7 +31,19 @@ public class ChatRoomController {
 		@RequestHeader("X-Member-Id") Long memberId
 	) {
 		CreateOrGetResult result = chatRoomService.createOrGetChatRoom(creatorId, memberId);
+		//새로만든방이면 201 반환, 기존방이면 200 반환
 		HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
 		return ResponseEntity.status(status).body(ApiResponse.success(result.room()));
+	}
+
+	/**
+	 * 참여 채팅방 목록 + 마지막 메시지 조회 (CHAT-005).
+	 * 권한: 로그인 사용자(본인이 creator 또는 member인 방만)
+	 */
+	@GetMapping("/api/chat-rooms")
+	public ApiResponse<List<ChatRoomListItemResponse>> getMyChatRooms(
+		@RequestHeader("X-Member-Id") Long memberId
+	) {
+		return ApiResponse.success(chatRoomService.getMyChatRooms(memberId));
 	}
 }

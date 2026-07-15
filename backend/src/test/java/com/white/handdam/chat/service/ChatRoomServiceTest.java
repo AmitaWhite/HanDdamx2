@@ -3,20 +3,26 @@ package com.white.handdam.chat.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.white.handdam.board.service.PaidSubscriptionChecker;
+import com.white.handdam.chat.dto.response.ChatRoomListItemResponse;
 import com.white.handdam.chat.dto.response.ChatRoomResponse;
+import com.white.handdam.chat.entity.ChatMessage;
+import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.entity.ChatRoom;
 import com.white.handdam.chat.entity.ChatRoomStatus;
 import com.white.handdam.chat.exception.ChatErrorCode;
+import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.repository.ChatRoomRepository;
 import com.white.handdam.chat.service.ChatRoomService.CreateOrGetResult;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +37,9 @@ class ChatRoomServiceTest {
 
 	@Mock
 	private ChatRoomRepository chatRoomRepository;
+
+	@Mock
+	private ChatMessageRepository chatMessageRepository;
 
 	@Mock
 	private PaidSubscriptionChecker paidSubscriptionChecker;
@@ -113,6 +122,66 @@ class ChatRoomServiceTest {
 	@DisplayName("로그인이 없으면 채팅방을 생성할 수 없다")
 	void loginRequired() {
 		assertThatThrownBy(() -> chatRoomService.createOrGetChatRoom(1L, null))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_LOGIN_REQUIRED));
+	}
+
+	@Test
+	@DisplayName("참여 채팅방 목록에 마지막 메시지와 미읽음 수를 포함한다")
+	void listsParticipatingRoomsWithLastMessageAndUnread() {
+		Long memberId = 2L;
+		ChatRoom roomAsMember = ChatRoom.builder().creatorId(1L).memberId(memberId).build();
+		ReflectionTestUtils.setField(roomAsMember, "id", 10L);
+		ReflectionTestUtils.setField(roomAsMember, "lastMessageAt", Instant.parse("2026-07-16T12:00:00Z"));
+		ReflectionTestUtils.setField(roomAsMember, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(roomAsMember, "updatedAt", Instant.parse("2026-07-16T12:00:00Z"));
+
+		ChatRoom roomAsCreator = ChatRoom.builder().creatorId(memberId).memberId(99L).build();
+		ReflectionTestUtils.setField(roomAsCreator, "id", 11L);
+		ReflectionTestUtils.setField(roomAsCreator, "lastMessageAt", Instant.parse("2026-07-16T10:00:00Z"));
+		ReflectionTestUtils.setField(roomAsCreator, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+		ReflectionTestUtils.setField(roomAsCreator, "updatedAt", Instant.parse("2026-07-16T10:00:00Z"));
+
+		ChatMessage lastMessage = ChatMessage.builder()
+			.chatRoomId(10L)
+			.senderId(1L)
+			.type(ChatMessageType.TEXT)
+			.content("안녕하세요")
+			.build();
+		ReflectionTestUtils.setField(lastMessage, "id", 100L);
+		ReflectionTestUtils.setField(lastMessage, "sentAt", Instant.parse("2026-07-16T12:00:00Z"));
+
+		given(chatRoomRepository.findParticipatingOrderByLastMessageAtDesc(memberId))
+			.willReturn(List.of(roomAsMember, roomAsCreator));
+		given(chatMessageRepository.findLatestByChatRoomIdIn(List.of(10L, 11L)))
+			.willReturn(List.of(lastMessage));
+		given(chatMessageRepository.countUnreadByChatRoomIdIn(eq(List.of(10L, 11L)), eq(memberId)))
+			.willReturn(List.<Object[]>of(new Object[] {10L, 3L}));
+
+		List<ChatRoomListItemResponse> result = chatRoomService.getMyChatRooms(memberId);
+
+		assertThat(result).hasSize(2);
+		assertThat(result.get(0).id()).isEqualTo(10L);
+		assertThat(result.get(0).lastMessage().content()).isEqualTo("안녕하세요");
+		assertThat(result.get(0).unreadCount()).isEqualTo(3L);
+		assertThat(result.get(1).id()).isEqualTo(11L);
+		assertThat(result.get(1).lastMessage()).isNull();
+		assertThat(result.get(1).unreadCount()).isZero();
+		verify(paidSubscriptionChecker, never()).hasActivePaidSubscription(any(), any());
+	}
+
+	@Test
+	@DisplayName("참여 방이 없으면 빈 목록을 반환한다")
+	void emptyChatRoomList() {
+		given(chatRoomRepository.findParticipatingOrderByLastMessageAtDesc(5L)).willReturn(List.of());
+
+		assertThat(chatRoomService.getMyChatRooms(5L)).isEmpty();
+		verify(chatMessageRepository, never()).findLatestByChatRoomIdIn(any());
+	}
+
+	@Test
+	@DisplayName("로그인이 없으면 채팅방 목록을 조회할 수 없다")
+	void listLoginRequired() {
+		assertThatThrownBy(() -> chatRoomService.getMyChatRooms(null))
 			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_LOGIN_REQUIRED));
 	}
 

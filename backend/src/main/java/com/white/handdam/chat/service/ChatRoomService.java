@@ -2,11 +2,19 @@ package com.white.handdam.chat.service;
 
 import com.white.handdam.board.service.PaidSubscriptionChecker;
 import com.white.handdam.chat.converter.ChatRoomConverter;
+import com.white.handdam.chat.dto.response.ChatRoomListItemResponse;
 import com.white.handdam.chat.dto.response.ChatRoomResponse;
+import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatRoom;
 import com.white.handdam.chat.exception.ChatErrorCode;
+import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.repository.ChatRoomRepository;
 import com.white.handdam.global.exception.CustomException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatRoomService {
 
 	private final ChatRoomRepository chatRoomRepository;
+	private final ChatMessageRepository chatMessageRepository;
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
 
 	/**
@@ -55,6 +64,73 @@ public class ChatRoomService {
 				);
 				return new CreateOrGetResult(ChatRoomConverter.toResponse(saved), true);
 			});
+	}
+
+	/**
+	 * 참여 채팅방 목록 조회 (CHAT-005 / LDJ-018).
+	 *
+	 * <pre>
+	 * 1. 로그인 확인
+	 * 2. creator_id 또는 member_id 가 요청자인 방 조회
+	 * 3. last_message_at 최신순 (NULL 은 뒤로)
+	 * 4. 방별 마지막 메시지·상대 미읽음 수 함께 반환
+	 * </pre>
+	 */
+	public List<ChatRoomListItemResponse> getMyChatRooms(Long memberId) {
+		if (memberId == null) {
+			throw new CustomException(ChatErrorCode.CHAT_LOGIN_REQUIRED);
+		}
+
+		List<ChatRoom> rooms = chatRoomRepository.findParticipatingOrderByLastMessageAtDesc(memberId);
+		if (rooms.isEmpty()) {
+			return List.of();
+		}
+
+		// 방마다 메시지/미읽음을 따로 조회하면 N+1이 되므로,
+		// 방 ID 목록으로 한 번에 조회한 뒤 Map으로 붙여 쓴다.
+		List<Long> roomIds = rooms.stream().map(ChatRoom::getId).toList();
+
+		// 방ID → 해당 방의 마지막 메시지
+		// findLatestByChatRoomIdIn: 방별 sentAt 최대인 메시지 조회
+		// toMap 세 번째 인자: 같은 방에 sentAt이 동률이면 id가 큰 메시지를 채택
+		Map<Long, ChatMessage> lastMessages = chatMessageRepository.findLatestByChatRoomIdIn(roomIds)
+			.stream()
+			.collect(Collectors.toMap(
+				ChatMessage::getChatRoomId,
+				Function.identity(),
+				(left, right) -> left.getId() >= right.getId() ? left : right
+			));
+
+		// 방ID → 미읽음 개수
+		// 상대가 보낸 메시지 중 readAt IS NULL 인 것만 집계 (내가 보낸 것 제외)
+		// 미읽음이 0인 방은 결과 행이 없으므로 아래에서 getOrDefault(..., 0L) 처리
+		Map<Long, Long> unreadCounts = toUnreadCountMap(
+			chatMessageRepository.countUnreadByChatRoomIdIn(roomIds, memberId)
+		);
+
+		// 방 목록 순서(lastMessageAt 최신순)를 유지한 채
+		// 마지막 메시지 미리보기 + 미읽음 수를 붙여 목록 DTO로 변환
+		return rooms.stream()
+			.map(room -> ChatRoomConverter.toListItem(
+				room,
+				lastMessages.get(room.getId()), // 메시지 없으면 null → 미리보기 없음
+				unreadCounts.getOrDefault(room.getId(), 0L)
+			))
+			.toList();
+	}
+
+	/**
+	 * 미읽음 집계 결과({@code List<Object[]>} = [chatRoomId, count])를
+	 * 방ID → 개수 Map으로 변환한다.
+	 */
+	private static Map<Long, Long> toUnreadCountMap(List<Object[]> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		return rows.stream().collect(Collectors.toMap(
+			row -> (Long) row[0], // chatRoomId
+			row -> (Long) row[1]  // unread count
+		));
 	}
 
 	/**
