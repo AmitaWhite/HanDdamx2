@@ -25,6 +25,11 @@ public class PasswordResetService {
         String normalizedEmail = EmailNormalizer.normalize(email);
 
         memberRepository.findByEmail(normalizedEmail).ifPresent(member -> {
+            // OAuth 전용 계정은 비밀번호 재설정 메일을 보내지 X
+            if (member.getOauthProvider() != null) {
+                return;
+            } // 항상 동일한 응답 위해 예외 던지지 X
+
             emailVerificationService.issueAndSend(
                     member.getId(),
                     normalizedEmail,
