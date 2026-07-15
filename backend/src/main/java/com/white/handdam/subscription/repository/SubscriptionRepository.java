@@ -11,4 +11,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     Optional<Subscription> findBySubscriberIdAndCreatorId(Long subscriberId, Long creatorId);
 
     List<Subscription> findBySubscriberIdOrderByStartedAtDesc(Long subscriberId);
+
+    // 크리에이터 구독자 수 조회
+    long countByCreatorId(Long creatorId);
 }
