@@ -9,6 +9,7 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.event.FeedPublishedEvent;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
@@ -18,6 +19,7 @@ import com.white.handdam.storage.StoredObject;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ public class BoardPostService {
 	private final BoardPostImageRepository boardPostImageRepository;
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
 	private final ObjectStorage objectStorage;
+	private final ApplicationEventPublisher eventPublisher;
 
 	// -------------------------------------------------------------------------
 	// 목록 · 작성 (게시판 단위) — assertCanAccessBoard 공통
@@ -103,8 +106,9 @@ public class BoardPostService {
 	 * 1. assertCanWriteOnBoard — 크리에이터 본인 또는 활성 유료 구독자만 허용 (아니면 403)
 	 * 2. BoardPost 생성   — title/type/content 반영, status 기본값 WAITING
 	 * 3. board_post 저장  — DB INSERT 후 id 발급 (이미지 FK에 필요)
-	 * 4. 이미지 처리      — 파일이 있으면 S3 업로드 + board_post_image 저장
-	 * 5. DTO 변환         — BoardPostResponse 로 반환
+	 * 4. FeedPublishedEvent 발행 — postId 확보 후 (Phase 1: Spring Application Event)
+	 * 5. 이미지 처리      — 파일이 있으면 S3 업로드 + board_post_image 저장
+	 * 6. DTO 변환         — BoardPostResponse 로 반환
 	 * </pre>
 	 *
 	 * @param creatorId   게시판 소유 크리에이터 ID
@@ -131,6 +135,13 @@ public class BoardPostService {
 			.build();
 
 		BoardPost saved = boardPostRepository.save(post);
+		// TODO(NOTIFICATION): FeedPublishedEvent 구독 리스너에서 알림 저장·전송 처리 (현재는 발행만)
+		eventPublisher.publishEvent(new FeedPublishedEvent(
+			saved.getId(),
+			saved.getCreatorId(),
+			saved.getMemberId(),
+			saved.getTitle()
+		));
 		List<BoardPostImage> images = uploadAndSaveImages(saved, creatorId, imageFiles, 0);
 		return BoardPostConverter.toResponse(saved, images);
 	}

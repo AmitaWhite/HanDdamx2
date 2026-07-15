@@ -18,6 +18,7 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.entity.BoardPostImage;
 import com.white.handdam.board.entity.BoardPostStatus;
 import com.white.handdam.board.entity.BoardPostType;
+import com.white.handdam.board.event.FeedPublishedEvent;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardPostImageRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,6 +64,9 @@ class BoardPostServiceTest {
 
 	@Mock
 	private ObjectStorage objectStorage;
+
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private BoardPostService boardPostService;
@@ -174,6 +179,13 @@ class BoardPostServiceTest {
 		verify(boardPostRepository).save(postCaptor.capture());
 		assertThat(postCaptor.getValue().getTitle()).isEqualTo("재료 질문");
 		verify(objectStorage).upload("premium-board/1", image);
+
+		ArgumentCaptor<FeedPublishedEvent> eventCaptor = ArgumentCaptor.forClass(FeedPublishedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue().postId()).isEqualTo(10L);
+		assertThat(eventCaptor.getValue().creatorId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().writerId()).isEqualTo(subscriberId);
+		assertThat(eventCaptor.getValue().title()).isEqualTo("재료 질문");
 	}
 
 	@Test
@@ -200,6 +212,13 @@ class BoardPostServiceTest {
 		verifyNoInteractions(objectStorage);
 		verify(boardPostImageRepository, never()).saveAll(anyList());
 		verifyNoInteractions(paidSubscriptionChecker);
+
+		ArgumentCaptor<FeedPublishedEvent> eventCaptor = ArgumentCaptor.forClass(FeedPublishedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue().postId()).isEqualTo(11L);
+		assertThat(eventCaptor.getValue().creatorId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().writerId()).isEqualTo(creatorId);
+		assertThat(eventCaptor.getValue().title()).isEqualTo("공지");
 	}
 
 	@Test
@@ -219,6 +238,7 @@ class BoardPostServiceTest {
 
 		verify(boardPostRepository, never()).save(any());
 		verifyNoInteractions(objectStorage);
+		verifyNoInteractions(eventPublisher);
 	}
 
 	@Test
@@ -557,7 +577,8 @@ class BoardPostServiceTest {
 			boardPostRepository,
 			boardPostImageRepository,
 			paidSubscriptionChecker,
-			realStorage
+			realStorage,
+			eventPublisher
 		);
 
 		Long creatorId = 1L;
@@ -614,7 +635,8 @@ class BoardPostServiceTest {
 			boardPostRepository,
 			boardPostImageRepository,
 			paidSubscriptionChecker,
-			realStorage
+			realStorage,
+			eventPublisher
 		);
 
 		Long creatorId = 1L;
@@ -656,7 +678,8 @@ class BoardPostServiceTest {
 			boardPostRepository,
 			boardPostImageRepository,
 			paidSubscriptionChecker,
-			realStorage
+			realStorage,
+			eventPublisher
 		);
 
 		Long creatorId = 1L;
