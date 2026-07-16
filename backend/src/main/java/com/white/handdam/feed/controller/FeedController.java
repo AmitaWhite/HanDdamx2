@@ -38,7 +38,6 @@ public class FeedController {
     }
 
     // [LYJ-002] GET /api/feeds/{feedId}
-    // TODO 이 엔드포인트 비회원도 접근 가능하게 하려면 SecurityConfig PERMIT_ALL에 추가해야함
     @GetMapping("/{feedId}")
     public ApiResponse<FeedDetailResponse> getFeed(
             @PathVariable Long feedId,
@@ -96,8 +95,7 @@ public class FeedController {
     }
 
     // [LYJ-008] GET /api/feeds/explore
-    // TODO 비회원도 접근 가능 - SecurityConfig에서 이 경로 permitAll() 처리필요
-    @GetMapping("/explore")
+   @GetMapping("/explore")
     public SliceResponse<FeedSummaryResponse> getExploreFeeds(
             @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
@@ -106,7 +104,6 @@ public class FeedController {
     }
 
     // [LYJ-009] GET /api/feeds/creators/{creatorId}
-    // TODO 비회원도 접근 가능 - SecurityConfig에서 이 경로 permitAll() 처리필요
     @GetMapping("/creators/{creatorId}")
     public SliceResponse<FeedSummaryResponse> getCreatorFeeds(
             @PathVariable Long creatorId,
@@ -115,5 +112,15 @@ public class FeedController {
     ){
         Long memberId = (member != null) ? member.id() : null;
         return SliceResponse.from(feedService.getCreatorFeeds(creatorId, memberId, pageable));
+    }
+
+    // [LYJ-010] GET /api/feeds/me — 내 작성 피드 목록
+    // TODO [LYJ-010] CREATOR 역할만 접근 가능하도록 추후 @PreAuthorize("hasRole('CREATOR')") 추가
+    @GetMapping("/me")
+    public SliceResponse<FeedSummaryResponse> getMyFeeds(
+            @AuthenticationPrincipal AuthMember member,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return SliceResponse.from(feedService.getMyFeeds(member.id(), pageable));
     }
 }

@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -152,5 +153,13 @@ public class FeedService {
             return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER);
         }
         return List.of(Visibility.PUBLIC);
+    }
+
+    // [LYJ-010] 내 작성 피드 목록 (크리에이터 본인 전용 — 공개범위 무관 전체 조회)
+    public Slice<FeedSummaryResponse> getMyFeeds(Long creatorId, Pageable pageable) {
+        // TODO [LYJ-010] Project 엔티티 추가 후 아래 코드로 교체
+        // return feedRepository.findByCreatorId(creatorId, pageable)
+        //         .map(feed -> FeedSummaryResponse.from(feed));
+        return new SliceImpl<>(List.of()); // 임시: Project 연결 전까지 빈 결과 반환
     }
 }

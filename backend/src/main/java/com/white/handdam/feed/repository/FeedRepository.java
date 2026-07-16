@@ -66,4 +66,19 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
     //         @Param("visibilities") List<Visibility> visibilities,
     //         Pageable pageable
     // );
+
+    // TODO [LYJ-010] Project 엔티티 추가 후 사용
+    // @Query("""
+    //         SELECT f FROM Feed f, com.white.handdam.project.entity.Project p
+    //         WHERE p.id = f.projectId
+    //           AND f.deleted = false
+    //           AND p.deleted = false
+    //           AND p.creatorId = :creatorId
+    //         ORDER BY f.createdAt DESC
+    //         """)
+    // Slice<Feed> findByCreatorId(
+    //         @Param("creatorId") Long creatorId,
+    //         Pageable pageable
+    // );
+
 }
