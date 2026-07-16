@@ -49,13 +49,16 @@ public class Member extends BaseTimeEntity {
     private Instant emailVerifiedAt; // NULL = 미인증
 
     @Builder(access = AccessLevel.PRIVATE)
-    private Member(String email, String password, String nickname, Role role, OAuthProvider oauthProvider, String oauthId) {
+    private Member(String email, String password, String nickname, String profileImageUrl,
+                   Role role, OAuthProvider oauthProvider, String oauthId, Instant emailVerifiedAt) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
+        this.profileImageUrl = profileImageUrl;
         this.role = role;
         this.oauthProvider = oauthProvider;
         this.oauthId = oauthId;
+        this.emailVerifiedAt = emailVerifiedAt;
     }
 
     public static Member createLocalMember(String email, String encodedPassword, String nickname) {
@@ -68,14 +71,16 @@ public class Member extends BaseTimeEntity {
                 .build();
     }
 
-    public static Member createSocialMember(String email, String nickname,
+    public static Member createOAuthMember(String email, String nickname, String profileImageUrl,
                                             OAuthProvider oauthProvider, String oauthId) {
         return Member.builder()
                 .email(email)
                 .nickname(nickname)
+                .profileImageUrl(profileImageUrl)
                 .role(Role.USER)
                 .oauthProvider(oauthProvider)
                 .oauthId(oauthId)
+                .emailVerifiedAt(Instant.now()) // OAuth는 가입 즉시 인증 완료
                 .build();
     }
 
