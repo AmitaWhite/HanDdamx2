@@ -2,14 +2,15 @@ package com.white.handdam.creator.controller;
 
 import com.white.handdam.creator.dto.response.CreatorProfileResponse;
 import com.white.handdam.creator.dto.request.UpdateCreatorProfileRequest;
+import com.white.handdam.creator.dto.request.UpdateSubscriptionPriceRequest;
 import com.white.handdam.creator.service.CreatorProfileService;
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.security.AuthMember;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,80 +33,93 @@ public class CreatorController {
      * 내 크리에이터 프로필 조회
      */
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> getMyProfile(
-            @RequestHeader("X-Member-Id") Long memberId
+    public ApiResponse<CreatorProfileResponse> getMyProfile(
+            @AuthenticationPrincipal AuthMember member
     ) {
-        CreatorProfileResponse response = creatorProfileService.getMyProfile(memberId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.getMyProfile(member.id());
+        return ApiResponse.success(response);
     }
 
     /**
      * 소개·구독 혜택 수정
      */
     @PatchMapping("/me")
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> updateProfile(
-            @RequestHeader("X-Member-Id") Long memberId,
+    public ApiResponse<CreatorProfileResponse> updateProfile(
+            @AuthenticationPrincipal AuthMember member,
             @RequestBody UpdateCreatorProfileRequest request
     ) {
-        CreatorProfileResponse response = creatorProfileService.updateProfile(memberId, request);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.updateProfile(member.id(), request);
+        return ApiResponse.success(response);
     }
 
     /**
      * 대표 이미지 변경
      */
     @PatchMapping(value = "/me/representative-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> updateRepresentativeImage(
-            @RequestHeader("X-Member-Id") Long memberId,
+    public ApiResponse<CreatorProfileResponse> updateRepresentativeImage(
+            @AuthenticationPrincipal AuthMember member,
             @RequestPart("image") MultipartFile image
     ) {
-        CreatorProfileResponse response = creatorProfileService.updateRepresentativeImage(memberId, image);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.updateRepresentativeImage(member.id(), image);
+        return ApiResponse.success(response);
     }
 
     /**
      * 대표 이미지 제거
      */
     @DeleteMapping("/me/representative-image")
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> clearRepresentativeImage(
-            @RequestHeader("X-Member-Id") Long memberId
+    public ApiResponse<CreatorProfileResponse> clearRepresentativeImage(
+            @AuthenticationPrincipal AuthMember member
     ) {
-        CreatorProfileResponse response = creatorProfileService.clearRepresentativeImage(memberId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.clearRepresentativeImage(member.id());
+        return ApiResponse.success(response);
     }
 
     /**
      * 커버 이미지 변경
      */
     @PatchMapping(value = "/me/cover-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> updateCoverImage(
-            @RequestHeader("X-Member-Id") Long memberId,
+    public ApiResponse<CreatorProfileResponse> updateCoverImage(
+            @AuthenticationPrincipal AuthMember member,
             @RequestPart("image") MultipartFile image
     ) {
-        CreatorProfileResponse response = creatorProfileService.updateCoverImage(memberId, image);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.updateCoverImage(member.id(), image);
+        return ApiResponse.success(response);
     }
 
     /**
      * 커버 이미지 제거
      */
     @DeleteMapping("/me/cover-image")
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> clearCoverImage(
-            @RequestHeader("X-Member-Id") Long memberId
+    public ApiResponse<CreatorProfileResponse> clearCoverImage(
+            @AuthenticationPrincipal AuthMember member
     ) {
-        CreatorProfileResponse response = creatorProfileService.clearCoverImage(memberId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.clearCoverImage(member.id());
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 월 구독 가격 변경
+     */
+    @PatchMapping("/me/subscription-price")
+    public ApiResponse<CreatorProfileResponse> updateSubscriptionPrice(
+            @AuthenticationPrincipal AuthMember member,
+            @RequestBody UpdateSubscriptionPriceRequest request
+    ) {
+        CreatorProfileResponse response = creatorProfileService.updateSubscriptionPrice(member.id(), request);
+        return ApiResponse.success(response);
     }
 
     /**
      * 크리에이터 공개 프로필 조회
      */
     @GetMapping("/{creatorId}")
-    public ResponseEntity<ApiResponse<CreatorProfileResponse>> getPublicProfile(
+    public ApiResponse<CreatorProfileResponse> getPublicProfile(
             @PathVariable Long creatorId,
-            @RequestHeader(value = "X-Member-Id", required = false) Long memberId
+            @AuthenticationPrincipal AuthMember member
     ) {
-        CreatorProfileResponse response = creatorProfileService.getPublicProfile(creatorId, memberId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        CreatorProfileResponse response = creatorProfileService.getPublicProfile(
+                creatorId, member != null ? member.id() : null);
+        return ApiResponse.success(response);
     }
 }
