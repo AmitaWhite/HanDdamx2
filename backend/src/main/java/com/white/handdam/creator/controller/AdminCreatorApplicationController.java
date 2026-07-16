@@ -5,6 +5,8 @@ import com.white.handdam.creator.dto.response.CreatorApplicationResponse;
 import com.white.handdam.creator.entity.CreatorApplicationStatus;
 import com.white.handdam.creator.service.CreatorApplicationService;
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.security.AuthMember;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,7 +15,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,12 +38,12 @@ public class AdminCreatorApplicationController {
      */
     @GetMapping
     public ApiResponse<Page<CreatorApplicationResponse>> getApplicationList(
-            @RequestHeader("X-Member-Id") Long adminId,
+            @AuthenticationPrincipal AuthMember member,
             @RequestParam(required = false) CreatorApplicationStatus status,
             Pageable pageable
     ) {
         return ApiResponse.success(
-                creatorApplicationService.getApplicationList(adminId, status, pageable));
+                creatorApplicationService.getApplicationList(member.id(), status, pageable));
     }
 
     /**
@@ -50,11 +51,11 @@ public class AdminCreatorApplicationController {
      */
     @GetMapping("/{applicationId}")
     public ApiResponse<CreatorApplicationResponse> getApplicationDetail(
-            @RequestHeader("X-Member-Id") Long adminId,
+            @AuthenticationPrincipal AuthMember member,
             @PathVariable Long applicationId
     ) {
         return ApiResponse.success(
-                creatorApplicationService.getApplicationDetail(adminId, applicationId));
+                creatorApplicationService.getApplicationDetail(member.id(), applicationId));
     }
 
     /**
@@ -63,10 +64,10 @@ public class AdminCreatorApplicationController {
      */
     @PatchMapping("/{applicationId}/approve")
     public ApiResponse<CreatorApplicationResponse> approve(
-            @RequestHeader("X-Member-Id") Long adminId,
+            @AuthenticationPrincipal AuthMember member,
             @PathVariable Long applicationId
     ) {
-        return ApiResponse.success(creatorApplicationService.approve(adminId, applicationId));
+        return ApiResponse.success(creatorApplicationService.approve(member.id(), applicationId));
     }
 
     /**
@@ -75,11 +76,11 @@ public class AdminCreatorApplicationController {
      */
     @PatchMapping("/{applicationId}/reject")
     public ApiResponse<CreatorApplicationResponse> reject(
-            @RequestHeader("X-Member-Id") Long adminId,
+            @AuthenticationPrincipal AuthMember member,
             @PathVariable Long applicationId,
             @Valid @RequestBody RejectCreatorApplicationRequest request
     ) {
         return ApiResponse.success(
-                creatorApplicationService.reject(adminId, applicationId, request));
+                creatorApplicationService.reject(member.id(), applicationId, request));
     }
 }
