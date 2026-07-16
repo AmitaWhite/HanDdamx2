@@ -59,4 +59,17 @@ public class ChatRoom extends BaseTimeEntity {
 		}
 		return memberId.equals(creatorId) || memberId.equals(this.memberId);
 	}
+
+	public boolean isActive() {
+		return status == ChatRoomStatus.ACTIVE;
+	}
+
+	/** 구독자(member) 측 참여자인지 */
+	public boolean isSubscriber(Long memberId) {
+		return memberId != null && memberId.equals(this.memberId);
+	}
+
+	public void updateLastMessageAt(Instant sentAt) {
+		this.lastMessageAt = sentAt;
+	}
 }
