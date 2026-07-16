@@ -82,4 +82,39 @@ class SubscriptionTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("startedAt must not be null");
     }
+
+    @Test
+    @DisplayName("createPaid creates an active paid subscription for one month")
+    void createPaidCreatesActivePaidSubscription() {
+        Subscription subscription = Subscription.createPaid(SUBSCRIBER_ID, CREATOR_ID, 15000, STARTED_AT);
+
+        assertThat(subscription.getSubscriptionLevel()).isEqualTo(SubscriptionLevel.PAID);
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getSubscriptionPriceSnapshot()).isEqualTo(15000);
+        assertThat(subscription.getStartedAt()).isEqualTo(STARTED_AT);
+        assertThat(subscription.getCurrentPeriodStartAt()).isEqualTo(STARTED_AT);
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(
+                STARTED_AT.atZone(java.time.ZoneOffset.UTC).plusMonths(1).toInstant()
+        );
+        assertThat(subscription.isAutoRenew()).isFalse();
+        assertThat(subscription.getCancelScheduledAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("upgradeToPaid changes an existing free subscription to paid without changing startedAt")
+    void upgradeToPaidChangesFreeSubscriptionToPaid() {
+        Instant approvedAt = Instant.parse("2026-07-15T00:00:00Z");
+        Subscription subscription = Subscription.createFree(SUBSCRIBER_ID, CREATOR_ID, STARTED_AT);
+
+        subscription.upgradeToPaid(15000, approvedAt);
+
+        assertThat(subscription.getSubscriptionLevel()).isEqualTo(SubscriptionLevel.PAID);
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getStartedAt()).isEqualTo(STARTED_AT);
+        assertThat(subscription.getCurrentPeriodStartAt()).isEqualTo(approvedAt);
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(
+                approvedAt.atZone(java.time.ZoneOffset.UTC).plusMonths(1).toInstant()
+        );
+        assertThat(subscription.getSubscriptionPriceSnapshot()).isEqualTo(15000);
+    }
 }

@@ -89,6 +89,7 @@ cloud:
 toss:
   client-key: ${TOSS_CLIENT_KEY:}
   secret-key: ${TOSS_SECRET_KEY:}
+  api-base-url: ${TOSS_API_BASE_URL:https://api.tosspayments.com}
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
@@ -131,6 +132,10 @@ jwt:
 
 app:
   frontend-base-url: http://localhost:3000
+
+toss:
+  secret-key: test_secret_do_not_use
+  api-base-url: https://api.tosspayments.com
 
 cloud:
   aws:
@@ -213,6 +218,7 @@ cloud:
 toss:
   client-key: ${TOSS_CLIENT_KEY}
   secret-key: ${TOSS_SECRET_KEY}
+  api-base-url: ${TOSS_API_BASE_URL:https://api.tosspayments.com}
 
 springdoc:
   swagger-ui:
