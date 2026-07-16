@@ -50,9 +50,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 	 * @throws IllegalArgumentException 토큰 없음/무효 시 CONNECT 거부
 	 */
 	@Override
-	//메시지 전송 직전 훅
+	//메시지 전송 직전 훅//message:클라이언트가 보낸 STOMP 프레임 (CONNECT, SEND, SUBSCRIBE 등)//channel:인바운드 채널 (클라 → 서버 통로)
+	//반환 Message<?> 그대로 통과시키거나, 수정한 뒤 다음 단계로 넘김
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
-		//메시지 헤더 접근자 가져오기
+		//메시지 헤더 접근자 가져오기//StompHeaderAccessor:STOMP 전용 — 명령(CONNECT/SEND 등), 헤더, user 정보 조회·설정
 		StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
 			message,
 			StompHeaderAccessor.class
@@ -64,13 +65,13 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
 		//토큰 조회
 		String token = resolveToken(accessor);
-		//토큰이 없거나, 토큰이 유효하지 않다면 연결을 거부한다.
+		//토큰 문자열 자체가 없음 (null, 빈 문자열, 공백만) — 헤더·세션 어디에서도 못 찾음, 토큰은 있는데 JWT로 유효하지 않음
 		if (!StringUtils.hasText(token) || !jwtTokenProvider.validate(token)) {
 			throw new IllegalArgumentException("WebSocket 인증에 실패했습니다. 유효한 JWT가 필요합니다.");
 		}
 		//토큰을 사용하여 인증 정보를 가져온다.
 		Authentication authentication = jwtTokenProvider.getAuthentication(token);
-		//인증 정보를 메시지 헤더 접근자에 설정한다.
+		//인증 정보를 메시지 헤더 접근자에 설정한다.//이 WebSocket 세션에 “로그인한 유저”로 등록 (이후 Principal로 사용)
 		accessor.setUser(authentication);
 		return message;
 	}

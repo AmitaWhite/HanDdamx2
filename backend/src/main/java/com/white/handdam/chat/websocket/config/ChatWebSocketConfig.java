@@ -84,9 +84,9 @@ public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	@Override
 	//메시지 경로 규칙과 메시지 브로커를 설정하는 메서드
 	public void configureMessageBroker(MessageBrokerRegistry registry) {
-		// 서버 → 클라이언트 구독 prefix ///sub 채팅방 전체 구독용 ///queue 개인 메시지용으로 사용
+		// 서버 → 클라이언트 구독 prefix ///sub SEND용, 클라 → 서버 (보내기) ///queue 개인 메시지용으로 사용///브로커로 받기 (구독 + 발행)
 		registry.enableSimpleBroker("/sub", "/queue");
-		// 클라이언트 → 서버 송신 prefix ///pub 채팅방 메시지 전송용
+		// 클라이언트 → 서버 송신 prefix ////pub로 보내기 (컨트롤러 처리)///여기서는 구독등록이 아니라 서버 애클리케이션으로 보내는 주소규칙
 		registry.setApplicationDestinationPrefixes("/pub");
 		// 특정 유저 대상 메시지 prefix (/user/queue/errors 등) ///user 개인 메시지용으로 사용
 		registry.setUserDestinationPrefix("/user");
