@@ -45,6 +45,9 @@ public class SecurityConfig {
                         "/api/auth/token/refresh",
                         "/swagger-ui/**", "/v3/api-docs/**",
                         "/actuator/health",
+                        // handshake만 공개. STOMP CONNECT JWT는 StompAuthChannelInterceptor에서 검증
+                        "/ws",
+                        "/ws/**"
                         "/oauth2/**",
                         "/login/oauth2/**",
                         "/api/feeds/explore",

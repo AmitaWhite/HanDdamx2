@@ -270,6 +270,67 @@ class ChatRoomServiceTest {
 			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_LOGIN_REQUIRED));
 	}
 
+	@Test
+	@DisplayName("멤버(참여자)는 채팅방을 종료할 수 있다")
+	void memberCanCloseChatRoom() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = ChatRoom.builder().creatorId(creatorId).memberId(memberId).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		ReflectionTestUtils.setField(room, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(room, "updatedAt", Instant.parse("2026-07-16T00:00:00Z"));
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		ChatRoomResponse response = chatRoomService.closeChatRoom(10L, memberId);
+
+		assertThat(response.status()).isEqualTo(ChatRoomStatus.CLOSED);
+		assertThat(response.closedBy()).isEqualTo(memberId);
+		assertThat(response.closedAt()).isNotNull();
+		verify(paidSubscriptionChecker, never()).hasActivePaidSubscription(any(), any());
+	}
+
+	@Test
+	@DisplayName("크리에이터(작성자)는 채팅방을 종료할 수 있다")
+	void creatorCanCloseChatRoom() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = ChatRoom.builder().creatorId(creatorId).memberId(memberId).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		ReflectionTestUtils.setField(room, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(room, "updatedAt", Instant.parse("2026-07-16T00:00:00Z"));
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		ChatRoomResponse response = chatRoomService.closeChatRoom(10L, creatorId);
+
+		assertThat(response.status()).isEqualTo(ChatRoomStatus.CLOSED);
+		assertThat(response.closedBy()).isEqualTo(creatorId);
+	}
+
+	@Test
+	@DisplayName("이미 종료된 채팅방은 다시 종료할 수 없다")
+	void cannotCloseAlreadyClosedRoom() {
+		ChatRoom room = ChatRoom.builder().creatorId(1L).memberId(99L).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		ReflectionTestUtils.setField(room, "status", ChatRoomStatus.CLOSED);
+		ReflectionTestUtils.setField(room, "closedBy", 99L);
+		ReflectionTestUtils.setField(room, "closedAt", Instant.parse("2026-07-16T12:00:00Z"));
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		assertThatThrownBy(() -> chatRoomService.closeChatRoom(10L, 99L))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_ROOM_ALREADY_CLOSED));
+	}
+
+	@Test
+	@DisplayName("참여자가 아니면 채팅방을 종료할 수 없다")
+	void nonParticipantCannotClose() {
+		ChatRoom room = ChatRoom.builder().creatorId(1L).memberId(99L).build();
+		ReflectionTestUtils.setField(room, "id", 10L);
+		given(chatRoomRepository.findById(10L)).willReturn(Optional.of(room));
+
+		assertThatThrownBy(() -> chatRoomService.closeChatRoom(10L, 7L))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_NOT_PARTICIPANT));
+	}
+
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {
 		assertThat(thrown).isInstanceOf(CustomException.class);
 		assertThat(((CustomException) thrown).getErrorCode()).isEqualTo(expected);
