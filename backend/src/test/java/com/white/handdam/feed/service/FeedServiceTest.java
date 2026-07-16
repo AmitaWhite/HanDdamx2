@@ -210,6 +210,37 @@ class FeedServiceTest {
     // void getHomeFeed_withCategoryFilter() { ... }
 
     // ---------------------------------------------------------------
+    // LYJ-008 전체 공개 탐색 피드
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-008] 탐색 피드 조회 시 PUBLIC 피드를 반환한다")
+    void getExploreFeeds_returnsPublicFeeds() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByVisibilityAndDeletedFalse(
+                eq(Visibility.PUBLIC), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(List.of(feed)));
+
+        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, Pageable.unpaged());
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).visibility()).isEqualTo(Visibility.PUBLIC);
+    }
+
+    @Test
+    @DisplayName("[LYJ-008] 결과가 없으면 빈 리스트를 반환한다")
+    void getExploreFeeds_noResult_returnsEmpty() {
+        given(feedRepository.findByVisibilityAndDeletedFalse(any(), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(List.of()));
+
+        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, Pageable.unpaged());
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    // TODO [LYJ-008] Project 엔티티 추가 후 categoryId 필터 테스트 추가
+
+    // ---------------------------------------------------------------
     // 헬퍼
     // ---------------------------------------------------------------
     private Feed sampleFeed(Visibility visibility) {

@@ -123,4 +123,11 @@ public class FeedService {
 
     }
 
+    // [LYJ-008] 전체 공개 탐색 피드 (비회원도 접근 가능)
+    // categoryId : 카테고리 필터가 생겨야 적용할 수 있음
+    public Slice<FeedSummaryResponse> getExploreFeeds(Long categoryId, Pageable pageable){
+        // TODO [LYJ-008] Project 엔티티 추가 후 findExploreFeeds로 교체
+        return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
+                .map(feed -> FeedSummaryResponse.from(feed));
+    }
 }

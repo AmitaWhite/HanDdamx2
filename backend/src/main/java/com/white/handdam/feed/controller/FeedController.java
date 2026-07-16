@@ -30,10 +30,9 @@ public class FeedController {
     private final FeedService feedService;
 
     // [LYJ-001] POST /api/feeds
+    // 201 반환 필요해 ResponseEntity 사용
     @PostMapping
     public ResponseEntity<ApiResponse<FeedIdResponse>> createFeed(
-            // TODO JWT랑 연결 필요 현재 임시로 X-Member-Id 사용
-//            @AuthenticationPrincipal MemberDto dto,
             @AuthenticationPrincipal AuthMember member,
             @Valid @RequestBody FeedCreateRequest request
             )
@@ -100,5 +99,15 @@ public class FeedController {
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
         return SliceResponse.from(feedService.getHomeFeed(member.id(), categoryId, pageable));
+    }
+
+    // [LYJ-008] GET /api/feeds/explore
+    // 비회원도 접근 가능 - SecurityConfig에서 이 경로 permitAll() 처리필요
+    @GetMapping("/explore")
+    public SliceResponse<FeedSummaryResponse> getExploreFeeds(
+            @RequestParam(required = false) Long categoryId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ){
+        return SliceResponse.from(feedService.getExploreFeeds(categoryId, pageable));
     }
 }
