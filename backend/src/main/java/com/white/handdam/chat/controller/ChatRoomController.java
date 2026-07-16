@@ -75,4 +75,16 @@ public class ChatRoomController {
 	) {
 		return ApiResponse.success(chatMessageService.markMessagesAsRead(chatRoomId, member.id()));
 	}
+
+	/**
+	 * 채팅방 종료·읽기 전용 전환 (CHAT-008~010).
+	 * 권한: 해당 채팅방 참여자(creator 또는 member)
+	 */
+	@PatchMapping("/api/chat-rooms/{chatRoomId}/close")
+	public ApiResponse<ChatRoomResponse> closeChatRoom(
+		@PathVariable Long chatRoomId,
+		@AuthenticationPrincipal AuthMember member
+	) {
+		return ApiResponse.success(chatRoomService.closeChatRoom(chatRoomId, member.id()));
+	}
 }
