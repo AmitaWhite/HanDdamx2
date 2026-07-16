@@ -33,6 +33,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 		  AND m.readAt IS NULL
 		GROUP BY m.chatRoomId
 		""")
+		//방별 미읽음 개수 조회
 	List<Object[]> countUnreadByChatRoomIdIn(
 		@Param("roomIds") Collection<Long> roomIds,
 		@Param("memberId") Long memberId
