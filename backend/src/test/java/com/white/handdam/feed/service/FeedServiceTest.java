@@ -241,6 +241,43 @@ class FeedServiceTest {
     // TODO [LYJ-008] Project 엔티티 추가 후 categoryId 필터 테스트 추가
 
     // ---------------------------------------------------------------
+    // LYJ-009 크리에이터별 피드 조회
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-009] 비회원은 구독 레벨 조회 없이 PUBLIC 피드를 반환한다")
+    void getCreatorFeeds_nonMember_returnsPublicOnly() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByVisibilityAndDeletedFalse(eq(Visibility.PUBLIC), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(List.of(feed)));
+
+        // memberId = null (비회원)
+        Slice<FeedSummaryResponse> result = feedService.getCreatorFeeds(10L, null, Pageable.unpaged());
+
+        assertThat(result.getContent()).hasSize(1);
+        // 비회원이므로 getLevel 호출 안 됨
+        verify(subscriptionLevelChecker, org.mockito.Mockito.never())
+                .getLevel(any(), any());
+    }
+
+    @Test
+    @DisplayName("[LYJ-009] 구독자는 구독 레벨 조회 후 피드를 반환한다")
+    void getCreatorFeeds_member_callsLevelChecker() {
+        given(subscriptionLevelChecker.getLevel(1L, 10L)).willReturn("FREE");
+        given(feedRepository.findByVisibilityAndDeletedFalse(eq(Visibility.PUBLIC), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(List.of()));
+
+        feedService.getCreatorFeeds(10L, 1L, Pageable.unpaged());
+
+        // memberId=1, creatorId=10 으로 레벨 조회했는지 검증
+        verify(subscriptionLevelChecker).getLevel(1L, 10L);
+    }
+
+    // TODO [LYJ-009] Project 엔티티 추가 후 아래 테스트 활성화
+    // PAID 구독자 → PAID_SUBSCRIBER 피드 열람 가능
+    // FREE 구독자 → FREE_SUBSCRIBER까지 열람 가능
+    // 비구독자 → PUBLIC만 열람 가능
+
+    // ---------------------------------------------------------------
     // 헬퍼
     // ---------------------------------------------------------------
     private Feed sampleFeed(Visibility visibility) {

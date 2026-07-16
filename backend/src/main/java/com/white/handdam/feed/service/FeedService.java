@@ -12,6 +12,7 @@ import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -129,5 +130,27 @@ public class FeedService {
         // TODO [LYJ-008] Project 엔티티 추가 후 findExploreFeeds로 교체
         return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
                 .map(feed -> FeedSummaryResponse.from(feed));
+    }
+
+    // [LYJ-009] 특정 크리에이터의 피드 목록 조회
+    // 비회원: PUBLIC만, FREE 구독자 : PUBLIC+FREE_SUBSCRIBER, PAID 구독자 : 전체 조회 가능
+    public Slice<FeedSummaryResponse> getCreatorFeeds(Long creatorId, Long memberId, Pageable pageable){
+        String level = (memberId != null) ? subscriptionLevelChecker.getLevel(memberId, creatorId) : null;
+        List<Visibility> visibilities = resolveVisibilites(level);
+        // TODO [LYJ-009] Project 추가 후 아래 사용
+        // return feedRepository.findByCreatorIdAndVisibilityIn(creatorId, visibilities, pageable)
+        //         .map(feed -> FeedSummaryResponse.from(feed));
+        return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
+                .map(feed -> FeedSummaryResponse.from(feed));
+    }
+
+    // 구독 레벨을 접근 가능한 공개범위 목록으로 변환
+    private List<Visibility> resolveVisibilites(String level){
+        if("PAID".equals(level)){
+            return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER, Visibility.PAID_SUBSCRIBER);
+        } else if ("FREE".equals(level)) {
+            return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER);
+        }
+        return List.of(Visibility.PUBLIC);
     }
 }

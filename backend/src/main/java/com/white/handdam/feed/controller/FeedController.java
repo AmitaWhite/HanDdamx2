@@ -102,12 +102,24 @@ public class FeedController {
     }
 
     // [LYJ-008] GET /api/feeds/explore
-    // 비회원도 접근 가능 - SecurityConfig에서 이 경로 permitAll() 처리필요
+    // TODO 비회원도 접근 가능 - SecurityConfig에서 이 경로 permitAll() 처리필요
     @GetMapping("/explore")
     public SliceResponse<FeedSummaryResponse> getExploreFeeds(
             @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
         return SliceResponse.from(feedService.getExploreFeeds(categoryId, pageable));
+    }
+
+    // [LYJ-009] GET /api/feeds/creators/{creatorId}
+    // TODO 비회원도 접근 가능 - SecurityConfig에서 이 경로 permitAll() 처리필요
+    @GetMapping("/creators/{creatorId}")
+    public SliceResponse<FeedSummaryResponse> getCreatorFeeds(
+            @PathVariable Long creatorId,
+            @AuthenticationPrincipal AuthMember member,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ){
+        Long memberId = (member != null) ? member.id() : null;
+        return SliceResponse.from(feedService.getCreatorFeeds(creatorId, memberId, pageable));
     }
 }
