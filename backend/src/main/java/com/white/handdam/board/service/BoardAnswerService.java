@@ -9,7 +9,6 @@ import com.white.handdam.board.entity.BoardPost;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardAnswerRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,7 +40,7 @@ public class BoardAnswerService {
 		CreateBoardAnswerRequest request
 	) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "게시글을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		assertCanCreateAnswer(post, requesterId);
 
@@ -67,13 +66,11 @@ public class BoardAnswerService {
 	 * 공식 답변 작성: 게시판 소유 크리에이터만 허용.
 	 */
 	void assertCanCreateAnswer(BoardPost post, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
-		}
-		if (requesterId.equals(post.getCreatorId())) {
-			return;
-		}
-		throw new CustomException(CommonErrorCode.FORBIDDEN, "공식 답변을 작성할 권한이 없습니다.");
+		BoardOwnershipAsserter.assertOwner(
+			post.getCreatorId(),
+			requesterId,
+			BoardErrorCode.BOARD_ANSWER_CREATE_FORBIDDEN
+		);
 	}
 
 	/**
@@ -92,7 +89,7 @@ public class BoardAnswerService {
 		UpdateBoardAnswerRequest request
 	) {
 		BoardAnswer answer = boardAnswerRepository.findByIdAndDeletedFalse(answerId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "공식 답변을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_ANSWER_NOT_FOUND));
 
 		// 2) 작성 크리에이터만 수정 허용 (아니면 403)
 		assertCanEditAnswer(answer, requesterId);
@@ -115,7 +112,7 @@ public class BoardAnswerService {
 	@Transactional
 	public void deleteAnswer(Long answerId, Long requesterId) {
 		BoardAnswer answer = boardAnswerRepository.findByIdAndDeletedFalse(answerId)
-			.orElseThrow(() -> new CustomException(CommonErrorCode.RESOURCE_NOT_FOUND, "공식 답변을 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_ANSWER_NOT_FOUND));
 
 		assertCanEditAnswer(answer, requesterId);
 		answer.softDelete();
@@ -126,12 +123,10 @@ public class BoardAnswerService {
 	 * 공식 답변 수정·삭제: 해당 답변을 작성한 크리에이터만 허용.
 	 */
 	void assertCanEditAnswer(BoardAnswer answer, Long requesterId) {
-		if (requesterId == null) {
-			throw new CustomException(CommonErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
-		}
-		if (requesterId.equals(answer.getCreatorId())) {
-			return;
-		}
-		throw new CustomException(CommonErrorCode.FORBIDDEN, "공식 답변을 수정할 권한이 없습니다.");
+		BoardOwnershipAsserter.assertOwner(
+			answer.getCreatorId(),
+			requesterId,
+			BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN
+		);
 	}
 }

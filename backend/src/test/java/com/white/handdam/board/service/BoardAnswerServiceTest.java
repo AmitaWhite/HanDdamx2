@@ -17,7 +17,6 @@ import com.white.handdam.board.entity.BoardPostType;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardAnswerRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
-import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import java.time.Instant;
@@ -86,7 +85,7 @@ class BoardAnswerServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardAnswerService.createAnswer(10L, subscriberId, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_ANSWER_CREATE_FORBIDDEN));
 
 		verify(boardAnswerRepository, never()).save(any());
 		assertThat(post.getStatus()).isEqualTo(BoardPostStatus.WAITING);
@@ -115,7 +114,7 @@ class BoardAnswerServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardAnswerService.createAnswer(10L, 1L, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_POST_NOT_FOUND));
 
 		verify(boardAnswerRepository, never()).save(any());
 	}
@@ -128,7 +127,7 @@ class BoardAnswerServiceTest {
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
 
 		assertThatThrownBy(() -> boardAnswerService.createAnswer(10L, null, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_LOGIN_REQUIRED));
 
 		verify(boardAnswerRepository, never()).save(any());
 	}
@@ -160,7 +159,7 @@ class BoardAnswerServiceTest {
 		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
 
 		assertThatThrownBy(() -> boardAnswerService.updateAnswer(50L, otherId, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN));
 
 		assertThat(answer.getContent()).isEqualTo("공식 답변입니다.");
 	}
@@ -172,7 +171,7 @@ class BoardAnswerServiceTest {
 		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardAnswerService.updateAnswer(50L, 1L, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_ANSWER_NOT_FOUND));
 	}
 
 	@Test
@@ -183,7 +182,7 @@ class BoardAnswerServiceTest {
 		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
 
 		assertThatThrownBy(() -> boardAnswerService.updateAnswer(50L, null, request))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.UNAUTHORIZED));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_LOGIN_REQUIRED));
 	}
 
 	@Test
@@ -210,7 +209,7 @@ class BoardAnswerServiceTest {
 		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.of(answer));
 
 		assertThatThrownBy(() -> boardAnswerService.deleteAnswer(50L, otherId))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.FORBIDDEN));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN));
 
 		assertThat(answer.isDeleted()).isFalse();
 	}
@@ -221,7 +220,7 @@ class BoardAnswerServiceTest {
 		given(boardAnswerRepository.findByIdAndDeletedFalse(50L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardAnswerService.deleteAnswer(50L, 1L))
-			.satisfies(ex -> assertErrorCode(ex, CommonErrorCode.RESOURCE_NOT_FOUND));
+			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_ANSWER_NOT_FOUND));
 	}
 
 	private static void assertErrorCode(Throwable thrown, ErrorCode expected) {

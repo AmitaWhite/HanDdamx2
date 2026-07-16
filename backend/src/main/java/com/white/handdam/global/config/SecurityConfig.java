@@ -34,6 +34,7 @@ public class SecurityConfig {
                         "/api/auth/email-availability",
                         "/api/auth/nickname-availability",
                         "/api/auth/email-verifications/**",
+                        "/api/auth/login",
                         "/swagger-ui/**", "/v3/api-docs/**",
                         "/actuator/health",
 
