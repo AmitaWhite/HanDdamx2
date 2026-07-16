@@ -36,7 +36,12 @@ public class SecurityConfig {
                         "/api/auth/email-verifications/**",
                         "/api/auth/login",
                         "/swagger-ui/**", "/v3/api-docs/**",
-                        "/actuator/health"
+                        "/actuator/health",
+
+                        "/api/feeds/explore",
+                        "/api/feeds/creators/**",
+                        "/api/feeds/public",
+                        "/api/feeds/*"
         };
 
         @Bean
