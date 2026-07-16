@@ -1,7 +1,9 @@
 package com.white.handdam.comment.service;
 
+import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.entity.FeedComment;
+import com.white.handdam.comment.exception.FeedCommentErrorCode;
 import com.white.handdam.comment.repository.FeedCommentRepository;
 import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.entity.Visibility;
@@ -87,7 +89,52 @@ public class FeedCommentService {
         );
     }
 
-    // [LYJ-030] FeedService.canAccess()와 동일 로직
+    // [LYJ-016] 댓글 작성
+    @Transactional
+    public Long createComment(Long feedId, Long memberId, FeedCommentCreateRequest request) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        // TODO [LYJ-016] Project 엔티티 추가 후 creatorId로 isOwner/level 판단
+        boolean isOwner = false;
+        String level = null;
+        if (!canAccess(feed.getVisibility(), level, isOwner)) {
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        FeedComment comment = FeedComment.create(feedId, memberId, null, (short) 0, request.content());
+        return feedCommentRepository.save(comment).getId();
+    }
+
+    // [LYJ-017] 대댓글 작성
+    @Transactional
+    public Long createReply(Long feedId, Long parentCommentId, Long memberId, FeedCommentCreateRequest request){
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        // TODO [LYJ-017] Project 엔티티 추가 후 creatorId로 isOwner/level 판단
+        boolean isOwner = false;
+        String level = null;
+        if(!canAccess(feed.getVisibility(), level, isOwner)){
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        FeedComment parent = feedCommentRepository.findByIdAndDeletedFalse(parentCommentId)
+                .orElseThrow(() -> new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+
+        if(!parent.getFeedId().equals(feedId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        if(parent.getDepth() != 0){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_CANNOT_REPLY);
+        }
+
+        FeedComment reply = FeedComment.create(feedId, memberId, parentCommentId, (short) 1, request.content());
+        return feedCommentRepository.save(reply).getId();
+    }
+
+    // [LYJ-030]
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;
         return switch (visibility) {

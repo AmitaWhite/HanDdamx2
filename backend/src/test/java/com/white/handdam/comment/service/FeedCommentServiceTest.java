@@ -1,7 +1,9 @@
 package com.white.handdam.comment.service;
 
+import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.entity.FeedComment;
+import com.white.handdam.comment.exception.FeedCommentErrorCode;
 import com.white.handdam.comment.repository.FeedCommentRepository;
 import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.entity.Visibility;
@@ -99,6 +101,124 @@ class FeedCommentServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
     }
+    // ---------------------------------------------------------------
+// LYJ-016 댓글 작성
+// ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-016] PUBLIC 피드에 댓글 작성 성공 - 생성된 commentId 반환")
+    void createComment_public_success() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+
+        FeedComment saved = FeedComment.create(1L, 1L, null, (short) 0, "테스트 댓글");
+        ReflectionTestUtils.setField(saved, "id", 10L);
+        given(feedCommentRepository.save(any(FeedComment.class))).willReturn(saved);
+
+        Long commentId = feedCommentService.createComment(1L, 1L, new FeedCommentCreateRequest("테스트 댓글"));
+
+        assertThat(commentId).isEqualTo(10L);
+    }
+
+    @Test
+    @DisplayName("[LYJ-016] 존재하지 않는 피드에 댓글 작성 시 FEED_NOT_FOUND 예외 발생")
+    void createComment_feedNotFound() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.createComment(999L, 1L, new FeedCommentCreateRequest("댓글")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-016] FREE_SUBSCRIBER 피드에 비구독자 댓글 작성 시 FEED_FORBIDDEN 예외 발생")
+    void createComment_freeSubscriberFeed_forbidden() {
+        Feed feed = sampleFeed(Visibility.FREE_SUBSCRIBER);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+
+        assertThatThrownBy(() -> feedCommentService.createComment(1L, 1L, new FeedCommentCreateRequest("댓글")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+    }
+
+    // ---------------------------------------------------------------
+    // LYJ-017 대댓글 작성
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-017] PUBLIC 피드에 대댓글 작성 성공 - 생성된 commentId 반환")
+    void createReply_public_success() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+
+        FeedComment parent = sampleComment(10L, 1L, null, (short) 0, "부모 댓글");
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(parent));
+
+        FeedComment savedReply = FeedComment.create(1L, 2L, 10L, (short) 1, "대댓글");
+        ReflectionTestUtils.setField(savedReply, "id", 20L);
+        given(feedCommentRepository.save(any(FeedComment.class))).willReturn(savedReply);
+
+        Long commentId = feedCommentService.createReply(1L, 10L, 2L, new FeedCommentCreateRequest("대댓글"));
+
+        assertThat(commentId).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("[LYJ-017] 존재하지 않는 피드에 대댓글 작성 시 FEED_NOT_FOUND 예외 발생")
+    void createReply_feedNotFound() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.createReply(999L, 10L, 1L, new FeedCommentCreateRequest("대댓글")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-017] 존재하지 않는 부모 댓글에 대댓글 작성 시 COMMENT_NOT_FOUND 예외 발생")
+    void createReply_parentNotFound() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(feedCommentRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.createReply(1L, 999L, 1L, new FeedCommentCreateRequest("대댓글")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-017] 부모 댓글이 다른 피드 소속이면 COMMENT_NOT_FOUND 예외 발생")
+    void createReply_parentBelongsToAnotherFeed() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+
+        FeedComment parent = sampleComment(10L, 1L, null, (short) 0, "다른 피드 댓글");
+        ReflectionTestUtils.setField(parent, "feedId", 5L); // feedId=1 요청인데 5 소속 댓글
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(parent));
+
+        assertThatThrownBy(() -> feedCommentService.createReply(1L, 10L, 1L, new FeedCommentCreateRequest("대댓글")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-017] 대댓글(depth=1)에 대댓글 작성 시 COMMENT_CANNOT_REPLY 예외 발생")
+    void createReply_parentIsAlreadyReply() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+
+        FeedComment parent = sampleComment(10L, 1L, 5L, (short) 1, "이미 대댓글"); // depth=1
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(parent));
+
+        assertThatThrownBy(() -> feedCommentService.createReply(1L, 10L, 1L, new FeedCommentCreateRequest("대댓글")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_CANNOT_REPLY));
+    }
+
+
 
     // ---------------------------------------------------------------
     // 헬퍼
