@@ -134,6 +134,14 @@ public class ChatRoomService {
 	 * </pre>
 	 */
 	public ChatRoomResponse getChatRoom(Long chatRoomId, Long memberId) {
+		return ChatRoomConverter.toResponse(requireParticipatingRoom(chatRoomId, memberId));
+	}
+
+	/**
+	 * 로그인·채팅방 존재·참여자 여부를 검증한 뒤 채팅방을 반환한다.
+	 * 메시지 조회 등 다른 chat 서비스에서도 재사용한다.
+	 */
+	public ChatRoom requireParticipatingRoom(Long chatRoomId, Long memberId) {
 		if (memberId == null) {
 			throw new CustomException(ChatErrorCode.CHAT_LOGIN_REQUIRED);
 		}
@@ -145,7 +153,7 @@ public class ChatRoomService {
 			throw new CustomException(ChatErrorCode.CHAT_NOT_PARTICIPANT);
 		}
 
-		return ChatRoomConverter.toResponse(room);
+		return room;
 	}
 
 	/**
