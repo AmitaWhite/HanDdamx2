@@ -24,7 +24,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -42,49 +41,46 @@ public class AuthController {
 
     // KSY-001
     @GetMapping("/email-availability")
-    public ResponseEntity<ApiResponse<AvailabilityResponse>> checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
+    public ApiResponse<AvailabilityResponse> checkEmailAvailability(@RequestParam @Email @NotBlank String email) {
         AvailabilityResponse response = new AvailabilityResponse(
                 authService.isEmailAvailable(email)
         );
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ApiResponse.success(response);
     }
 
     // KSY-002
     @GetMapping("/nickname-availability")
-    public ResponseEntity<ApiResponse<AvailabilityResponse>> checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
+    public ApiResponse<AvailabilityResponse> checkNicknameAvailability(@RequestParam @NotBlank String nickname) {
         AvailabilityResponse response = new AvailabilityResponse(
                 authService.isNicknameAvailable(nickname)
         );
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ApiResponse.success(response);
     }
 
     // KSY-003
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<SignupResponse>> signup(@Valid @RequestBody SignupRequest request) {
+    public ApiResponse<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
         SignupResponse response = authService.signup(request);
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response));
+        return ApiResponse.success(response);
     }
 
     // KSY-007
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         LoginResult result = loginService.login(request.email(), request.password());
 
         ResponseCookie cookie = createRefreshTokenCookie(
                 result.refreshToken(),
                 jwtProperties.refreshExpiration() / 1000
         );
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        LoginResponse response = new LoginResponse(
+        LoginResponse loginResponse = new LoginResponse(
                 result.accessToken(), result.memberId(), result.nickname(), result.role()
         );
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(ApiResponse.success(response));
-
+        return ApiResponse.success(loginResponse);
     }
 
     // Access Token 재발급
@@ -105,12 +101,12 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal AuthMember authMember) {
+    public ApiResponse<Void> logout(@AuthenticationPrincipal AuthMember authMember, HttpServletResponse response) {
         loginService.logout(authMember.id());
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, createRefreshTokenCookie("", 0).toString()) // 브라우저 쿠키 삭제
-                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, createRefreshTokenCookie("", 0).toString()); // 브라우저 쿠키 삭제
+
+        return ApiResponse.noContent();
     }
 
     private ResponseCookie createRefreshTokenCookie (String refreshToken, long maxAgeSeconds) {
@@ -125,16 +121,16 @@ public class AuthController {
 
     // KSY-012
     @PostMapping("/password-reset")
-    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@Valid @RequestBody EmailVerificationRequest request) {
+    public ApiResponse<Void> requestPasswordReset(@Valid @RequestBody EmailVerificationRequest request) {
         passwordResetService.requestPasswordReset(request.email());
-        return ResponseEntity.ok(ApiResponse.noContent());
+        return ApiResponse.noContent();
     }
 
     // KSY-013
     @PatchMapping("/password-reset")
-    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
         passwordResetService.resetPassword(request.token(), request.newPassword());
-        return ResponseEntity.ok(ApiResponse.noContent());
+        return ApiResponse.noContent();
     }
 
 }
