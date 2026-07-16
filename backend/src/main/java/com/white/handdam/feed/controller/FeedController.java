@@ -12,13 +12,10 @@ import com.white.handdam.global.response.SliceResponse;
 import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,17 +27,14 @@ public class FeedController {
     private final FeedService feedService;
 
     // [LYJ-001] POST /api/feeds
-    // 201 반환 필요해 ResponseEntity 사용
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping
-    public ResponseEntity<ApiResponse<FeedIdResponse>> createFeed(
+    public ApiResponse<FeedIdResponse> createFeed(
             @AuthenticationPrincipal AuthMember member,
             @Valid @RequestBody FeedCreateRequest request
-            )
-    {
+    ) {
         Long feedId = feedService.createFeed(member.id(), request);
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(new FeedIdResponse(feedId)));
+        return ApiResponse.success(new FeedIdResponse(feedId));
     }
 
     // [LYJ-002] GET /api/feeds/{feedId}
