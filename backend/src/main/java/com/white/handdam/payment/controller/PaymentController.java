@@ -8,13 +8,14 @@ import com.white.handdam.payment.dto.response.PaymentConfirmResponse;
 import com.white.handdam.payment.dto.response.PaymentFailResponse;
 import com.white.handdam.payment.dto.response.PaymentPrepareResponse;
 import com.white.handdam.payment.service.PaymentService;
+import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,12 +28,10 @@ public class PaymentController {
 
     @PostMapping("/prepare")
     public ResponseEntity<ApiResponse<PaymentPrepareResponse>> prepare(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long memberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @Valid @RequestBody PaymentPrepareRequest request
     ) {
-        PaymentPrepareResponse response = paymentService.prepare(memberId, request);
+        PaymentPrepareResponse response = paymentService.prepare(authMember.id(), request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -41,24 +40,20 @@ public class PaymentController {
 
     @PostMapping("/confirm")
     public ResponseEntity<ApiResponse<PaymentConfirmResponse>> confirm(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long memberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @Valid @RequestBody PaymentConfirmRequest request
     ) {
-        PaymentConfirmResponse response = paymentService.confirm(memberId, request);
+        PaymentConfirmResponse response = paymentService.confirm(authMember.id(), request);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/fail")
     public ResponseEntity<ApiResponse<PaymentFailResponse>> fail(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long memberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @Valid @RequestBody PaymentFailRequest request
     ) {
-        PaymentFailResponse response = paymentService.fail(memberId, request);
+        PaymentFailResponse response = paymentService.fail(authMember.id(), request);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

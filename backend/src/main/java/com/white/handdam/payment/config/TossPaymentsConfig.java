@@ -7,8 +7,10 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class TossPaymentsConfig {
 
-    @Bean
-    public RestClient.Builder tossRestClientBuilder() {
-        return RestClient.builder();
+    @Bean("tossApiRestClient")
+    public RestClient tossApiRestClient(TossPaymentsProperties properties) {
+        return RestClient.builder()
+                .baseUrl(properties.getApiBaseUrl())
+                .build();
     }
 }

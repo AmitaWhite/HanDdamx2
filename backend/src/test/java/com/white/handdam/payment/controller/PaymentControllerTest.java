@@ -2,6 +2,8 @@ package com.white.handdam.payment.controller;
 
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.GlobalExceptionHandler;
+import com.white.handdam.global.security.AuthMember;
+import com.white.handdam.member.entity.Role;
 import com.white.handdam.payment.dto.request.PaymentConfirmRequest;
 import com.white.handdam.payment.dto.request.PaymentFailRequest;
 import com.white.handdam.payment.dto.request.PaymentPrepareRequest;
@@ -12,11 +14,15 @@ import com.white.handdam.payment.entity.PaymentStatus;
 import com.white.handdam.payment.exception.PaymentErrorCode;
 import com.white.handdam.payment.service.PaymentService;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -24,7 +30,6 @@ import java.time.Instant;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,8 +55,14 @@ class PaymentControllerTest {
     void setUp() {
         paymentService = Mockito.mock(PaymentService.class);
         mockMvc = standaloneSetup(new PaymentController(paymentService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -70,9 +81,9 @@ class PaymentControllerTest {
         );
         PaymentPrepareRequest request = new PaymentPrepareRequest(CREATOR_ID);
         when(paymentService.prepare(MEMBER_ID, request)).thenReturn(response);
+        authenticate();
 
         mockMvc.perform(post("/api/payments/prepare")
-                        .header("X-User-Id", MEMBER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -114,9 +125,9 @@ class PaymentControllerTest {
                 PERIOD_END_AT
         );
         when(paymentService.confirm(MEMBER_ID, request)).thenReturn(response);
+        authenticate();
 
         mockMvc.perform(post("/api/payments/confirm")
-                        .header("X-User-Id", MEMBER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -152,9 +163,9 @@ class PaymentControllerTest {
                 "PAY_PROCESS_CANCELED"
         );
         when(paymentService.fail(MEMBER_ID, request)).thenReturn(response);
+        authenticate();
 
         mockMvc.perform(post("/api/payments/fail")
-                        .header("X-User-Id", MEMBER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -182,9 +193,9 @@ class PaymentControllerTest {
         PaymentConfirmRequest request = new PaymentConfirmRequest(PAYMENT_KEY, ORDER_ID, 15000);
         when(paymentService.confirm(MEMBER_ID, request))
                 .thenThrow(new CustomException(PaymentErrorCode.PAYMENT_AMOUNT_MISMATCH));
+        authenticate();
 
         mockMvc.perform(post("/api/payments/confirm")
-                        .header("X-User-Id", MEMBER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -207,8 +218,9 @@ class PaymentControllerTest {
     @Test
     @DisplayName("Invalid prepare request returns common validation error")
     void invalidPrepareRequest() throws Exception {
+        authenticate();
+
         mockMvc.perform(post("/api/payments/prepare")
-                        .header("X-User-Id", MEMBER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -221,5 +233,12 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.data").value(nullValue()))
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+    }
+
+    private void authenticate() {
+        AuthMember authMember = new AuthMember(MEMBER_ID, Role.USER);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(authMember, null)
+        );
     }
 }

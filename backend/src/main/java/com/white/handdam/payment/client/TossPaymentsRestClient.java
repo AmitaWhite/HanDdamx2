@@ -1,19 +1,19 @@
 package com.white.handdam.payment.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.white.handdam.payment.config.TossPaymentsProperties;
 import com.white.handdam.payment.dto.toss.TossConfirmRequest;
 import com.white.handdam.payment.dto.toss.TossConfirmResponse;
 import com.white.handdam.payment.dto.toss.TossErrorResponse;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -34,13 +34,12 @@ public class TossPaymentsRestClient implements TossPaymentsClient {
 
     public TossPaymentsRestClient(
             TossPaymentsProperties properties,
-            RestClient.Builder restClientBuilder
+            ObjectMapper objectMapper,
+            @Qualifier("tossApiRestClient") RestClient restClient
     ) {
         this.properties = properties;
-        this.objectMapper = new ObjectMapper().findAndRegisterModules();
-        this.restClient = restClientBuilder
-                .baseUrl(properties.getApiBaseUrl())
-                .build();
+        this.objectMapper = objectMapper;
+        this.restClient = restClient;
     }
 
     @Override
@@ -53,7 +52,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient {
                     .header("Idempotency-Key", idempotencyKey)
                     .body(request)
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (httpRequest, clientResponse) -> {
+                    .onStatus(statusCode -> statusCode.isError(), (httpRequest, clientResponse) -> {
                         TossErrorResponse errorResponse = readErrorResponse(clientResponse);
                         if (clientResponse.getStatusCode().is5xxServerError()
                                 || IDEMPOTENT_REQUEST_PROCESSING.equals(errorResponse.code())) {
@@ -102,7 +101,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient {
                     defaultIfBlank(errorResponse.code(), UNKNOWN_TOSS_ERROR),
                     defaultIfBlank(errorResponse.message(), "Toss Payments request failed.")
             );
-        } catch (IOException exception) {
+        } catch (RuntimeException exception) {
             return new TossErrorResponse(UNKNOWN_TOSS_ERROR, "Toss Payments error response is invalid.");
         }
     }

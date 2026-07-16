@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:8080
-@memberId = 1
-@otherMemberId = 9
+@accessToken = REPLACE_WITH_ACCESS_TOKEN
+@otherAccessToken = REPLACE_WITH_OTHER_MEMBER_ACCESS_TOKEN
 @creatorId = 2
 @selfCreatorId = 1
 @missingCreatorId = 999999
@@ -15,7 +15,7 @@
 # 프론트는 VITE_TOSS_CLIENT_KEY와 prepare 응답값으로 Toss 결제창을 실행한다.
 POST {{baseUrl}}/api/payments/prepare
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "creatorId": {{creatorId}}
@@ -26,7 +26,7 @@ X-User-Id: {{memberId}}
 # error.code = SELF_SUBSCRIPTION_NOT_ALLOWED
 POST {{baseUrl}}/api/payments/prepare
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "creatorId": {{selfCreatorId}}
@@ -37,7 +37,7 @@ X-User-Id: {{memberId}}
 # error.code = CREATOR_NOT_FOUND
 POST {{baseUrl}}/api/payments/prepare
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "creatorId": {{missingCreatorId}}
@@ -48,7 +48,7 @@ X-User-Id: {{memberId}}
 # error.code = PAID_PLAN_NOT_AVAILABLE
 POST {{baseUrl}}/api/payments/prepare
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "creatorId": {{zeroPriceCreatorId}}
@@ -61,7 +61,7 @@ X-User-Id: {{memberId}}
 # success=true, data.status=SUCCESS, data.subscriptionLevel=PAID
 POST {{baseUrl}}/api/payments/confirm
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "paymentKey": "{{paymentKey}}",
@@ -75,7 +75,7 @@ X-User-Id: {{memberId}}
 # success=true, data.status=FAILED
 POST {{baseUrl}}/api/payments/fail
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "orderId": "{{orderId}}",
@@ -88,7 +88,7 @@ X-User-Id: {{memberId}}
 # FAILED 상태를 멱등 성공으로 반환
 POST {{baseUrl}}/api/payments/fail
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "orderId": "{{orderId}}",
@@ -101,7 +101,7 @@ X-User-Id: {{memberId}}
 # error.code = PAYMENT_NOT_FOUND
 POST {{baseUrl}}/api/payments/fail
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "orderId": "HANDDAM-NOT-FOUND",
@@ -114,7 +114,7 @@ X-User-Id: {{memberId}}
 # error.code = PAYMENT_OWNER_MISMATCH
 POST {{baseUrl}}/api/payments/fail
 Content-Type: application/json
-X-User-Id: {{otherMemberId}}
+Authorization: Bearer {{otherAccessToken}}
 
 {
   "orderId": "{{orderId}}",
@@ -127,7 +127,7 @@ X-User-Id: {{otherMemberId}}
 # error.code = PAYMENT_CONFLICT
 POST {{baseUrl}}/api/payments/fail
 Content-Type: application/json
-X-User-Id: {{memberId}}
+Authorization: Bearer {{accessToken}}
 
 {
   "orderId": "{{orderId}}",

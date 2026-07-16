@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -35,11 +36,13 @@ class TossPaymentsRestClientTest {
     @Test
     @DisplayName("confirm sends Toss authorization and idempotency headers")
     void confirmSendsHeaders() {
-        RestClient.Builder restClientBuilder = RestClient.builder();
+        RestClient.Builder restClientBuilder = RestClient.builder()
+                .baseUrl(BASE_URL);
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         TossPaymentsRestClient client = new TossPaymentsRestClient(
                 properties(),
-                restClientBuilder
+                new ObjectMapper(),
+                restClientBuilder.build()
         );
 
         server.expect(once(), requestTo(BASE_URL + "/v1/payments/confirm"))
@@ -78,11 +81,13 @@ class TossPaymentsRestClientTest {
     @Test
     @DisplayName("confirm maps definitive 4xx Toss error to TossConfirmFailureException")
     void confirmMapsFourHundredError() {
-        RestClient.Builder restClientBuilder = RestClient.builder();
+        RestClient.Builder restClientBuilder = RestClient.builder()
+                .baseUrl(BASE_URL);
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         TossPaymentsRestClient client = new TossPaymentsRestClient(
                 properties(),
-                restClientBuilder
+                new ObjectMapper(),
+                restClientBuilder.build()
         );
 
         server.expect(once(), requestTo(BASE_URL + "/v1/payments/confirm"))
@@ -109,11 +114,13 @@ class TossPaymentsRestClientTest {
     @Test
     @DisplayName("confirm keeps 5xx Toss errors as uncertain API errors")
     void confirmMapsFiveHundredError() {
-        RestClient.Builder restClientBuilder = RestClient.builder();
+        RestClient.Builder restClientBuilder = RestClient.builder()
+                .baseUrl(BASE_URL);
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         TossPaymentsRestClient client = new TossPaymentsRestClient(
                 properties(),
-                restClientBuilder
+                new ObjectMapper(),
+                restClientBuilder.build()
         );
 
         server.expect(once(), requestTo(BASE_URL + "/v1/payments/confirm"))
