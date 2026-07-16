@@ -1,0 +1,29 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"useDefineForClassFields": true,
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"types": ["node"],
+		"skipLibCheck": true,
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"moduleDetection": "force",
+		"noEmit": true,
+		"jsx": "react-jsx",
+
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noFallthroughCasesInSwitch": true,
+
+		// baseUrl 없이 paths 만 사용 (경로는 이 파일 기준 상대해석).
+		// baseUrl 은 bare import 해석 용도가 deprecated 되어 제거.
+		"paths": {
+			"@/*": ["./src/*"]
+		}
+	},
+	"include": ["src", "vite.config.ts"]
+}
