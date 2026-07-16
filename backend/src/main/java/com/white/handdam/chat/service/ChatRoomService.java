@@ -138,6 +138,25 @@ public class ChatRoomService {
 	}
 
 	/**
+	 * 채팅방 종료·읽기 전용 전환 (CHAT-008~010 / LDJ-023).
+	 *
+	 * <pre>
+	 * 1. 로그인·방 존재·참여자 확인 (creator 또는 member)
+	 * 2. ACTIVE → CLOSED, closed_by/closed_at 설정
+	 * 3. 이미 CLOSED면 409
+	 * 4. 구독 만료와 무관하게 참여자면 종료 가능
+	 * </pre>
+	 */
+	@Transactional
+	public ChatRoomResponse closeChatRoom(Long chatRoomId, Long memberId) {
+		ChatRoom room = requireParticipatingRoom(chatRoomId, memberId);
+		if (!room.close(memberId)) {
+			throw new CustomException(ChatErrorCode.CHAT_ROOM_ALREADY_CLOSED);
+		}
+		return ChatRoomConverter.toResponse(room);
+	}
+
+	/**
 	 * 로그인·채팅방 존재·참여자 여부를 검증한 뒤 채팅방을 반환한다.
 	 * 메시지 조회 등 다른 chat 서비스에서도 재사용한다.
 	 */

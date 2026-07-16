@@ -72,4 +72,18 @@ public class ChatRoom extends BaseTimeEntity {
 	public void updateLastMessageAt(Instant sentAt) {
 		this.lastMessageAt = sentAt;
 	}
+
+	/**
+	 * 채팅방 종료 → 읽기 전용(CLOSED).
+	 * 이미 종료된 방이면 false 반환.
+	 */
+	public boolean close(Long closedBy) {
+		if (!isActive()) {
+			return false;
+		}
+		this.status = ChatRoomStatus.CLOSED;
+		this.closedBy = closedBy;
+		this.closedAt = Instant.now();
+		return true;
+	}
 }

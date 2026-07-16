@@ -78,4 +78,11 @@ public class ChatMessage {
 			sentAt = Instant.now();
 		}
 	}
+
+	/** 상대방이 읽음 처리 (이미 읽힌 메시지는 무시) */
+	public void markAsRead(Instant readAt) {
+		if (this.readAt == null) {
+			this.readAt = readAt;
+		}
+	}
 }
