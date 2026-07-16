@@ -36,7 +36,10 @@ public class SecurityConfig {
                         "/api/auth/email-verifications/**",
                         "/api/auth/login",
                         "/swagger-ui/**", "/v3/api-docs/**",
-                        "/actuator/health"
+                        "/actuator/health",
+                        // handshake만 공개. STOMP CONNECT JWT는 StompAuthChannelInterceptor에서 검증
+                        "/ws",
+                        "/ws/**"
         };
 
         @Bean

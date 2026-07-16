@@ -17,6 +17,7 @@ import com.white.handdam.chat.entity.ChatRoom;
 import com.white.handdam.chat.entity.ChatRoomStatus;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
+import com.white.handdam.chat.websocket.publisher.ChatMessagePublisher;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.ErrorCode;
 import com.white.handdam.storage.ObjectStorage;
@@ -53,6 +54,9 @@ class ChatMessageServiceTest {
 
 	@Mock
 	private ObjectStorage objectStorage;
+
+	@Mock
+	private ChatMessagePublisher chatMessagePublisher;
 
 	@InjectMocks
 	private ChatMessageService chatMessageService;

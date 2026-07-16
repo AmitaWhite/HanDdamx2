@@ -9,6 +9,7 @@ import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.entity.ChatRoom;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
+import com.white.handdam.chat.websocket.publisher.ChatMessagePublisher;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
@@ -30,6 +31,7 @@ public class ChatMessageService {
 	private final ChatMessageRepository chatMessageRepository;
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
 	private final ObjectStorage objectStorage;
+	private final ChatMessagePublisher chatMessagePublisher;
 
 	/**
 	 * 채팅 메시지 내역 조회 (CHAT-006 / LDJ-020).
@@ -55,6 +57,7 @@ public class ChatMessageService {
 	 * 3. 구독자(member)는 활성 유료 구독 필요 / 크리에이터(작성자)는 구독 검사 생략
 	 * 4. TEXT: content 필수 / IMAGE: image 파일 필수 → S3 업로드
 	 * 5. 메시지 저장 후 chat_room.last_message_at 갱신
+	 * 6. WebSocket 구독자(/sub/chat-rooms/{id})에게 브로드캐스트
 	 * </pre>
 	 */
 	@Transactional
@@ -83,7 +86,9 @@ public class ChatMessageService {
 		//방의 마지막 메시지 시간 업데이트
 		room.updateLastMessageAt(saved.getSentAt());
 
-		return ChatMessageConverter.toResponse(saved);
+		ChatMessageResponse response = ChatMessageConverter.toResponse(saved);
+		chatMessagePublisher.publish(room.getId(), response);
+		return response;
 	}
 
 	/**
