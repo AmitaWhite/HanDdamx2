@@ -3,6 +3,7 @@ package com.white.handdam.creator.service;
 import com.white.handdam.creator.converter.CreatorProfileConverter;
 import com.white.handdam.creator.dto.response.CreatorProfileResponse;
 import com.white.handdam.creator.dto.request.UpdateCreatorProfileRequest;
+import com.white.handdam.creator.dto.request.UpdateSubscriptionPriceRequest;
 import com.white.handdam.creator.entity.CreatorProfile;
 import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.creator.repository.CreatorProfileRepository;
@@ -176,6 +177,27 @@ public class CreatorProfileService {
                 .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
 
         profile.clearCoverImage();
+
+        long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
+        // Project 구현 후 projectCount, feedCount 교체
+        return CreatorProfileConverter.toResponse(
+                profile, creator, null, subscriberCount, 0L, 0L, true);
+    }
+
+    /**
+     * 월 구독 가격 변경
+     */
+    @Transactional
+    public CreatorProfileResponse updateSubscriptionPrice(Long memberId, UpdateSubscriptionPriceRequest request) {
+        if (request.subscriptionPrice() < 0) {
+            throw new CustomException(CommonErrorCode.INVALID_REQUEST);
+        }
+
+        Member creator = findCreatorMemberById(memberId);
+        CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
+
+        profile.updateSubscriptionPrice(request.subscriptionPrice());
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
         // Project 구현 후 projectCount, feedCount 교체

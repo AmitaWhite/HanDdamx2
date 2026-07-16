@@ -71,6 +71,15 @@ spring:
           starttls:
             enable: true
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: email, profile
+
 jwt:
   secret: ${JWT_SECRET:local_dev_jwt_secret_change_me}
   access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
@@ -93,6 +102,7 @@ toss:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+
 
 ---
 # =====================================================================
