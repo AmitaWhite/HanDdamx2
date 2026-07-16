@@ -1,7 +1,9 @@
 package com.white.handdam.chat.controller;
 
+import com.white.handdam.chat.dto.response.ChatReadResponse;
 import com.white.handdam.chat.dto.response.ChatRoomListItemResponse;
 import com.white.handdam.chat.dto.response.ChatRoomResponse;
+import com.white.handdam.chat.service.ChatMessageService;
 import com.white.handdam.chat.service.ChatRoomService;
 import com.white.handdam.chat.service.ChatRoomService.CreateOrGetResult;
 import com.white.handdam.global.response.ApiResponse;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatRoomController {
 
 	private final ChatRoomService chatRoomService;
+	private final ChatMessageService chatMessageService;
 
 	/**
 	 * 크리에이터와 1:1 채팅방 생성 또는 기존 방 반환 (CHAT-001).
@@ -58,5 +62,17 @@ public class ChatRoomController {
 		@AuthenticationPrincipal AuthMember member
 	) {
 		return ResponseEntity.ok(ApiResponse.success(chatRoomService.getChatRoom(chatRoomId, member.id())));
+	}
+
+	/**
+	 * 상대방 미확인 메시지 일괄 읽음 (CHAT-007).
+	 * 권한: 해당 채팅방 참여자(creator 또는 member)
+	 */
+	@PatchMapping("/api/chat-rooms/{chatRoomId}/read")
+	public ApiResponse<ChatReadResponse> markMessagesAsRead(
+		@PathVariable Long chatRoomId,
+		@AuthenticationPrincipal AuthMember member
+	) {
+		return ApiResponse.success(chatMessageService.markMessagesAsRead(chatRoomId, member.id()));
 	}
 }

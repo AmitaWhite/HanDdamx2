@@ -1,11 +1,13 @@
 package com.white.handdam.chat.repository;
 
 import com.white.handdam.chat.entity.ChatMessage;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,9 +35,26 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 		  AND m.readAt IS NULL
 		GROUP BY m.chatRoomId
 		""")
-		//방별 미읽음 개수 조회
 	List<Object[]> countUnreadByChatRoomIdIn(
 		@Param("roomIds") Collection<Long> roomIds,
 		@Param("memberId") Long memberId
+	);
+
+	/**
+	 * 상대방이 보낸 미확인 메시지를 일괄 읽음 처리.
+	 * readerId 본인이 보낸 메시지는 제외한다.
+	 */
+	@Modifying(clearAutomatically = true)
+	@Query("""
+		UPDATE ChatMessage m
+		SET m.readAt = :readAt
+		WHERE m.chatRoomId = :chatRoomId
+		  AND m.senderId <> :readerId
+		  AND m.readAt IS NULL
+		""")
+	int markOpponentMessagesAsRead(
+		@Param("chatRoomId") Long chatRoomId,
+		@Param("readerId") Long readerId,
+		@Param("readAt") Instant readAt
 	);
 }

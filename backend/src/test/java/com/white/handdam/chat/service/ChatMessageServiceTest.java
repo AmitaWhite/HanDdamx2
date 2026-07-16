@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 
 import com.white.handdam.board.service.PaidSubscriptionChecker;
 import com.white.handdam.chat.dto.response.ChatMessageResponse;
+import com.white.handdam.chat.dto.response.ChatReadResponse;
 import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.entity.ChatRoom;
@@ -293,6 +294,59 @@ class ChatMessageServiceTest {
 		assertThatThrownBy(() -> chatMessageService.sendMessage(
 			10L, 7L, ChatMessageType.TEXT, "hi", null
 		)).satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_NOT_PARTICIPANT));
+	}
+
+	@Test
+	@DisplayName("멤버는 상대방 미확인 메시지를 일괄 읽음 처리할 수 있다")
+	void memberCanMarkOpponentMessagesAsRead() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = activeRoom(creatorId, memberId);
+		given(chatRoomService.requireParticipatingRoom(10L, memberId)).willReturn(room);
+		given(chatMessageRepository.markOpponentMessagesAsRead(eq(10L), eq(memberId), any(Instant.class)))
+			.willReturn(3);
+
+		ChatReadResponse response = chatMessageService.markMessagesAsRead(10L, memberId);
+
+		assertThat(response.updatedCount()).isEqualTo(3L);
+		verify(paidSubscriptionChecker, never()).hasActivePaidSubscription(any(), any());
+	}
+
+	@Test
+	@DisplayName("크리에이터(작성자)도 상대 메시지를 일괄 읽음 처리할 수 있다")
+	void creatorCanMarkOpponentMessagesAsRead() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom room = activeRoom(creatorId, memberId);
+		given(chatRoomService.requireParticipatingRoom(10L, creatorId)).willReturn(room);
+		given(chatMessageRepository.markOpponentMessagesAsRead(eq(10L), eq(creatorId), any(Instant.class)))
+			.willReturn(1);
+
+		assertThat(chatMessageService.markMessagesAsRead(10L, creatorId).updatedCount()).isEqualTo(1L);
+	}
+
+	@Test
+	@DisplayName("종료된 채팅방에서도 참여자는 읽음 처리할 수 있다")
+	void participantCanMarkReadInClosedRoom() {
+		ChatRoom room = activeRoom(1L, 99L);
+		ReflectionTestUtils.setField(room, "status", ChatRoomStatus.CLOSED);
+		given(chatRoomService.requireParticipatingRoom(10L, 99L)).willReturn(room);
+		given(chatMessageRepository.markOpponentMessagesAsRead(eq(10L), eq(99L), any(Instant.class)))
+			.willReturn(2);
+
+		assertThat(chatMessageService.markMessagesAsRead(10L, 99L).updatedCount()).isEqualTo(2L);
+	}
+
+	@Test
+	@DisplayName("참여자가 아니면 읽음 처리할 수 없다")
+	void nonParticipantCannotMarkAsRead() {
+		given(chatRoomService.requireParticipatingRoom(10L, 7L))
+			.willThrow(new CustomException(ChatErrorCode.CHAT_NOT_PARTICIPANT));
+
+		assertThatThrownBy(() -> chatMessageService.markMessagesAsRead(10L, 7L))
+			.satisfies(ex -> assertErrorCode(ex, ChatErrorCode.CHAT_NOT_PARTICIPANT));
+
+		verify(chatMessageRepository, never()).markOpponentMessagesAsRead(any(), any(), any());
 	}
 
 	private static ChatRoom activeRoom(Long creatorId, Long memberId) {
