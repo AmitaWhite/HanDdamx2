@@ -3,17 +3,20 @@ package com.white.handdam.auth.controller;
 import com.white.handdam.auth.dto.request.EmailVerificationRequest;
 import com.white.handdam.auth.dto.request.PasswordResetConfirmRequest;
 import com.white.handdam.auth.dto.LoginResult;
+import com.white.handdam.auth.dto.TokenRefreshResult;
 import com.white.handdam.auth.dto.request.LoginRequest;
 import com.white.handdam.auth.dto.request.SignupRequest;
 import com.white.handdam.auth.dto.response.AvailabilityResponse;
 import com.white.handdam.auth.dto.response.LoginResponse;
 import com.white.handdam.auth.dto.response.SignupResponse;
+import com.white.handdam.auth.dto.response.TokenRefreshResponse;
 import com.white.handdam.auth.service.AuthService;
 import com.white.handdam.auth.service.PasswordResetService;
 import com.white.handdam.auth.service.LoginService;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.global.security.jwt.JwtProperties;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -82,6 +85,23 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(ApiResponse.success(response));
 
+    }
+
+    // Access Token 재발급
+    @PostMapping("/token/refresh")
+    public ApiResponse<TokenRefreshResponse> refresh(
+            @CookieValue(value = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response) {
+        TokenRefreshResult result = loginService.refresh(refreshToken);
+
+        ResponseCookie cookie = createRefreshTokenCookie(
+                result.refreshToken(),
+                jwtProperties.refreshExpiration() / 1000
+        );
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return ApiResponse.success(new TokenRefreshResponse(result.accessToken()));
     }
 
     @PostMapping("/logout")

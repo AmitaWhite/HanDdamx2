@@ -35,7 +35,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         Long memberId = principal.getMemberId();
         Role role = principal.getRole();
 
-        String accessToken = jwtTokenProvider.createAccessToken(memberId, role);
         String refreshToken = jwtTokenProvider.createRefreshToken(memberId, role);
 
         refreshTokenRepository.save(memberId, refreshToken);
@@ -49,8 +48,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        // accessToken 프래그먼트(#)로 전달 -> 서버 로그에 토큰 노출 방지
-        String redirectUrl = frontendUrl + "/oauth/callback#accessToken=" + accessToken;
-        response.sendRedirect(redirectUrl);
+        // 프론트에서 refreshToken 쿠키로 /api/auth/token/refresh 호출해서 authToken 발급 필요
+        response.sendRedirect(frontendUrl + "/oauth/callback");
     }
 }

@@ -1,6 +1,7 @@
 package com.white.handdam.auth.service;
 
 import com.white.handdam.auth.dto.LoginResult;
+import com.white.handdam.auth.dto.TokenRefreshResult;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.auth.util.EmailNormalizer;
 import com.white.handdam.global.exception.CustomException;
@@ -51,6 +52,34 @@ public class LoginService {
 
     public void logout(Long memberId) {
         refreshTokenRepository.deleteByMemberId(memberId); // redis에서 삭제
+    }
+
+    // Access Token 재발급
+    public TokenRefreshResult refresh(String refreshToken) {
+        // refresh token 유효 확인
+        if (refreshToken == null || !jwtTokenProvider.validate(refreshToken)) {
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        Long memberId = jwtTokenProvider.getMemberId(refreshToken);
+
+        String storedRefreshToken = refreshTokenRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+
+        if (!storedRefreshToken.equals(refreshToken)) {
+            // Redis에 저장된 토큰과 다르면 탈취/재사용 의심 -> 강제 로그아웃
+            refreshTokenRepository.deleteByMemberId(memberId);
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
+
+        String newAccessToken = jwtTokenProvider.createAccessToken(memberId, member.getRole());
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(memberId, member.getRole()); // rotation
+        refreshTokenRepository.save(memberId, newRefreshToken);
+
+        return new TokenRefreshResult(newAccessToken, newRefreshToken);
     }
 
 }
