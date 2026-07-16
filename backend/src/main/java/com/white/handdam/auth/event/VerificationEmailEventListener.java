@@ -21,10 +21,12 @@ public class VerificationEmailEventListener {
     @Async("emailExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(VerificationEmailRequestedEvent event) {
+        log.info("[인증 토큰] email={}, purpose={}, token={}", event.email(), event.purpose(), event.rawToken()); // TODO : 추후 제거
         try {
             MailContent content = verificationEmailContent.create(
                     event.nickname(),
-                    event.rawToken()
+                    event.rawToken(),
+                    event.purpose()
             );
 
             emailSender.send(

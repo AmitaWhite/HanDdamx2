@@ -79,4 +79,52 @@ public class CreatorProfile extends BaseTimeEntity {
         this.representativeImageUrl = representativeImageUrl;
         this.representativeImageStorageKey = representativeImageStorageKey;
     }
+    /**
+     * 소개글·구독 혜택 수정
+     */
+    public void updateProfile(String introduction, String benefitsDescription) {
+        this.introduction = introduction;
+        this.benefitsDescription = benefitsDescription;
+    }
+
+    /**
+     * 대표 이미지 변경
+     */
+    public void updateRepresentativeImage(String url, String storageKey) {
+        this.representativeImageUrl = url;
+        this.representativeImageStorageKey = storageKey;
+    }
+
+    /**
+     * 대표 이미지 제거
+     * null로 초기화
+     */
+    public void clearRepresentativeImage() {
+        this.representativeImageUrl = null;
+        this.representativeImageStorageKey = null;
+    }
+
+    /**
+     * 커버 이미지 변경
+     */
+    public void updateCoverImage(String url, String storageKey) {
+        this.coverImageUrl = url;
+        this.coverImageStorageKey = storageKey;
+    }
+
+    /**
+     * KHM-014: 커버 이미지 제거
+     */
+    public void clearCoverImage() {
+        this.coverImageUrl = null;
+        this.coverImageStorageKey = null;
+    }
+
+    /**
+     * 월 구독 가격 변경
+     * 0원이면 유료 구독 비활성화로 처리됨
+     */
+    public void updateSubscriptionPrice(int price) {
+        this.subscriptionPrice = price;
+    }
 }

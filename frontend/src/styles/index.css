@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: inherit;
+    /* 한글 자간이 라틴보다 넓어보이는 문제 완화 */
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+    /* 한글 줄바꿈을 어절 단위로 */
+  }
+
+  /* 폼 요소가 브랜드 폰트를 상속하도록 */
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    /* 아이콘이 텍스트 라인에 맞도록 */
+    line-height: 1;
+    user-select: none;
+  }
+}
+
+@layer components {
+
+  /* 페이지 콘텐츠 기본 컨테이너 (max 1200px, 좌우 거터) */
+  .container-page {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 1200px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .container-page {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+}
