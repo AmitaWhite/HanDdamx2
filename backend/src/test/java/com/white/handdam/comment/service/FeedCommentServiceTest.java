@@ -1,6 +1,7 @@
 package com.white.handdam.comment.service;
 
 import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
+import com.white.handdam.comment.dto.request.FeedCommentUpdateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.entity.FeedComment;
 import com.white.handdam.comment.exception.FeedCommentErrorCode;
@@ -218,6 +219,74 @@ class FeedCommentServiceTest {
                         .isEqualTo(FeedCommentErrorCode.COMMENT_CANNOT_REPLY));
     }
 
+    // ---------------------------------------------------------------
+    // LYJ-018 댓글 수정
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-018] 댓글 수정 성공 - commentId 반환")
+    void updateComment_success() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "원본 내용");
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+
+        Long result = feedCommentService.updateComment(1L, 10L, 1L, new FeedCommentUpdateRequest("수정된 내용"));
+
+        assertThat(result).isEqualTo(10L);
+    }
+
+    @Test
+    @DisplayName("[LYJ-018] 존재하지 않는 피드에 댓글 수정 시 FEED_NOT_FOUND 예외 발생")
+    void updateComment_feedNotFound() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.updateComment(999L, 10L, 1L, new FeedCommentUpdateRequest("수정")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-018] 존재하지 않는 댓글 수정 시 COMMENT_NOT_FOUND 예외 발생")
+    void updateComment_commentNotFound() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(feedCommentRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.updateComment(1L, 999L, 1L, new FeedCommentUpdateRequest("수정")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-018] 다른 피드 소속 댓글 수정 시 COMMENT_NOT_FOUND 예외 발생")
+    void updateComment_commentBelongsToAnotherFeed() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "내용");
+        ReflectionTestUtils.setField(comment, "feedId", 5L);
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> feedCommentService.updateComment(1L, 10L, 1L, new FeedCommentUpdateRequest("수정")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-018] 작성자가 아닌 사용자가 수정 시 COMMENT_FORBIDDEN 예외 발생")
+    void updateComment_notAuthor_forbidden() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "내용"); // memberId=1L 작성
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+
+        // memberId=99L (다른 사람)이 수정 시도
+        assertThatThrownBy(() -> feedCommentService.updateComment(1L, 10L, 99L, new FeedCommentUpdateRequest("수정")))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_FORBIDDEN));
+    }
 
 
     // ---------------------------------------------------------------
