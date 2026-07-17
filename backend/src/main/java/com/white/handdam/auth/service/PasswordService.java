@@ -56,8 +56,7 @@ public class PasswordService {
                 .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
 
         member.changePassword(passwordEncoder.encode(newPassword));
-
-        // TODO: RefreshToken 도입 후 invalidateAll()
+        refreshTokenRepository.deleteByMemberId(verification.getMemberId()); // 비밀번호 변경 시 기존 로그인 세션 무효화
     }
 
     // KSY-011

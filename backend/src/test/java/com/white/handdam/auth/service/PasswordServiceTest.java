@@ -88,6 +88,7 @@ class PasswordServiceTest {
         passwordService.resetPassword("raw-token", "newPassword1!");
 
         assertThat(member.getPassword()).isEqualTo("newEncodedPassword");
+        then(refreshTokenRepository).should().deleteByMemberId(memberId);
     }
 
     @Test
