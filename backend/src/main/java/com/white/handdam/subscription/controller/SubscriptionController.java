@@ -3,17 +3,20 @@ package com.white.handdam.subscription.controller;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
 import com.white.handdam.subscription.dto.response.MySubscriptionResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionDetailResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.service.SubscriptionService;
+import com.white.handdam.global.security.AuthMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -26,12 +29,10 @@ public class SubscriptionController {
 
     @PostMapping("/api/creators/{creatorId}/free-subscriptions")
     public ResponseEntity<ApiResponse<FreeSubscriptionResponse>> createFreeSubscription(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long subscriberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @PathVariable Long creatorId
     ) {
-        FreeSubscriptionResponse response = subscriptionService.createFreeSubscription(subscriberId, creatorId);
+        FreeSubscriptionResponse response = subscriptionService.createFreeSubscription(authMember.id(), creatorId);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -40,36 +41,63 @@ public class SubscriptionController {
 
     @DeleteMapping("/api/creators/{creatorId}/free-subscriptions")
     public ResponseEntity<ApiResponse<Void>> cancelFreeSubscription(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long subscriberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @PathVariable Long creatorId
     ) {
-        subscriptionService.cancelFreeSubscription(subscriberId, creatorId);
+        subscriptionService.cancelFreeSubscription(authMember.id(), creatorId);
 
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
     @GetMapping("/api/creators/{creatorId}/subscription-status")
     public ResponseEntity<ApiResponse<SubscriptionStatusResponse>> getSubscriptionStatus(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long subscriberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @PathVariable Long creatorId
     ) {
         SubscriptionStatusResponse response =
-                subscriptionService.getSubscriptionStatus(subscriberId, creatorId);
+                subscriptionService.getSubscriptionStatus(authMember.id(), creatorId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/api/subscriptions/me")
     public ResponseEntity<ApiResponse<List<MySubscriptionResponse>>> getMySubscriptions(
-            // TODO: X-User-Id is temporary and is not real authentication.
-            // Remove it after the auth module is complete, then read memberId from SecurityContext or authenticated Principal.
-            @RequestHeader("X-User-Id") Long subscriberId
+            @AuthenticationPrincipal AuthMember authMember
     ) {
-        List<MySubscriptionResponse> response = subscriptionService.getMySubscriptions(subscriberId);
+        List<MySubscriptionResponse> response = subscriptionService.getMySubscriptions(authMember.id());
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/api/subscriptions/{subscriptionId}")
+    public ResponseEntity<ApiResponse<SubscriptionDetailResponse>> getSubscription(
+            @AuthenticationPrincipal AuthMember authMember,
+            @PathVariable Long subscriptionId
+    ) {
+        SubscriptionDetailResponse response =
+                subscriptionService.getSubscription(authMember.id(), subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PatchMapping("/api/subscriptions/{subscriptionId}/cancel-schedule")
+    public ResponseEntity<ApiResponse<SubscriptionDetailResponse>> scheduleCancellation(
+            @AuthenticationPrincipal AuthMember authMember,
+            @PathVariable Long subscriptionId
+    ) {
+        SubscriptionDetailResponse response =
+                subscriptionService.scheduleCancellation(authMember.id(), subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @DeleteMapping("/api/subscriptions/{subscriptionId}/cancel-schedule")
+    public ResponseEntity<ApiResponse<SubscriptionDetailResponse>> revokeCancellationSchedule(
+            @AuthenticationPrincipal AuthMember authMember,
+            @PathVariable Long subscriptionId
+    ) {
+        SubscriptionDetailResponse response =
+                subscriptionService.revokeCancellationSchedule(authMember.id(), subscriptionId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

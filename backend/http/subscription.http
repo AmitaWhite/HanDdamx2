@@ -1,7 +1,8 @@
 @baseUrl = http://localhost:8080
-@subscriberId = 1
+@accessToken = REPLACE_WITH_ACCESS_TOKEN
 @creatorId = 2
 @creatorWithoutProfileId = 3
+@subscriptionId = 1
 
 ### Free subscription create
 # Run server with only the local profile.
@@ -18,16 +19,15 @@
 #   },
 #   "error": null
 # }
-# X-User-Id is temporary and is not real authentication.
 POST {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
-X-User-Id: {{subscriberId}}
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Duplicate free subscription create
 # Expected: 409 Conflict
 # Expected body: success=false, data=null, error.code=SUBSCRIPTION_ALREADY_EXISTS
 POST {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
-X-User-Id: {{subscriberId}}
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Free subscription cancel
@@ -39,14 +39,14 @@ Accept: application/json
 #   "error": null
 # }
 DELETE {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
-X-User-Id: {{subscriberId}}
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Cancel a missing free subscription again
 # Expected: 404 Not Found
 # Expected body: success=false, data=null, error.code=FREE_SUBSCRIPTION_NOT_FOUND
 DELETE {{baseUrl}}/api/creators/{{creatorId}}/free-subscriptions
-X-User-Id: {{subscriberId}}
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Subscription status
@@ -55,31 +55,51 @@ Accept: application/json
 # success=true, data.subscribed=true, data.subscriptionLevel=FREE or PAID, error=null
 # Expected body when not subscribed:
 # success=true, data.subscribed=false, nullable subscription fields are null, error=null
-# X-User-Id is temporary and is not real authentication.
 GET {{baseUrl}}/api/creators/{{creatorId}}/subscription-status
-X-User-Id: {{subscriberId}}
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### My subscriptions
 # Expected: 200 OK
 # Expected body: success=true, data=[], error=null when there are no subscriptions
 # Existing subscription rows are returned in startedAt DESC order.
-# X-User-Id is temporary and is not real authentication.
 GET {{baseUrl}}/api/subscriptions/me
-X-User-Id: {{subscriberId}}
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Subscription detail
+# Expected: 200 OK
+# Expected body: success=true, data.subscriptionId={{subscriptionId}}, error=null
+GET {{baseUrl}}/api/subscriptions/{{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Paid subscription cancel schedule
+# Expected: 200 OK
+# Expected body: success=true, data.status=CANCEL_SCHEDULED
+PATCH {{baseUrl}}/api/subscriptions/{{subscriptionId}}/cancel-schedule
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Paid subscription cancel schedule revoke
+# Expected: 200 OK
+# Expected body: success=true, data.status=ACTIVE, data.cancelScheduledAt=null
+DELETE {{baseUrl}}/api/subscriptions/{{subscriptionId}}/cancel-schedule
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Subscription plans
 # Expected: 200 OK
 # Expected body: success=true, data has FREE and PAID plans, error=null
-# This endpoint does not require X-User-Id.
 GET {{baseUrl}}/api/creators/{{creatorId}}/subscription-plans
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Subscription plans for invalid creator
 # Expected: 404 Not Found
 # Expected body: success=false, data=null, error.code=CREATOR_NOT_FOUND
 GET {{baseUrl}}/api/creators/999999/subscription-plans
+Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Subscription plans for creator without profile
@@ -88,4 +108,5 @@ Accept: application/json
 # Expected body: success=false, data=null, error.code=CREATOR_PROFILE_NOT_FOUND
 # Expected message: 크리에이터 프로필을 찾을 수 없습니다.
 GET {{baseUrl}}/api/creators/{{creatorWithoutProfileId}}/subscription-plans
+Authorization: Bearer {{accessToken}}
 Accept: application/json

@@ -9,6 +9,7 @@ import com.white.handdam.member.entity.Role;
 import com.white.handdam.member.repository.MemberRepository;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
 import com.white.handdam.subscription.dto.response.MySubscriptionResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionDetailResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.entity.Subscription;
@@ -22,6 +23,7 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -114,6 +116,55 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
+    public SubscriptionDetailResponse getSubscription(Long subscriberId, Long subscriptionId) {
+        validateRequired(subscriberId, "subscriberId");
+        validateRequired(subscriptionId, "subscriptionId");
+
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new CustomException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
+        validateOwner(subscription, subscriberId);
+
+        Member creator = memberRepository.findById(subscription.getCreatorId())
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+
+        return SubscriptionDetailResponse.from(subscription, creator);
+    }
+
+    @Transactional
+    public SubscriptionDetailResponse scheduleCancellation(Long subscriberId, Long subscriptionId) {
+        validateRequired(subscriberId, "subscriberId");
+        validateRequired(subscriptionId, "subscriptionId");
+
+        Subscription subscription = subscriptionRepository.findByIdForUpdate(subscriptionId)
+                .orElseThrow(() -> new CustomException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
+        validateOwner(subscription, subscriberId);
+
+        subscription.scheduleCancellation(Instant.now());
+
+        Member creator = memberRepository.findById(subscription.getCreatorId())
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+
+        return SubscriptionDetailResponse.from(subscription, creator);
+    }
+
+    @Transactional
+    public SubscriptionDetailResponse revokeCancellationSchedule(Long subscriberId, Long subscriptionId) {
+        validateRequired(subscriberId, "subscriberId");
+        validateRequired(subscriptionId, "subscriptionId");
+
+        Subscription subscription = subscriptionRepository.findByIdForUpdate(subscriptionId)
+                .orElseThrow(() -> new CustomException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
+        validateOwner(subscription, subscriberId);
+
+        subscription.revokeCancellationSchedule();
+
+        Member creator = memberRepository.findById(subscription.getCreatorId())
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+
+        return SubscriptionDetailResponse.from(subscription, creator);
+    }
+
+    @Transactional(readOnly = true)
     public List<SubscriptionPlanResponse> getSubscriptionPlans(Long creatorId) {
         validateRequired(creatorId, "creatorId");
         validateCreator(creatorId);
@@ -144,6 +195,12 @@ public class SubscriptionService {
         }
 
         return creator;
+    }
+
+    private void validateOwner(Subscription subscription, Long subscriberId) {
+        if (!Objects.equals(subscription.getSubscriberId(), subscriberId)) {
+            throw new CustomException(SubscriptionErrorCode.SUBSCRIPTION_OWNER_MISMATCH);
+        }
     }
 
     private Member findCreatorInMap(Long creatorId, Map<Long, Member> creatorsById) {

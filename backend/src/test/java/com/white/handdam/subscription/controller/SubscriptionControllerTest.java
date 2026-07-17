@@ -3,19 +3,26 @@ package com.white.handdam.subscription.controller;
 import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.GlobalExceptionHandler;
+import com.white.handdam.global.security.AuthMember;
+import com.white.handdam.member.entity.Role;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
 import com.white.handdam.subscription.dto.response.MySubscriptionResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionDetailResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
 import com.white.handdam.subscription.exception.SubscriptionErrorCode;
 import com.white.handdam.subscription.service.SubscriptionService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -27,10 +34,10 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,6 +50,7 @@ class SubscriptionControllerTest {
     private static final Long SUBSCRIPTION_ID = 10L;
     private static final Instant STARTED_AT = Instant.parse("2026-07-13T00:00:00Z");
     private static final Instant PERIOD_END_AT = Instant.parse("2026-08-13T00:00:00Z");
+    private static final Instant CANCEL_SCHEDULED_AT = Instant.parse("2026-07-20T00:00:00Z");
 
     private SubscriptionService subscriptionService;
     private MockMvc mockMvc;
@@ -51,8 +59,14 @@ class SubscriptionControllerTest {
     void setUp() {
         subscriptionService = Mockito.mock(SubscriptionService.class);
         mockMvc = standaloneSetup(new SubscriptionController(subscriptionService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -67,9 +81,9 @@ class SubscriptionControllerTest {
         );
         when(subscriptionService.createFreeSubscription(SUBSCRIBER_ID, CREATOR_ID))
                 .thenReturn(response);
+        authenticate();
 
         mockMvc.perform(post("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
@@ -86,8 +100,9 @@ class SubscriptionControllerTest {
     @Test
     @DisplayName("DELETE returns 200 with ApiResponse noContent")
     void cancelFreeSubscription() throws Exception {
+        authenticate();
+
         mockMvc.perform(delete("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -102,9 +117,9 @@ class SubscriptionControllerTest {
     void createFreeSubscriptionRejectsDuplicateSubscription() throws Exception {
         when(subscriptionService.createFreeSubscription(SUBSCRIBER_ID, CREATOR_ID))
                 .thenThrow(new CustomException(SubscriptionErrorCode.SUBSCRIPTION_ALREADY_EXISTS));
+        authenticate();
 
         mockMvc.perform(post("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
@@ -123,9 +138,9 @@ class SubscriptionControllerTest {
         doThrow(new CustomException(SubscriptionErrorCode.FREE_SUBSCRIPTION_NOT_FOUND))
                 .when(subscriptionService)
                 .cancelFreeSubscription(SUBSCRIBER_ID, CREATOR_ID);
+        authenticate();
 
         mockMvc.perform(delete("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
@@ -151,9 +166,9 @@ class SubscriptionControllerTest {
         );
         when(subscriptionService.getSubscriptionStatus(SUBSCRIBER_ID, CREATOR_ID))
                 .thenReturn(response);
+        authenticate();
 
         mockMvc.perform(get("/api/creators/{creatorId}/subscription-status", CREATOR_ID)
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -183,9 +198,9 @@ class SubscriptionControllerTest {
                 null
         );
         when(subscriptionService.getMySubscriptions(SUBSCRIBER_ID)).thenReturn(List.of(response));
+        authenticate();
 
         mockMvc.perform(get("/api/subscriptions/me")
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -205,9 +220,9 @@ class SubscriptionControllerTest {
     @DisplayName("GET my subscriptions returns an empty list")
     void getMySubscriptionsReturnsEmptyList() throws Exception {
         when(subscriptionService.getMySubscriptions(SUBSCRIBER_ID)).thenReturn(List.of());
+        authenticate();
 
         mockMvc.perform(get("/api/subscriptions/me")
-                        .header("X-User-Id", SUBSCRIBER_ID)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -218,7 +233,89 @@ class SubscriptionControllerTest {
     }
 
     @Test
-    @DisplayName("GET subscription plans returns free and paid plans without X-User-Id")
+    @DisplayName("GET subscription detail returns 200 with ApiResponse")
+    void getSubscription() throws Exception {
+        SubscriptionDetailResponse response = paidDetailResponse(SubscriptionStatus.ACTIVE, null);
+        when(subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(get("/api/subscriptions/{subscriptionId}", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data.creatorNickname").value("creator"))
+                .andExpect(jsonPath("$.data.subscriptionLevel").value("PAID"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.subscriptionPriceSnapshot").value(15000))
+                .andExpect(jsonPath("$.data.currentPeriodEndAt").value("2026-08-13T00:00:00Z"))
+                .andExpect(jsonPath("$.data.cancelScheduledAt").value(nullValue()))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("PATCH cancel schedule returns scheduled paid subscription")
+    void scheduleCancellation() throws Exception {
+        SubscriptionDetailResponse response =
+                paidDetailResponse(SubscriptionStatus.CANCEL_SCHEDULED, CANCEL_SCHEDULED_AT);
+        when(subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(patch("/api/subscriptions/{subscriptionId}/cancel-schedule", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.status").value("CANCEL_SCHEDULED"))
+                .andExpect(jsonPath("$.data.currentPeriodEndAt").value("2026-08-13T00:00:00Z"))
+                .andExpect(jsonPath("$.data.cancelScheduledAt").value("2026-07-20T00:00:00Z"))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("DELETE cancel schedule returns active paid subscription")
+    void revokeCancellationSchedule() throws Exception {
+        SubscriptionDetailResponse response = paidDetailResponse(SubscriptionStatus.ACTIVE, null);
+        when(subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(delete("/api/subscriptions/{subscriptionId}/cancel-schedule", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.cancelScheduledAt").value(nullValue()))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription detail owner mismatch returns common error response")
+    void getSubscriptionRejectsOwnerMismatch() throws Exception {
+        when(subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .thenThrow(new CustomException(SubscriptionErrorCode.SUBSCRIPTION_OWNER_MISMATCH));
+        authenticate();
+
+        mockMvc.perform(get("/api/subscriptions/{subscriptionId}", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("SUBSCRIPTION_OWNER_MISMATCH"))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(subscriptionService).getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription plans returns free and paid plans")
     void getSubscriptionPlans() throws Exception {
         when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
                 .thenReturn(List.of(
@@ -282,31 +379,29 @@ class SubscriptionControllerTest {
         verify(subscriptionService).getSubscriptionPlans(CREATOR_ID);
     }
 
-    @Test
-    @DisplayName("POST without X-User-Id follows current GlobalExceptionHandler fallback")
-    void createFreeSubscriptionRejectsMissingUserIdHeader() throws Exception {
-        mockMvc.perform(post("/api/creators/{creatorId}/free-subscriptions", CREATOR_ID)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.data").value(nullValue()))
-                .andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"))
-                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
-
-        verifyNoInteractions(subscriptionService);
+    private void authenticate() {
+        AuthMember authMember = new AuthMember(SUBSCRIBER_ID, Role.USER);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(authMember, null)
+        );
     }
 
-    @Test
-    @DisplayName("GET subscription status without X-User-Id follows current GlobalExceptionHandler fallback")
-    void getSubscriptionStatusRejectsMissingUserIdHeader() throws Exception {
-        mockMvc.perform(get("/api/creators/{creatorId}/subscription-status", CREATOR_ID)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.data").value(nullValue()))
-                .andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"))
-                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
-
-        verifyNoInteractions(subscriptionService);
+    private SubscriptionDetailResponse paidDetailResponse(
+            SubscriptionStatus status,
+            Instant cancelScheduledAt
+    ) {
+        return new SubscriptionDetailResponse(
+                SUBSCRIPTION_ID,
+                CREATOR_ID,
+                "creator",
+                null,
+                SubscriptionLevel.PAID,
+                status,
+                15000,
+                STARTED_AT,
+                STARTED_AT,
+                PERIOD_END_AT,
+                cancelScheduledAt
+        );
     }
 }

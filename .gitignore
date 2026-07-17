@@ -52,6 +52,7 @@ bin/
 # Backend - Java / Gradle / Spring Boot
 ######################################
 .gradle/
+.gradle-user-home/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
