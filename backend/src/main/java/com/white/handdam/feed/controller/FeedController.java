@@ -78,49 +78,49 @@ public class FeedController {
 
     // [LYJ-006] GET /api/feeds/public
     @GetMapping("/public")
-    public SliceResponse<FeedSummaryResponse> getPublicFeeds(
+    public ApiResponse<SliceResponse<FeedSummaryResponse>> getPublicFeeds(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
-        return SliceResponse.from(feedService.getPublicFeeds(pageable));
+        return ApiResponse.success(SliceResponse.from(feedService.getPublicFeeds(pageable)));
     }
 
     // [LYJ-007] GET /api/feeds/home
     @GetMapping("/home")
-    public SliceResponse<FeedSummaryResponse> getHomeFeed(
+    public ApiResponse<SliceResponse<FeedSummaryResponse>> getHomeFeed(
             @AuthenticationPrincipal AuthMember member,
             @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
-        return SliceResponse.from(feedService.getHomeFeed(member.id(), categoryId, pageable));
+        return ApiResponse.success(SliceResponse.from(feedService.getHomeFeed(member.id(), categoryId, pageable)));
     }
 
     // [LYJ-008] GET /api/feeds/explore
-   @GetMapping("/explore")
-    public SliceResponse<FeedSummaryResponse> getExploreFeeds(
+    @GetMapping("/explore")
+    public ApiResponse<SliceResponse<FeedSummaryResponse>> getExploreFeeds(
             @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
-        return SliceResponse.from(feedService.getExploreFeeds(categoryId, pageable));
+        return ApiResponse.success(SliceResponse.from(feedService.getExploreFeeds(categoryId, pageable)));
     }
 
     // [LYJ-009] GET /api/feeds/creators/{creatorId}
     @GetMapping("/creators/{creatorId}")
-    public SliceResponse<FeedSummaryResponse> getCreatorFeeds(
+    public ApiResponse<SliceResponse<FeedSummaryResponse>> getCreatorFeeds(
             @PathVariable Long creatorId,
             @AuthenticationPrincipal AuthMember member,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
         Long memberId = (member != null) ? member.id() : null;
-        return SliceResponse.from(feedService.getCreatorFeeds(creatorId, memberId, pageable));
+        return ApiResponse.success(SliceResponse.from(feedService.getCreatorFeeds(creatorId, memberId, pageable)));
     }
 
     // [LYJ-010] GET /api/feeds/me — 내 작성 피드 목록
     // TODO [LYJ-010] CREATOR 역할만 접근 가능하도록 추후 @PreAuthorize("hasRole('CREATOR')") 추가
     @GetMapping("/me")
-    public SliceResponse<FeedSummaryResponse> getMyFeeds(
+    public ApiResponse<SliceResponse<FeedSummaryResponse>> getMyFeeds(
             @AuthenticationPrincipal AuthMember member,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return SliceResponse.from(feedService.getMyFeeds(member.id(), pageable));
+        return ApiResponse.success(SliceResponse.from(feedService.getMyFeeds(member.id(), pageable)));
     }
 }
