@@ -8,8 +8,10 @@ import com.white.handdam.payment.dto.request.PaymentConfirmRequest;
 import com.white.handdam.payment.dto.request.PaymentFailRequest;
 import com.white.handdam.payment.dto.request.PaymentPrepareRequest;
 import com.white.handdam.payment.dto.response.PaymentConfirmResponse;
+import com.white.handdam.payment.dto.response.PaymentDetailResponse;
 import com.white.handdam.payment.dto.response.PaymentFailResponse;
 import com.white.handdam.payment.dto.response.PaymentPrepareResponse;
+import com.white.handdam.payment.dto.response.PaymentSummaryResponse;
 import com.white.handdam.payment.entity.PaymentStatus;
 import com.white.handdam.payment.exception.PaymentErrorCode;
 import com.white.handdam.payment.service.PaymentService;
@@ -18,20 +20,32 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 
 import java.time.Instant;
+import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,7 +69,10 @@ class PaymentControllerTest {
     void setUp() {
         paymentService = Mockito.mock(PaymentService.class);
         mockMvc = standaloneSetup(new PaymentController(paymentService))
-                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .setCustomArgumentResolvers(
+                        new AuthenticationPrincipalArgumentResolver(),
+                        new PageableHandlerMethodArgumentResolver()
+                )
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -63,6 +80,102 @@ class PaymentControllerTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("GET /api/payments/me returns current member payment slice")
+    void getMyPayments() throws Exception {
+        PaymentSummaryResponse response = new PaymentSummaryResponse(
+                PAYMENT_ID,
+                CREATOR_ID,
+                "creator",
+                "https://image/creator.png",
+                15000,
+                PaymentStatus.SUCCESS,
+                "CARD",
+                PAID_AT,
+                PAID_AT
+        );
+        when(paymentService.getMyPayments(eq(MEMBER_ID), any(Pageable.class)))
+                .thenReturn(new SliceImpl<>(
+                        List.of(response),
+                        PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")),
+                        false
+                ));
+        authenticate();
+
+        mockMvc.perform(get("/api/payments/me")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].paymentId").value(PAYMENT_ID))
+                .andExpect(jsonPath("$.content[0].creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.content[0].creatorNickname").value("creator"))
+                .andExpect(jsonPath("$.content[0].creatorProfileImageUrl").value("https://image/creator.png"))
+                .andExpect(jsonPath("$.content[0].amount").value(15000))
+                .andExpect(jsonPath("$.content[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.content[0].paymentMethod").value("CARD"))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(paymentService).getMyPayments(eq(MEMBER_ID), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("GET /api/payments/{paymentId} returns current member payment detail")
+    void getPayment() throws Exception {
+        PaymentDetailResponse response = new PaymentDetailResponse(
+                PAYMENT_ID,
+                SUBSCRIPTION_ID,
+                CREATOR_ID,
+                "creator",
+                null,
+                15000,
+                PaymentStatus.SUCCESS,
+                "CARD",
+                null,
+                PAID_AT,
+                PAID_AT
+        );
+        when(paymentService.getPayment(MEMBER_ID, PAYMENT_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(get("/api/payments/{paymentId}", PAYMENT_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.paymentId").value(PAYMENT_ID))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data.creatorNickname").value("creator"))
+                .andExpect(jsonPath("$.data.amount").value(15000))
+                .andExpect(jsonPath("$.data.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.paymentMethod").value("CARD"))
+                .andExpect(jsonPath("$.data.failureCode").value(nullValue()))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(paymentService).getPayment(MEMBER_ID, PAYMENT_ID);
+    }
+
+    @Test
+    @DisplayName("GET /api/payments/{paymentId} converts owner mismatch to common error response")
+    void getPaymentRejectsOwnerMismatch() throws Exception {
+        when(paymentService.getPayment(MEMBER_ID, PAYMENT_ID))
+                .thenThrow(new CustomException(PaymentErrorCode.PAYMENT_OWNER_MISMATCH));
+        authenticate();
+
+        mockMvc.perform(get("/api/payments/{paymentId}", PAYMENT_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("PAYMENT_OWNER_MISMATCH"))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(paymentService).getPayment(MEMBER_ID, PAYMENT_ID);
     }
 
     @Test

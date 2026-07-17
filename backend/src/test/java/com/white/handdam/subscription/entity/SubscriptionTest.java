@@ -15,6 +15,7 @@ class SubscriptionTest {
     private static final Long SUBSCRIBER_ID = 1L;
     private static final Long CREATOR_ID = 2L;
     private static final Instant STARTED_AT = Instant.parse("2026-07-13T00:00:00Z");
+    private static final Instant CANCEL_REQUESTED_AT = Instant.parse("2026-07-20T00:00:00Z");
 
     @Test
     @DisplayName("createFree creates an active free subscription")
@@ -116,5 +117,81 @@ class SubscriptionTest {
                 approvedAt.atZone(java.time.ZoneOffset.UTC).plusMonths(1).toInstant()
         );
         assertThat(subscription.getSubscriptionPriceSnapshot()).isEqualTo(15000);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation changes active paid subscription to cancel scheduled")
+    void scheduleCancellationChangesActivePaidSubscription() {
+        Subscription subscription = Subscription.createPaid(SUBSCRIBER_ID, CREATOR_ID, 15000, STARTED_AT);
+        Instant periodEndAt = subscription.getCurrentPeriodEndAt();
+
+        subscription.scheduleCancellation(CANCEL_REQUESTED_AT);
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.CANCEL_SCHEDULED);
+        assertThat(subscription.getCancelScheduledAt()).isEqualTo(CANCEL_REQUESTED_AT);
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(periodEndAt);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation is idempotent when already scheduled")
+    void scheduleCancellationIsIdempotent() {
+        Subscription subscription = Subscription.createPaid(SUBSCRIBER_ID, CREATOR_ID, 15000, STARTED_AT);
+        subscription.scheduleCancellation(CANCEL_REQUESTED_AT);
+
+        subscription.scheduleCancellation(Instant.parse("2026-07-21T00:00:00Z"));
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.CANCEL_SCHEDULED);
+        assertThat(subscription.getCancelScheduledAt()).isEqualTo(CANCEL_REQUESTED_AT);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation rejects free subscription")
+    void scheduleCancellationRejectsFreeSubscription() {
+        Subscription subscription = Subscription.createFree(SUBSCRIBER_ID, CREATOR_ID, STARTED_AT);
+
+        assertThatThrownBy(() -> subscription.scheduleCancellation(CANCEL_REQUESTED_AT))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.FREE_SUBSCRIPTION_CANNOT_BE_CANCEL_SCHEDULED)
+                );
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule changes scheduled paid subscription to active")
+    void revokeCancellationScheduleChangesScheduledPaidSubscription() {
+        Subscription subscription = Subscription.createPaid(SUBSCRIBER_ID, CREATOR_ID, 15000, STARTED_AT);
+        Instant periodEndAt = subscription.getCurrentPeriodEndAt();
+        subscription.scheduleCancellation(CANCEL_REQUESTED_AT);
+
+        subscription.revokeCancellationSchedule();
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getCancelScheduledAt()).isNull();
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(periodEndAt);
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule is idempotent for active paid subscription without schedule")
+    void revokeCancellationScheduleIsIdempotent() {
+        Subscription subscription = Subscription.createPaid(SUBSCRIBER_ID, CREATOR_ID, 15000, STARTED_AT);
+
+        subscription.revokeCancellationSchedule();
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getCancelScheduledAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule rejects free subscription")
+    void revokeCancellationScheduleRejectsFreeSubscription() {
+        Subscription subscription = Subscription.createFree(SUBSCRIBER_ID, CREATOR_ID, STARTED_AT);
+
+        assertThatThrownBy(() -> subscription.revokeCancellationSchedule())
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.FREE_SUBSCRIPTION_CANNOT_BE_CANCEL_SCHEDULED)
+                );
     }
 }

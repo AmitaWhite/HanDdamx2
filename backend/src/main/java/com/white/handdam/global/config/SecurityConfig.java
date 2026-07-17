@@ -47,7 +47,7 @@ public class SecurityConfig {
                         "/actuator/health",
                         // handshake만 공개. STOMP CONNECT JWT는 StompAuthChannelInterceptor에서 검증
                         "/ws",
-                        "/ws/**"
+                        "/ws/**",
                         "/oauth2/**",
                         "/login/oauth2/**",
                         "/api/feeds/explore",
