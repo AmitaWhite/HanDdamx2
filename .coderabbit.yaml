@@ -10,10 +10,6 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-  # path_instructions(빌더 패턴/AOP/동시성/정합성/성능 리뷰 기준)는
-  # 저장소에 커밋하지 않고 CodeRabbit 대시보드 UI에서 비공개로 설정한다.
-  # (Organization/Repository Settings → Reviews → Behavior)
-
 chat:
   auto_reply: true
 
