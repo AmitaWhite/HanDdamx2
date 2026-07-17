@@ -53,7 +53,8 @@ public class SecurityConfig {
                         "/api/feeds/explore",
                         "/api/feeds/creators/**",
                         "/api/feeds/public",
-                        "/api/feeds/*"
+                        "/api/feeds/*",
+                        "/api/feeds/*/comments",
         };
 
         @Bean

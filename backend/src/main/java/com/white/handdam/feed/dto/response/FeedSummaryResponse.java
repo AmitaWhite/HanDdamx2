@@ -6,6 +6,7 @@ import com.white.handdam.feed.entity.Visibility;
 import java.time.Instant;
 
 // [LYJ-006]
+// 프로젝트랑 연결 후 creatorid, creatorname 추가 필요
 public record FeedSummaryResponse (
     Long id, Long projectId, String title,
     String content, Visibility visibility, long likeCount,
