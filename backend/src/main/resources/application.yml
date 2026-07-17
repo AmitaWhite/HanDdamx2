@@ -141,8 +141,17 @@ spring:
     username: test
     password: test
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-client-id
+            client-secret: test-client-secret
+            scope: email, profile
+
 jwt:
-  secret: test_secret_do_not_use_in_prod
+  secret: test_secret_do_not_use_in_prod_ci_pipeline_only
   access-expiration: 3600000
   refresh-expiration: 1209600000
 
