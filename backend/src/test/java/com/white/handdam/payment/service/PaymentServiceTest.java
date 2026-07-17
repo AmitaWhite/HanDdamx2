@@ -14,12 +14,15 @@ import com.white.handdam.payment.client.TossTimeoutException;
 import com.white.handdam.payment.dto.request.PaymentConfirmRequest;
 import com.white.handdam.payment.dto.request.PaymentPrepareRequest;
 import com.white.handdam.payment.dto.response.PaymentConfirmResponse;
+import com.white.handdam.payment.dto.response.PaymentDetailResponse;
 import com.white.handdam.payment.dto.response.PaymentPrepareResponse;
+import com.white.handdam.payment.dto.response.PaymentSummaryResponse;
 import com.white.handdam.payment.dto.toss.TossConfirmRequest;
 import com.white.handdam.payment.dto.toss.TossConfirmResponse;
 import com.white.handdam.payment.entity.Payment;
 import com.white.handdam.payment.entity.PaymentStatus;
 import com.white.handdam.payment.exception.PaymentErrorCode;
+import com.white.handdam.payment.repository.PaymentRepository;
 import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
@@ -32,15 +35,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -69,6 +78,9 @@ class PaymentServiceTest {
 
     @Mock
     private CreatorProfileRepository creatorProfileRepository;
+
+    @Mock
+    private PaymentRepository paymentRepository;
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
@@ -211,6 +223,88 @@ class PaymentServiceTest {
     }
 
     @Test
+    @DisplayName("getMyPayments reads only the current member payments and batches creator lookup")
+    void getMyPaymentsReadsCurrentMemberPayments() {
+        Payment payment = payment(MEMBER_ID, CREATOR_ID, PAYMENT_ID, APPROVED_AT);
+        Pageable pageable = PageRequest.of(0, 20);
+        when(paymentRepository.findByMemberIdOrderByLatest(MEMBER_ID, pageable))
+                .thenReturn(new SliceImpl<>(List.of(payment), pageable, false));
+        when(memberRepository.findAllById(any()))
+                .thenReturn(List.of(member(CREATOR_ID, Role.CREATOR, "creator", "https://image/creator.png")));
+
+        Slice<PaymentSummaryResponse> responses = paymentService.getMyPayments(MEMBER_ID, pageable);
+
+        assertThat(responses.getContent()).hasSize(1);
+        assertThat(responses.getContent().get(0).paymentId()).isEqualTo(PAYMENT_ID);
+        assertThat(responses.getContent().get(0).creatorId()).isEqualTo(CREATOR_ID);
+        assertThat(responses.getContent().get(0).creatorNickname()).isEqualTo("creator");
+        assertThat(responses.getContent().get(0).creatorProfileImageUrl()).isEqualTo("https://image/creator.png");
+        verify(paymentRepository).findByMemberIdOrderByLatest(MEMBER_ID, pageable);
+        verify(memberRepository).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("getMyPayments returns an empty slice without creator lookup")
+    void getMyPaymentsReturnsEmptySlice() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(paymentRepository.findByMemberIdOrderByLatest(MEMBER_ID, pageable))
+                .thenReturn(new SliceImpl<>(List.of(), pageable, false));
+
+        Slice<PaymentSummaryResponse> responses = paymentService.getMyPayments(MEMBER_ID, pageable);
+
+        assertThat(responses.getContent()).isEmpty();
+        verify(memberRepository, never()).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("getPayment returns detail for the current member payment")
+    void getPaymentReturnsCurrentMemberPayment() {
+        Payment payment = successfulPaymentForDetail(MEMBER_ID);
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+        when(memberRepository.findById(CREATOR_ID))
+                .thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR, "creator", null)));
+
+        PaymentDetailResponse response = paymentService.getPayment(MEMBER_ID, PAYMENT_ID);
+
+        assertThat(response.paymentId()).isEqualTo(PAYMENT_ID);
+        assertThat(response.subscriptionId()).isEqualTo(SUBSCRIPTION_ID);
+        assertThat(response.creatorId()).isEqualTo(CREATOR_ID);
+        assertThat(response.creatorNickname()).isEqualTo("creator");
+        assertThat(response.amount()).isEqualTo(15000);
+        assertThat(response.status()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.paymentMethod()).isEqualTo("CARD");
+        assertThat(response.failureCode()).isNull();
+    }
+
+    @Test
+    @DisplayName("getPayment rejects a missing payment")
+    void getPaymentRejectsMissingPayment() {
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.getPayment(MEMBER_ID, PAYMENT_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(PaymentErrorCode.PAYMENT_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("getPayment rejects another member payment")
+    void getPaymentRejectsOwnerMismatch() {
+        Payment payment = successfulPaymentForDetail(9L);
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> paymentService.getPayment(MEMBER_ID, PAYMENT_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(PaymentErrorCode.PAYMENT_OWNER_MISMATCH)
+                );
+        verify(memberRepository, never()).findById(eq(CREATOR_ID));
+    }
+
+    @Test
     @DisplayName("confirm calls Toss with DB idempotency key and completes success")
     void confirmCallsTossWithDbIdempotencyKey() {
         PaymentConfirmRequest request = new PaymentConfirmRequest(PAYMENT_KEY, ORDER_ID, 15000);
@@ -318,6 +412,27 @@ class PaymentServiceTest {
         return payment;
     }
 
+    private Payment payment(Long memberId, Long creatorId, Long paymentId, Instant createdAt) {
+        Payment payment = Payment.prepare(
+                memberId,
+                creatorId,
+                ORDER_ID + "-" + paymentId,
+                IDEMPOTENCY_KEY + "-" + paymentId,
+                "customer-key-" + paymentId,
+                15000
+        );
+        ReflectionTestUtils.setField(payment, "id", paymentId);
+        ReflectionTestUtils.setField(payment, "createdAt", createdAt);
+        return payment;
+    }
+
+    private Payment successfulPaymentForDetail(Long memberId) {
+        Payment payment = payment(memberId, CREATOR_ID, PAYMENT_ID, APPROVED_AT);
+        payment.startConfirm();
+        payment.completeSuccess(PAYMENT_KEY, "CARD", APPROVED_AT, SUBSCRIPTION_ID);
+        return payment;
+    }
+
     private PaymentConfirmCommand command() {
         return new PaymentConfirmCommand(
                 PAYMENT_ID,
@@ -369,9 +484,14 @@ class PaymentServiceTest {
     }
 
     private Member member(Long id, Role role) {
-        Member member = Member.createLocalMember("member" + id + "@handdam.com", "password", "creator" + id);
+        return member(id, role, "creator" + id, null);
+    }
+
+    private Member member(Long id, Role role, String nickname, String profileImageUrl) {
+        Member member = Member.createLocalMember("member" + id + "@handdam.com", "password", nickname);
         ReflectionTestUtils.setField(member, "id", id);
         ReflectionTestUtils.setField(member, "role", role);
+        ReflectionTestUtils.setField(member, "profileImageUrl", profileImageUrl);
         return member;
     }
 }

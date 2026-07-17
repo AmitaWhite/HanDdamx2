@@ -7,6 +7,7 @@ import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.member.entity.Role;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
 import com.white.handdam.subscription.dto.response.MySubscriptionResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionDetailResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +50,7 @@ class SubscriptionControllerTest {
     private static final Long SUBSCRIPTION_ID = 10L;
     private static final Instant STARTED_AT = Instant.parse("2026-07-13T00:00:00Z");
     private static final Instant PERIOD_END_AT = Instant.parse("2026-08-13T00:00:00Z");
+    private static final Instant CANCEL_SCHEDULED_AT = Instant.parse("2026-07-20T00:00:00Z");
 
     private SubscriptionService subscriptionService;
     private MockMvc mockMvc;
@@ -230,6 +233,88 @@ class SubscriptionControllerTest {
     }
 
     @Test
+    @DisplayName("GET subscription detail returns 200 with ApiResponse")
+    void getSubscription() throws Exception {
+        SubscriptionDetailResponse response = paidDetailResponse(SubscriptionStatus.ACTIVE, null);
+        when(subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(get("/api/subscriptions/{subscriptionId}", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data.creatorNickname").value("creator"))
+                .andExpect(jsonPath("$.data.subscriptionLevel").value("PAID"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.subscriptionPriceSnapshot").value(15000))
+                .andExpect(jsonPath("$.data.currentPeriodEndAt").value("2026-08-13T00:00:00Z"))
+                .andExpect(jsonPath("$.data.cancelScheduledAt").value(nullValue()))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("PATCH cancel schedule returns scheduled paid subscription")
+    void scheduleCancellation() throws Exception {
+        SubscriptionDetailResponse response =
+                paidDetailResponse(SubscriptionStatus.CANCEL_SCHEDULED, CANCEL_SCHEDULED_AT);
+        when(subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(patch("/api/subscriptions/{subscriptionId}/cancel-schedule", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.status").value("CANCEL_SCHEDULED"))
+                .andExpect(jsonPath("$.data.currentPeriodEndAt").value("2026-08-13T00:00:00Z"))
+                .andExpect(jsonPath("$.data.cancelScheduledAt").value("2026-07-20T00:00:00Z"))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("DELETE cancel schedule returns active paid subscription")
+    void revokeCancellationSchedule() throws Exception {
+        SubscriptionDetailResponse response = paidDetailResponse(SubscriptionStatus.ACTIVE, null);
+        when(subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID)).thenReturn(response);
+        authenticate();
+
+        mockMvc.perform(delete("/api/subscriptions/{subscriptionId}/cancel-schedule", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.subscriptionId").value(SUBSCRIPTION_ID))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.cancelScheduledAt").value(nullValue()))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("GET subscription detail owner mismatch returns common error response")
+    void getSubscriptionRejectsOwnerMismatch() throws Exception {
+        when(subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .thenThrow(new CustomException(SubscriptionErrorCode.SUBSCRIPTION_OWNER_MISMATCH));
+        authenticate();
+
+        mockMvc.perform(get("/api/subscriptions/{subscriptionId}", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("SUBSCRIPTION_OWNER_MISMATCH"))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(subscriptionService).getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
     @DisplayName("GET subscription plans returns free and paid plans")
     void getSubscriptionPlans() throws Exception {
         when(subscriptionService.getSubscriptionPlans(CREATOR_ID))
@@ -298,6 +383,25 @@ class SubscriptionControllerTest {
         AuthMember authMember = new AuthMember(SUBSCRIBER_ID, Role.USER);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(authMember, null)
+        );
+    }
+
+    private SubscriptionDetailResponse paidDetailResponse(
+            SubscriptionStatus status,
+            Instant cancelScheduledAt
+    ) {
+        return new SubscriptionDetailResponse(
+                SUBSCRIPTION_ID,
+                CREATOR_ID,
+                "creator",
+                null,
+                SubscriptionLevel.PAID,
+                status,
+                15000,
+                STARTED_AT,
+                STARTED_AT,
+                PERIOD_END_AT,
+                cancelScheduledAt
         );
     }
 }

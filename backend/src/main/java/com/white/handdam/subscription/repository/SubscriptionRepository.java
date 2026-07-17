@@ -18,6 +18,14 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     @Query("""
             select subscription
             from Subscription subscription
+            where subscription.id = :subscriptionId
+            """)
+    Optional<Subscription> findByIdForUpdate(@Param("subscriptionId") Long subscriptionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select subscription
+            from Subscription subscription
             where subscription.subscriberId = :subscriberId
               and subscription.creatorId = :creatorId
             """)

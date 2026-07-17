@@ -2,6 +2,7 @@
 @accessToken = REPLACE_WITH_ACCESS_TOKEN
 @creatorId = 2
 @creatorWithoutProfileId = 3
+@subscriptionId = 1
 
 ### Free subscription create
 # Run server with only the local profile.
@@ -63,6 +64,27 @@ Accept: application/json
 # Expected body: success=true, data=[], error=null when there are no subscriptions
 # Existing subscription rows are returned in startedAt DESC order.
 GET {{baseUrl}}/api/subscriptions/me
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Subscription detail
+# Expected: 200 OK
+# Expected body: success=true, data.subscriptionId={{subscriptionId}}, error=null
+GET {{baseUrl}}/api/subscriptions/{{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Paid subscription cancel schedule
+# Expected: 200 OK
+# Expected body: success=true, data.status=CANCEL_SCHEDULED
+PATCH {{baseUrl}}/api/subscriptions/{{subscriptionId}}/cancel-schedule
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Paid subscription cancel schedule revoke
+# Expected: 200 OK
+# Expected body: success=true, data.status=ACTIVE, data.cancelScheduledAt=null
+DELETE {{baseUrl}}/api/subscriptions/{{subscriptionId}}/cancel-schedule
 Authorization: Bearer {{accessToken}}
 Accept: application/json
 

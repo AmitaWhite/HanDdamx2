@@ -6,6 +6,7 @@
 @missingCreatorId = 999999
 @zeroPriceCreatorId = 3
 @orderId = HANDDAM_REPLACE_WITH_PREPARE_RESPONSE_ORDER_ID
+@paymentId = 1
 @paymentKey = REPLACE_WITH_TOSS_SUCCESS_REDIRECT_PAYMENT_KEY
 @amount = 15000
 
@@ -134,3 +135,17 @@ Authorization: Bearer {{accessToken}}
   "code": "PAY_PROCESS_CANCELED",
   "message": "성공 결제에 대한 실패 기록 시도"
 }
+
+### My payment history
+# Expected: 200 OK
+# Expected body: content contains only the current member's payments in latest-first order.
+GET {{baseUrl}}/api/payments/me?page=0&size=20
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Payment detail
+# Expected: 200 OK
+# Expected body: success=true, data.paymentId={{paymentId}}, internal Toss keys are not exposed.
+GET {{baseUrl}}/api/payments/{{paymentId}}
+Authorization: Bearer {{accessToken}}
+Accept: application/json

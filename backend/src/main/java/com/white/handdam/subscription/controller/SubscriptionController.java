@@ -3,6 +3,7 @@ package com.white.handdam.subscription.controller;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.subscription.dto.response.FreeSubscriptionResponse;
 import com.white.handdam.subscription.dto.response.MySubscriptionResponse;
+import com.white.handdam.subscription.dto.response.SubscriptionDetailResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionPlanResponse;
 import com.white.handdam.subscription.dto.response.SubscriptionStatusResponse;
 import com.white.handdam.subscription.service.SubscriptionService;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,6 +65,39 @@ public class SubscriptionController {
             @AuthenticationPrincipal AuthMember authMember
     ) {
         List<MySubscriptionResponse> response = subscriptionService.getMySubscriptions(authMember.id());
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/api/subscriptions/{subscriptionId}")
+    public ResponseEntity<ApiResponse<SubscriptionDetailResponse>> getSubscription(
+            @AuthenticationPrincipal AuthMember authMember,
+            @PathVariable Long subscriptionId
+    ) {
+        SubscriptionDetailResponse response =
+                subscriptionService.getSubscription(authMember.id(), subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PatchMapping("/api/subscriptions/{subscriptionId}/cancel-schedule")
+    public ResponseEntity<ApiResponse<SubscriptionDetailResponse>> scheduleCancellation(
+            @AuthenticationPrincipal AuthMember authMember,
+            @PathVariable Long subscriptionId
+    ) {
+        SubscriptionDetailResponse response =
+                subscriptionService.scheduleCancellation(authMember.id(), subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @DeleteMapping("/api/subscriptions/{subscriptionId}/cancel-schedule")
+    public ResponseEntity<ApiResponse<SubscriptionDetailResponse>> revokeCancellationSchedule(
+            @AuthenticationPrincipal AuthMember authMember,
+            @PathVariable Long subscriptionId
+    ) {
+        SubscriptionDetailResponse response =
+                subscriptionService.revokeCancellationSchedule(authMember.id(), subscriptionId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

@@ -16,19 +16,28 @@ import com.white.handdam.payment.dto.request.PaymentConfirmRequest;
 import com.white.handdam.payment.dto.request.PaymentFailRequest;
 import com.white.handdam.payment.dto.request.PaymentPrepareRequest;
 import com.white.handdam.payment.dto.response.PaymentConfirmResponse;
+import com.white.handdam.payment.dto.response.PaymentDetailResponse;
 import com.white.handdam.payment.dto.response.PaymentFailResponse;
 import com.white.handdam.payment.dto.response.PaymentPrepareResponse;
+import com.white.handdam.payment.dto.response.PaymentSummaryResponse;
 import com.white.handdam.payment.dto.toss.TossConfirmRequest;
 import com.white.handdam.payment.dto.toss.TossConfirmResponse;
 import com.white.handdam.payment.entity.Payment;
 import com.white.handdam.payment.exception.PaymentErrorCode;
+import com.white.handdam.payment.repository.PaymentRepository;
 import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
 import com.white.handdam.subscription.exception.SubscriptionErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +51,7 @@ public class PaymentService {
     private final TossPaymentsClient tossPaymentsClient;
     private final MemberRepository memberRepository;
     private final CreatorProfileRepository creatorProfileRepository;
+    private final PaymentRepository paymentRepository;
     private final SubscriptionRepository subscriptionRepository;
 
     public PaymentPrepareResponse prepare(Long memberId, PaymentPrepareRequest request) {
@@ -112,6 +122,46 @@ public class PaymentService {
         return paymentTransactionService.fail(memberId, request);
     }
 
+    @Transactional(readOnly = true)
+    public Slice<PaymentSummaryResponse> getMyPayments(Long memberId, Pageable pageable) {
+        validateRequired(memberId, "memberId");
+        validateRequired(pageable, "pageable");
+
+        Slice<Payment> payments = paymentRepository.findByMemberIdOrderByLatest(memberId, pageable);
+        if (!payments.hasContent()) {
+            return payments.map(payment -> PaymentSummaryResponse.from(payment, null));
+        }
+
+        LinkedHashSet<Long> creatorIds = payments.getContent().stream()
+                .map(payment -> payment.getCreatorId())
+                .collect(Collectors.toCollection(() -> new LinkedHashSet<>()));
+        Map<Long, Member> creatorsById = memberRepository.findAllById(creatorIds).stream()
+                .collect(Collectors.toMap(
+                        member -> member.getId(),
+                        member -> member
+                ));
+
+        return payments.map(payment -> PaymentSummaryResponse.from(
+                payment,
+                findCreatorInMap(payment.getCreatorId(), creatorsById)
+        ));
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentDetailResponse getPayment(Long memberId, Long paymentId) {
+        validateRequired(memberId, "memberId");
+        validateRequired(paymentId, "paymentId");
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new CustomException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+        validateOwner(payment, memberId);
+
+        Member creator = memberRepository.findById(payment.getCreatorId())
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+
+        return PaymentDetailResponse.from(payment, creator);
+    }
+
     private Member validateCreator(Long creatorId) {
         Member creator = memberRepository.findById(creatorId)
                 .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
@@ -129,6 +179,20 @@ public class PaymentService {
                 .ifPresent(subscription -> {
                     throw new CustomException(PaymentErrorCode.PAID_SUBSCRIPTION_ALREADY_EXISTS);
                 });
+    }
+
+    private void validateOwner(Payment payment, Long memberId) {
+        if (!Objects.equals(payment.getMemberId(), memberId)) {
+            throw new CustomException(PaymentErrorCode.PAYMENT_OWNER_MISMATCH);
+        }
+    }
+
+    private Member findCreatorInMap(Long creatorId, Map<Long, Member> creatorsById) {
+        Member creator = creatorsById.get(creatorId);
+        if (creator == null) {
+            throw new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND);
+        }
+        return creator;
     }
 
     private void validateTossResponse(

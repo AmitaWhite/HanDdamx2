@@ -43,6 +43,7 @@ import static org.mockito.Mockito.lenient;
 class SubscriptionServiceTest {
 
     private static final Long SUBSCRIBER_ID = 1L;
+    private static final Long OTHER_SUBSCRIBER_ID = 9L;
     private static final Long CREATOR_ID = 2L;
     private static final Long SECOND_CREATOR_ID = 3L;
     private static final Long SUBSCRIPTION_ID = 10L;
@@ -340,6 +341,192 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    @DisplayName("getSubscription returns detail for the current subscriber")
+    void getSubscriptionReturnsDetail() {
+        Subscription subscription = realPaidSubscription(SUBSCRIBER_ID);
+        when(subscriptionRepository.findById(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+        when(memberRepository.findById(CREATOR_ID))
+                .thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR, "creator", null)));
+
+        var response = subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+
+        assertThat(response.subscriptionId()).isEqualTo(SUBSCRIPTION_ID);
+        assertThat(response.creatorId()).isEqualTo(CREATOR_ID);
+        assertThat(response.creatorNickname()).isEqualTo("creator");
+        assertThat(response.subscriptionLevel()).isEqualTo(SubscriptionLevel.PAID);
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(response.subscriptionPriceSnapshot()).isEqualTo(15000);
+        assertThat(response.currentPeriodEndAt()).isEqualTo(PERIOD_END_AT);
+    }
+
+    @Test
+    @DisplayName("getSubscription rejects a missing subscription")
+    void getSubscriptionRejectsMissingSubscription() {
+        when(subscriptionRepository.findById(SUBSCRIPTION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("getSubscription rejects another subscriber subscription")
+    void getSubscriptionRejectsOwnerMismatch() {
+        Subscription subscription = realPaidSubscription(OTHER_SUBSCRIBER_ID);
+        when(subscriptionRepository.findById(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        assertThatThrownBy(() -> subscriptionService.getSubscription(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.SUBSCRIPTION_OWNER_MISMATCH)
+                );
+        verify(memberRepository, never()).findById(CREATOR_ID);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation locks and changes ACTIVE PAID to CANCEL_SCHEDULED")
+    void scheduleCancellationLocksAndSchedulesPaidSubscription() {
+        Subscription subscription = realPaidSubscription(SUBSCRIBER_ID);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+        when(memberRepository.findById(CREATOR_ID))
+                .thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR, "creator", null)));
+
+        var response = subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.CANCEL_SCHEDULED);
+        assertThat(subscription.getCancelScheduledAt()).isNotNull();
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(PERIOD_END_AT);
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.CANCEL_SCHEDULED);
+        assertThat(response.cancelScheduledAt()).isEqualTo(subscription.getCancelScheduledAt());
+        verify(subscriptionRepository).findByIdForUpdate(SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation rejects a missing subscription")
+    void scheduleCancellationRejectsMissingSubscription() {
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation rejects another subscriber subscription")
+    void scheduleCancellationRejectsOwnerMismatch() {
+        Subscription subscription = realPaidSubscription(OTHER_SUBSCRIBER_ID);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        assertThatThrownBy(() -> subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.SUBSCRIPTION_OWNER_MISMATCH)
+                );
+        verify(memberRepository, never()).findById(CREATOR_ID);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation rejects a FREE subscription")
+    void scheduleCancellationRejectsFreeSubscription() {
+        Subscription subscription = freeSubscription(SUBSCRIPTION_ID, CREATOR_ID, STARTED_AT);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        assertThatThrownBy(() -> subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.FREE_SUBSCRIPTION_CANNOT_BE_CANCEL_SCHEDULED)
+                );
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation is idempotent for an already scheduled paid subscription")
+    void scheduleCancellationIsIdempotent() {
+        Subscription subscription = realPaidSubscription(SUBSCRIBER_ID);
+        subscription.scheduleCancellation(CANCEL_SCHEDULED_AT);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+        when(memberRepository.findById(CREATOR_ID))
+                .thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR, "creator", null)));
+
+        var response = subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.CANCEL_SCHEDULED);
+        assertThat(response.cancelScheduledAt()).isEqualTo(CANCEL_SCHEDULED_AT);
+    }
+
+    @Test
+    @DisplayName("scheduleCancellation rejects paid subscription without current period end")
+    void scheduleCancellationRejectsMissingPeriodEnd() {
+        Subscription subscription = realPaidSubscription(SUBSCRIBER_ID);
+        ReflectionTestUtils.setField(subscription, "currentPeriodEndAt", null);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        assertThatThrownBy(() -> subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.SUBSCRIPTION_STATE_CONFLICT)
+                );
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule locks and changes CANCEL_SCHEDULED to ACTIVE")
+    void revokeCancellationScheduleLocksAndRevokes() {
+        Subscription subscription = realPaidSubscription(SUBSCRIBER_ID);
+        subscription.scheduleCancellation(CANCEL_SCHEDULED_AT);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+        when(memberRepository.findById(CREATOR_ID))
+                .thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR, "creator", null)));
+
+        var response = subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getCancelScheduledAt()).isNull();
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(PERIOD_END_AT);
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(response.cancelScheduledAt()).isNull();
+        verify(subscriptionRepository).findByIdForUpdate(SUBSCRIPTION_ID);
+        verify(subscriptionRepository, never()).delete(any(Subscription.class));
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule is idempotent for active paid subscription")
+    void revokeCancellationScheduleIsIdempotent() {
+        Subscription subscription = realPaidSubscription(SUBSCRIBER_ID);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+        when(memberRepository.findById(CREATOR_ID))
+                .thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR, "creator", null)));
+
+        var response = subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(response.cancelScheduledAt()).isNull();
+        assertThat(subscription.getCurrentPeriodEndAt()).isEqualTo(PERIOD_END_AT);
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule rejects a FREE subscription")
+    void revokeCancellationScheduleRejectsFreeSubscription() {
+        Subscription subscription = freeSubscription(SUBSCRIPTION_ID, CREATOR_ID, STARTED_AT);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        assertThatThrownBy(() -> subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.FREE_SUBSCRIPTION_CANNOT_BE_CANCEL_SCHEDULED)
+                );
+    }
+
+    @Test
     @DisplayName("getSubscriptionPlans returns free and active paid plans")
     void getSubscriptionPlansReturnsFreeAndActivePaidPlans() {
         when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR)));
@@ -439,6 +626,13 @@ class SubscriptionServiceTest {
     private Subscription freeSubscription(Long subscriptionId, Long creatorId, Instant startedAt) {
         Subscription subscription = Subscription.createFree(SUBSCRIBER_ID, creatorId, startedAt);
         ReflectionTestUtils.setField(subscription, "id", subscriptionId);
+        return subscription;
+    }
+
+    private Subscription realPaidSubscription(Long subscriberId) {
+        Subscription subscription = Subscription.createPaid(subscriberId, CREATOR_ID, 15000, STARTED_AT);
+        ReflectionTestUtils.setField(subscription, "id", SUBSCRIPTION_ID);
+        ReflectionTestUtils.setField(subscription, "currentPeriodEndAt", PERIOD_END_AT);
         return subscription;
     }
 
