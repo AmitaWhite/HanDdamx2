@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 @Getter
 @Entity
@@ -112,8 +113,57 @@ public class Subscription extends BaseTimeEntity {
         );
     }
 
+    public static Subscription createPaid(
+            Long subscriberId,
+            Long creatorId,
+            Integer subscriptionPriceSnapshot,
+            Instant approvedAt
+    ) {
+        validateRequired(subscriberId, "subscriberId");
+        validateRequired(creatorId, "creatorId");
+        validateRequired(subscriptionPriceSnapshot, "subscriptionPriceSnapshot");
+        validateRequired(approvedAt, "approvedAt");
+        validatePositive(subscriptionPriceSnapshot, "subscriptionPriceSnapshot");
+        validateNotSelfSubscription(subscriberId, creatorId);
+
+        return new Subscription(
+                subscriberId,
+                creatorId,
+                SubscriptionLevel.PAID,
+                SubscriptionStatus.ACTIVE,
+                subscriptionPriceSnapshot,
+                false,
+                approvedAt,
+                approvedAt,
+                plusOneMonth(approvedAt),
+                null
+        );
+    }
+
+    public void upgradeToPaid(Integer subscriptionPriceSnapshot, Instant approvedAt) {
+        validateRequired(subscriptionPriceSnapshot, "subscriptionPriceSnapshot");
+        validateRequired(approvedAt, "approvedAt");
+        validatePositive(subscriptionPriceSnapshot, "subscriptionPriceSnapshot");
+
+        if (subscriptionLevel == SubscriptionLevel.PAID) {
+            throw new IllegalStateException("Already paid subscription.");
+        }
+
+        subscriptionLevel = SubscriptionLevel.PAID;
+        status = SubscriptionStatus.ACTIVE;
+        this.subscriptionPriceSnapshot = subscriptionPriceSnapshot;
+        autoRenew = false;
+        currentPeriodStartAt = approvedAt;
+        currentPeriodEndAt = plusOneMonth(approvedAt);
+        cancelScheduledAt = null;
+    }
+
     public boolean isFree() {
         return subscriptionLevel == SubscriptionLevel.FREE;
+    }
+
+    public boolean isPaid() {
+        return subscriptionLevel == SubscriptionLevel.PAID;
     }
 
     private static void validateNotSelfSubscription(Long subscriberId, Long creatorId) {
@@ -126,5 +176,17 @@ public class Subscription extends BaseTimeEntity {
         if (value == null) {
             throw new IllegalArgumentException(fieldName + " must not be null");
         }
+    }
+
+    private static void validatePositive(Integer value, String fieldName) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(fieldName + " must be positive");
+        }
+    }
+
+    private static Instant plusOneMonth(Instant approvedAt) {
+        return approvedAt.atZone(ZoneOffset.UTC)
+                .plusMonths(1)
+                .toInstant();
     }
 }
