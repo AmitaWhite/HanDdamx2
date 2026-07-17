@@ -1,0 +1,22 @@
+language: "ko-KR"
+
+reviews:
+  profile: chill
+  poem: false
+  path_filters:
+    - "!**/build/**"
+    - "!**/.gradle/**"
+    - "!**/gradle-wrapper.jar"
+  auto_review:
+    enabled: true
+    drafts: false
+chat:
+  auto_reply: true
+
+tools:
+  gitleaks:
+    enabled: true
+  yamllint:
+    enabled: true
+  actionlint:
+    enabled: true
