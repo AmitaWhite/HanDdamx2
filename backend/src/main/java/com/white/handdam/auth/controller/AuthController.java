@@ -37,7 +37,7 @@ public class AuthController {
     private final AuthService authService;
     private final LoginService loginService;
     private final JwtProperties jwtProperties;
-    private final PasswordService passwordResetService;
+    private final PasswordService passwordService;
 
     // KSY-001
     @GetMapping("/email-availability")
@@ -122,14 +122,14 @@ public class AuthController {
     // KSY-012
     @PostMapping("/password-reset")
     public ApiResponse<Void> requestPasswordReset(@Valid @RequestBody EmailVerificationRequest request) {
-        passwordResetService.requestPasswordReset(request.email());
+        passwordService.requestPasswordReset(request.email());
         return ApiResponse.noContent();
     }
 
     // KSY-013
     @PatchMapping("/password-reset")
     public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
-        passwordResetService.resetPassword(request.token(), request.newPassword());
+        passwordService.resetPassword(request.token(), request.newPassword());
         return ApiResponse.noContent();
     }
 
