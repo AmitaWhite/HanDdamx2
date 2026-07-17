@@ -1,6 +1,7 @@
 package com.white.handdam.comment.service;
 
 import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
+import com.white.handdam.comment.dto.request.FeedCommentUpdateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.entity.FeedComment;
 import com.white.handdam.comment.exception.FeedCommentErrorCode;
@@ -132,6 +133,49 @@ public class FeedCommentService {
 
         FeedComment reply = FeedComment.create(feedId, memberId, parentCommentId, (short) 1, request.content());
         return feedCommentRepository.save(reply).getId();
+    }
+
+    // [LYJ-018] 댓글 수정
+    @Transactional
+    public Long updateComment(Long feedId, Long commentId, Long memberId, FeedCommentUpdateRequest request){
+        feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        FeedComment comment = feedCommentRepository.findByIdAndDeletedFalse(commentId)
+                .orElseThrow(() -> new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+
+        if(!comment.getFeedId().equals(feedId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        if(!comment.getMemberId().equals(memberId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_FORBIDDEN);
+        }
+
+        comment.updateContent(request.content());
+        return comment.getId();
+    }
+
+    // [LYJ-019] 댓글 삭제
+    @Transactional
+    public void deleteComment(Long feedId, Long commentId, Long memberId){
+        feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        FeedComment comment = feedCommentRepository.findByIdAndDeletedFalse(commentId)
+                .orElseThrow(() -> new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+
+        if (!comment.getFeedId().equals(feedId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        if(!comment.getMemberId().equals(memberId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_FORBIDDEN);
+        }
+
+        comment.delete();
+        if(comment.getDepth() == 0){
+            feedCommentRepository.findByParentCommentIdAndDeletedFalse(commentId)
+                    .forEach(reply -> reply.delete());
+        }
     }
 
     // [LYJ-030]
