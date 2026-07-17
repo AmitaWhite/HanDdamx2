@@ -198,6 +198,43 @@ public class Subscription extends BaseTimeEntity {
         cancelScheduledAt = null;
     }
 
+    public boolean isExpiredCancelScheduledPaid(Instant now) {
+        validateRequired(now, "now");
+
+        return subscriptionLevel == SubscriptionLevel.PAID
+                && status == SubscriptionStatus.CANCEL_SCHEDULED
+                && currentPeriodEndAt != null
+                && !currentPeriodEndAt.isAfter(now);
+    }
+
+    public void convertToFreeAfterPeriodEnd(Instant now) {
+        validateRequired(now, "now");
+
+        if (subscriptionLevel != SubscriptionLevel.PAID) {
+            throw new CustomException(SubscriptionErrorCode.SUBSCRIPTION_EXPIRATION_NOT_ALLOWED);
+        }
+
+        if (status != SubscriptionStatus.CANCEL_SCHEDULED) {
+            throw new CustomException(SubscriptionErrorCode.SUBSCRIPTION_EXPIRATION_NOT_ALLOWED);
+        }
+
+        if (currentPeriodEndAt == null) {
+            throw new CustomException(SubscriptionErrorCode.SUBSCRIPTION_STATE_CONFLICT);
+        }
+
+        if (currentPeriodEndAt.isAfter(now)) {
+            throw new CustomException(SubscriptionErrorCode.SUBSCRIPTION_PERIOD_NOT_ENDED);
+        }
+
+        subscriptionLevel = SubscriptionLevel.FREE;
+        status = SubscriptionStatus.ACTIVE;
+        subscriptionPriceSnapshot = null;
+        autoRenew = false;
+        currentPeriodStartAt = null;
+        currentPeriodEndAt = null;
+        cancelScheduledAt = null;
+    }
+
     public boolean isFree() {
         return subscriptionLevel == SubscriptionLevel.FREE;
     }

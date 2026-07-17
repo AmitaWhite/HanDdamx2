@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -67,6 +68,18 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMING);
         assertThat(result.alreadySucceeded()).isFalse();
         assertThat(result.command().idempotencyKey()).isEqualTo(IDEMPOTENCY_KEY);
+        verify(paymentRepository).findByOrderIdForUpdate(ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("startConfirm propagates payment lock acquisition failure")
+    void startConfirmPropagatesPaymentLockAcquisitionFailure() {
+        when(paymentRepository.findByOrderIdForUpdate(ORDER_ID))
+                .thenThrow(new CannotAcquireLockException("lock timeout"));
+
+        assertThatThrownBy(() -> paymentTransactionService.startConfirm(MEMBER_ID, confirmRequest()))
+                .isInstanceOf(CannotAcquireLockException.class);
+
         verify(paymentRepository).findByOrderIdForUpdate(ORDER_ID);
     }
 
@@ -175,6 +188,22 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getPgTransactionId()).isEqualTo(PAYMENT_KEY);
         assertThat(payment.getSubscriptionId()).isEqualTo(SUBSCRIPTION_ID);
         assertThat(response.subscriptionId()).isEqualTo(SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("completeSuccess does not complete payment when subscription lock acquisition fails")
+    void completeSuccessDoesNotCompletePaymentWhenSubscriptionLockAcquisitionFails() {
+        Payment payment = confirmingPayment();
+        when(paymentRepository.findByOrderIdForUpdate(ORDER_ID)).thenReturn(Optional.of(payment));
+        when(subscriptionRepository.findBySubscriberIdAndCreatorIdForUpdate(MEMBER_ID, CREATOR_ID))
+                .thenThrow(new CannotAcquireLockException("lock timeout"));
+
+        assertThatThrownBy(() -> paymentTransactionService.completeSuccess(command(), tossResponse()))
+                .isInstanceOf(CannotAcquireLockException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMING);
+        assertThat(payment.getSubscriptionId()).isNull();
+        verify(subscriptionRepository, never()).save(any(Subscription.class));
     }
 
     @Test
