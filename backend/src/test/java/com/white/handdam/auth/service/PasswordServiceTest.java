@@ -4,7 +4,9 @@ import com.white.handdam.auth.entity.EmailVerification;
 import com.white.handdam.auth.entity.VerificationPurpose;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.global.security.jwt.RefreshTokenRepository;
 import com.white.handdam.member.entity.Member;
+import com.white.handdam.member.entity.OAuthProvider;
 import com.white.handdam.member.repository.MemberRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
-class PasswordResetServiceTest {
+class PasswordServiceTest {
 
     @Mock
     private MemberRepository memberRepository;
@@ -37,8 +39,11 @@ class PasswordResetServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
     @InjectMocks
-    private PasswordService passwordResetService;
+    private PasswordService passwordService;
 
     // KSY-012
     @Test
@@ -47,7 +52,7 @@ class PasswordResetServiceTest {
         Member member = Member.createLocalMember("test@handdam.com", "encodedPassword", "테스트닉네임");
         given(memberRepository.findByEmail("test@handdam.com")).willReturn(Optional.of(member));
 
-        passwordResetService.requestPasswordReset("test@handdam.com");
+        passwordService.requestPasswordReset("test@handdam.com");
 
         then(emailVerificationService).should()
                 .issueAndSend(member.getId(), "test@handdam.com", member.getNickname(), VerificationPurpose.PASSWORD_RESET);
@@ -58,7 +63,7 @@ class PasswordResetServiceTest {
     void requestPasswordResetWhenMemberNotFound() {
         given(memberRepository.findByEmail("nobody@handdam.com")).willReturn(Optional.empty());
 
-        passwordResetService.requestPasswordReset("nobody@handdam.com");
+        passwordService.requestPasswordReset("nobody@handdam.com");
 
         then(emailVerificationService).should(never()).issueAndSend(any(), any(), any(), any());
     }
@@ -80,7 +85,7 @@ class PasswordResetServiceTest {
         given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
         given(passwordEncoder.encode("newPassword1!")).willReturn("newEncodedPassword");
 
-        passwordResetService.resetPassword("raw-token", "newPassword1!");
+        passwordService.resetPassword("raw-token", "newPassword1!");
 
         assertThat(member.getPassword()).isEqualTo("newEncodedPassword");
     }
@@ -91,7 +96,7 @@ class PasswordResetServiceTest {
         given(emailVerificationService.confirm("raw-token", VerificationPurpose.PASSWORD_RESET))
                 .willThrow(new CustomException(AuthErrorCode.EXPIRED_VERIFICATION_TOKEN));
 
-        assertThatThrownBy(() -> passwordResetService.resetPassword("raw-token", "newPassword1!"))
+        assertThatThrownBy(() -> passwordService.resetPassword("raw-token", "newPassword1!"))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.EXPIRED_VERIFICATION_TOKEN);
 
@@ -112,9 +117,72 @@ class PasswordResetServiceTest {
         given(emailVerificationService.confirm("raw-token", VerificationPurpose.PASSWORD_RESET)).willReturn(ev);
         given(memberRepository.findById(memberId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> passwordResetService.resetPassword("raw-token", "newPassword1!"))
+        assertThatThrownBy(() -> passwordService.resetPassword("raw-token", "newPassword1!"))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.MEMBER_NOT_FOUND);
+    }
+
+    // KSY-011
+    @Test
+    @DisplayName("현재 비밀번호가 일치하면 새 비밀번호로 변경")
+    void changePasswordSuccess() {
+        Long memberId = 1L;
+        Member member = Member.createLocalMember("test@handdam.com", "oldEncodedPassword", "테스트닉네임");
+
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches("currentPassword1!", "oldEncodedPassword")).willReturn(true);
+        given(passwordEncoder.encode("newPassword1!")).willReturn("newEncodedPassword");
+
+        passwordService.changePassword(memberId, "currentPassword1!", "newPassword1!");
+
+        assertThat(member.getPassword()).isEqualTo("newEncodedPassword");
+        then(refreshTokenRepository).should().deleteByMemberId(memberId);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원이면 예외 처리")
+    void changePasswordFailWhenMemberNotFound() {
+        Long memberId = 1L;
+        given(memberRepository.findById(memberId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> passwordService.changePassword(memberId, "currentPassword1!", "newPassword1!"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.MEMBER_NOT_FOUND);
+
+        then(refreshTokenRepository).should(never()).deleteByMemberId(any());
+    }
+
+    @Test
+    @DisplayName("OAuth 계정이면 예외 처리, 비밀번호 대조 X")
+    void changePasswordFailWhenOAuthMember() {
+        Long memberId = 1L;
+        Member member = Member.createOAuthMember(
+                "test@handdam.com", "테스트닉네임", null, OAuthProvider.GOOGLE, "oauth-id");
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> passwordService.changePassword(memberId, "currentPassword1!", "newPassword1!"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD);
+
+        then(passwordEncoder).should(never()).matches(any(), any());
+        then(refreshTokenRepository).should(never()).deleteByMemberId(any());
+    }
+
+    @Test
+    @DisplayName("현재 비밀번호가 일치하지 않으면 예외 처리, 비밀번호 변경 X")
+    void changePasswordFailWhenCurrentPasswordMismatch() {
+        Long memberId = 1L;
+        Member member = Member.createLocalMember("test@handdam.com", "oldEncodedPassword", "테스트닉네임");
+
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches("wrongPassword1!", "oldEncodedPassword")).willReturn(false);
+
+        assertThatThrownBy(() -> passwordService.changePassword(memberId, "wrongPassword1!", "newPassword1!"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_CURRENT_PASSWORD);
+
+        assertThat(member.getPassword()).isEqualTo("oldEncodedPassword");
+        then(refreshTokenRepository).should(never()).deleteByMemberId(any());
     }
 
 }
