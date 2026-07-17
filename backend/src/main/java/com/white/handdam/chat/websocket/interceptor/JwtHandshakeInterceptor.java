@@ -48,6 +48,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 	 * </ol>
 	 *
 	 * @return {@code true} 핸드셰이크 계속, {@code false} 연결 거부
+	 * HTTP → WebSocket으로 바뀌기 직전
 	 */
 	@Override
 	public boolean beforeHandshake(
@@ -63,13 +64,17 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 		if (!(request instanceof ServletServerHttpRequest servletRequest)) {
 			return true;
 		}
+		//쿼리 파라미터 access_token 을 꺼냄
 		String token = servletRequest.getServletRequest().getParameter("access_token");
+		//쿼리 파라미터 access_token 이 없으면 통과
 		if (!StringUtils.hasText(token)) {
 			return true;
 		}
+		//JWT 유효성 검사
 		if (!jwtTokenProvider.validate(token)) {
 			return false;
 		}
+		//웹소켓 세션에 토큰 저장
 		attributes.put(ATTR_ACCESS_TOKEN, token);
 		return true;
 	}
