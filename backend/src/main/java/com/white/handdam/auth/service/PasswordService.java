@@ -5,6 +5,7 @@ import com.white.handdam.auth.entity.VerificationPurpose;
 import com.white.handdam.auth.exception.AuthErrorCode;
 import com.white.handdam.auth.util.EmailNormalizer;
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.global.security.jwt.RefreshTokenRepository;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.entity.OAuthProvider;
 import com.white.handdam.member.repository.MemberRepository;
@@ -15,11 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class PasswordResetService {
+public class PasswordService {
 
     private final MemberRepository memberRepository;
     private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // KSY-012
     public void requestPasswordReset(String email) {
@@ -56,6 +58,22 @@ public class PasswordResetService {
         member.changePassword(passwordEncoder.encode(newPassword));
 
         // TODO: RefreshToken 도입 후 invalidateAll()
+    }
+
+    // KSY-011
+    public void changePassword(Long memberId, String currentPassword, String newPassword) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
+
+        if (member.getOauthProvider() != OAuthProvider.NONE) {
+            throw new CustomException(AuthErrorCode.OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD);
+        }
+        if (!passwordEncoder.matches(currentPassword, member.getPassword())) {
+            throw new CustomException(AuthErrorCode.INVALID_CURRENT_PASSWORD);
+        }
+
+        member.changePassword(passwordEncoder.encode(newPassword));
+        refreshTokenRepository.deleteByMemberId(memberId); // 비밀번호 변경 시 기존 로그인 세션 무효화
     }
 
 }

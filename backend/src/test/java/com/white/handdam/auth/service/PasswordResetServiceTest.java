@@ -38,7 +38,7 @@ class PasswordResetServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @InjectMocks
-    private PasswordResetService passwordResetService;
+    private PasswordService passwordResetService;
 
     // KSY-012
     @Test
