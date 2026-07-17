@@ -288,6 +288,107 @@ class FeedCommentServiceTest {
                         .isEqualTo(FeedCommentErrorCode.COMMENT_FORBIDDEN));
     }
 
+    // ---------------------------------------------------------------
+    // LYJ-019 댓글 삭제
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-019] 댓글 삭제 성공 - 대댓글 없는 경우")
+    void deleteComment_success_noReplies() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "댓글");
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+        given(feedCommentRepository.findByParentCommentIdAndDeletedFalse(10L)).willReturn(List.of());
+
+        feedCommentService.deleteComment(1L, 10L, 1L);
+
+        assertThat(comment.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("[LYJ-019] 부모 댓글 삭제 시 대댓글도 함께 soft delete")
+    void deleteComment_success_cascadesReplies() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "부모 댓글");
+        FeedComment reply1  = sampleComment(20L, 2L, 10L, (short) 1, "대댓글1");
+        FeedComment reply2  = sampleComment(21L, 3L, 10L, (short) 1, "대댓글2");
+
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+        given(feedCommentRepository.findByParentCommentIdAndDeletedFalse(10L)).willReturn(List.of(reply1, reply2));
+
+        feedCommentService.deleteComment(1L, 10L, 1L);
+
+        assertThat(comment.isDeleted()).isTrue();
+        assertThat(reply1.isDeleted()).isTrue();
+        assertThat(reply2.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("[LYJ-019] 대댓글(depth=1) 삭제 성공 - cascade 없음")
+    void deleteComment_success_reply() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment reply = sampleComment(20L, 1L, 10L, (short) 1, "대댓글");
+        given(feedCommentRepository.findByIdAndDeletedFalse(20L)).willReturn(Optional.of(reply));
+
+        feedCommentService.deleteComment(1L, 20L, 1L);
+
+        assertThat(reply.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("[LYJ-019] 존재하지 않는 피드 댓글 삭제 시 FEED_NOT_FOUND 예외 발생")
+    void deleteComment_feedNotFound() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.deleteComment(999L, 10L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-019] 존재하지 않는 댓글 삭제 시 COMMENT_NOT_FOUND 예외 발생")
+    void deleteComment_commentNotFound() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(feedCommentRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedCommentService.deleteComment(1L, 999L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-019] 다른 피드 소속 댓글 삭제 시 COMMENT_NOT_FOUND 예외 발생")
+    void deleteComment_commentBelongsToAnotherFeed() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "내용");
+        ReflectionTestUtils.setField(comment, "feedId", 5L); // 다른 피드 소속
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> feedCommentService.deleteComment(1L, 10L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-019] 작성자가 아닌 사용자가 삭제 시 COMMENT_FORBIDDEN 예외 발생")
+    void deleteComment_notAuthor_forbidden() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+
+        FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "내용"); // memberId=1L 작성
+        given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
+
+        // memberId=99L (다른 사람)이 삭제 시도
+        assertThatThrownBy(() -> feedCommentService.deleteComment(1L, 10L, 99L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedCommentErrorCode.COMMENT_FORBIDDEN));
+    }
 
     // ---------------------------------------------------------------
     // 헬퍼

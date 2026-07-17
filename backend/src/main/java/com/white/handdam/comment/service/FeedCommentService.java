@@ -155,6 +155,29 @@ public class FeedCommentService {
         return comment.getId();
     }
 
+    // [LYJ-019] 댓글 삭제
+    @Transactional
+    public void deleteComment(Long feedId, Long commentId, Long memberId){
+        feedRepository.findByIdAndDeletedFalse(feedId)
+                .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        FeedComment comment = feedCommentRepository.findByIdAndDeletedFalse(commentId)
+                .orElseThrow(() -> new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND));
+
+        if (!comment.getFeedId().equals(feedId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        if(!comment.getMemberId().equals(memberId)){
+            throw new CustomException(FeedCommentErrorCode.COMMENT_FORBIDDEN);
+        }
+
+        comment.delete();
+        if(comment.getDepth() == 0){
+            feedCommentRepository.findByParentCommentIdAndDeletedFalse(commentId)
+                    .forEach(reply -> reply.delete());
+        }
+    }
+
     // [LYJ-030]
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;

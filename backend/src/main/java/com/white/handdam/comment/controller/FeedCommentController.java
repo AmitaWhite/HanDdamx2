@@ -68,4 +68,15 @@ public class FeedCommentController {
         return ApiResponse.success(new FeedCommentIdResponse(id));
     }
 
+    // [LYJ-019] DELETE /api/feeds/{feedId}/comments/{commentId}
+    @DeleteMapping("/api/feeds/{feedId}/comments/{commentId}")
+    public ApiResponse<Void> deleteComment(
+            @PathVariable Long feedId,
+            @PathVariable Long commentId,
+            @AuthenticationPrincipal AuthMember member
+    ) {
+        feedCommentService.deleteComment(feedId, commentId, member.id());
+        return ApiResponse.noContent();
+    }
+
 }

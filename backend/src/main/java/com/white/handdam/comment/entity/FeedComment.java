@@ -55,4 +55,10 @@ public class FeedComment extends BaseTimeEntity {
         this.content = content;
     }
 
+    // [LYJ-019] 댓글 소프트 삭제
+    public void delete() {
+        this.deleted = true;
+        this.deletedAt = Instant.now();
+    }
+
 }
