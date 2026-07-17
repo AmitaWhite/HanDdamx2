@@ -2,8 +2,11 @@ package com.white.handdam.global.exception;
 
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.response.ErrorResponse;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,6 +47,19 @@ public class GlobalExceptionHandler {
     }
 
     // 그 외 모든 예외 (예상 못한 서버 오류)
+    // Lock acquisition timeout
+    @ExceptionHandler({
+            PessimisticLockingFailureException.class,
+            LockTimeoutException.class,
+            PessimisticLockException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleLockAcquisitionFailure(Exception e) {
+        String traceId = generateTraceId();
+        log.warn("[{}] LOCK_ACQUISITION_TIMEOUT - {}", traceId, e.getMessage());
+        return toResponse(LockErrorCode.LOCK_ACQUISITION_TIMEOUT, traceId);
+    }
+
+    // Other unhandled exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         String traceId = generateTraceId();

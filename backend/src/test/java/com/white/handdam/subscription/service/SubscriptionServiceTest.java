@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -406,6 +407,18 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    @DisplayName("scheduleCancellation propagates lock acquisition failure")
+    void scheduleCancellationPropagatesLockAcquisitionFailure() {
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID))
+                .thenThrow(new CannotAcquireLockException("lock timeout"));
+
+        assertThatThrownBy(() -> subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOf(CannotAcquireLockException.class);
+
+        verify(memberRepository, never()).findById(any());
+    }
+
+    @Test
     @DisplayName("scheduleCancellation rejects a missing subscription")
     void scheduleCancellationRejectsMissingSubscription() {
         when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.empty());
@@ -494,6 +507,19 @@ class SubscriptionServiceTest {
         assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
         assertThat(response.cancelScheduledAt()).isNull();
         verify(subscriptionRepository).findByIdForUpdate(SUBSCRIPTION_ID);
+        verify(subscriptionRepository, never()).delete(any(Subscription.class));
+    }
+
+    @Test
+    @DisplayName("revokeCancellationSchedule propagates lock acquisition failure")
+    void revokeCancellationSchedulePropagatesLockAcquisitionFailure() {
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID))
+                .thenThrow(new CannotAcquireLockException("lock timeout"));
+
+        assertThatThrownBy(() -> subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .isInstanceOf(CannotAcquireLockException.class);
+
+        verify(memberRepository, never()).findById(any());
         verify(subscriptionRepository, never()).delete(any(Subscription.class));
     }
 

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -278,6 +279,25 @@ class SubscriptionControllerTest {
     }
 
     @Test
+    @DisplayName("PATCH cancel schedule lock failure returns conflict response")
+    void scheduleCancellationLockFailure() throws Exception {
+        when(subscriptionService.scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .thenThrow(new PessimisticLockingFailureException("lock timeout"));
+        authenticate();
+
+        mockMvc.perform(patch("/api/subscriptions/{subscriptionId}/cancel-schedule", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("LOCK_ACQUISITION_TIMEOUT"))
+                .andExpect(jsonPath("$.error.message").value("현재 동일한 작업을 처리 중입니다. 잠시 후 다시 시도해 주세요."))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(subscriptionService).scheduleCancellation(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
     @DisplayName("DELETE cancel schedule returns active paid subscription")
     void revokeCancellationSchedule() throws Exception {
         SubscriptionDetailResponse response = paidDetailResponse(SubscriptionStatus.ACTIVE, null);
@@ -292,6 +312,25 @@ class SubscriptionControllerTest {
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.cancelScheduledAt").value(nullValue()))
                 .andExpect(jsonPath("$.error").value(nullValue()));
+
+        verify(subscriptionService).revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID);
+    }
+
+    @Test
+    @DisplayName("DELETE cancel schedule lock failure returns conflict response")
+    void revokeCancellationScheduleLockFailure() throws Exception {
+        when(subscriptionService.revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID))
+                .thenThrow(new PessimisticLockingFailureException("lock timeout"));
+        authenticate();
+
+        mockMvc.perform(delete("/api/subscriptions/{subscriptionId}/cancel-schedule", SUBSCRIPTION_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("LOCK_ACQUISITION_TIMEOUT"))
+                .andExpect(jsonPath("$.error.message").value("현재 동일한 작업을 처리 중입니다. 잠시 후 다시 시도해 주세요."))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
 
         verify(subscriptionService).revokeCancellationSchedule(SUBSCRIBER_ID, SUBSCRIPTION_ID);
     }

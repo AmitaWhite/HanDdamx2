@@ -120,7 +120,8 @@ class PaymentSubscriptionSecurityTest {
         mockMvc.perform(get("/api/payments/me")
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].paymentId").value(PAYMENT_ID));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].paymentId").value(PAYMENT_ID));
 
         verify(paymentService).getMyPayments(org.mockito.Mockito.eq(MEMBER_ID), any(Pageable.class));
     }

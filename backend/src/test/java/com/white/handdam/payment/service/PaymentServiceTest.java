@@ -39,6 +39,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -326,6 +327,21 @@ class PaymentServiceTest {
         assertThat(requestCaptor.getValue().paymentKey()).isEqualTo(PAYMENT_KEY);
         assertThat(requestCaptor.getValue().orderId()).isEqualTo(ORDER_ID);
         assertThat(requestCaptor.getValue().amount()).isEqualTo(15000);
+    }
+
+    @Test
+    @DisplayName("confirm does not call Toss when payment lock acquisition fails")
+    void confirmDoesNotCallTossWhenPaymentLockAcquisitionFails() {
+        PaymentConfirmRequest request = new PaymentConfirmRequest(PAYMENT_KEY, ORDER_ID, 15000);
+        when(paymentTransactionService.startConfirm(MEMBER_ID, request))
+                .thenThrow(new PessimisticLockingFailureException("lock timeout"));
+
+        assertThatThrownBy(() -> paymentService.confirm(MEMBER_ID, request))
+                .isInstanceOf(PessimisticLockingFailureException.class);
+
+        verifyNoInteractions(tossPaymentsClient);
+        verify(paymentTransactionService, never()).completeSuccess(any(), any());
+        verify(paymentTransactionService, never()).failConfirming(any(), any(), any());
     }
 
     @Test

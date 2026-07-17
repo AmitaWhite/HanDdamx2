@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.SliceImpl;
@@ -107,17 +108,19 @@ class PaymentControllerTest {
         mockMvc.perform(get("/api/payments/me")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].paymentId").value(PAYMENT_ID))
-                .andExpect(jsonPath("$.content[0].creatorId").value(CREATOR_ID))
-                .andExpect(jsonPath("$.content[0].creatorNickname").value("creator"))
-                .andExpect(jsonPath("$.content[0].creatorProfileImageUrl").value("https://image/creator.png"))
-                .andExpect(jsonPath("$.content[0].amount").value(15000))
-                .andExpect(jsonPath("$.content[0].status").value("SUCCESS"))
-                .andExpect(jsonPath("$.content[0].paymentMethod").value("CARD"))
-                .andExpect(jsonPath("$.hasNext").value(false))
-                .andExpect(jsonPath("$.page").value(0))
-                .andExpect(jsonPath("$.size").value(20));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].paymentId").value(PAYMENT_ID))
+                .andExpect(jsonPath("$.data.content[0].creatorId").value(CREATOR_ID))
+                .andExpect(jsonPath("$.data.content[0].creatorNickname").value("creator"))
+                .andExpect(jsonPath("$.data.content[0].creatorProfileImageUrl").value("https://image/creator.png"))
+                .andExpect(jsonPath("$.data.content[0].amount").value(15000))
+                .andExpect(jsonPath("$.data.content[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.content[0].paymentMethod").value("CARD"))
+                .andExpect(jsonPath("$.data.hasNext").value(false))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.error").value(nullValue()));
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(paymentService).getMyPayments(eq(MEMBER_ID), pageableCaptor.capture());
@@ -323,6 +326,34 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.data").value(nullValue()))
                 .andExpect(jsonPath("$.error.code").value("PAYMENT_AMOUNT_MISMATCH"))
                 .andExpect(jsonPath("$.error.message").value(PaymentErrorCode.PAYMENT_AMOUNT_MISMATCH.getMessage()))
+                .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
+
+        verify(paymentService).confirm(MEMBER_ID, request);
+    }
+
+    @Test
+    @DisplayName("Payment lock failure is converted to conflict response")
+    void paymentLockFailure() throws Exception {
+        PaymentConfirmRequest request = new PaymentConfirmRequest(PAYMENT_KEY, ORDER_ID, 15000);
+        when(paymentService.confirm(MEMBER_ID, request))
+                .thenThrow(new PessimisticLockingFailureException("lock timeout"));
+        authenticate();
+
+        mockMvc.perform(post("/api/payments/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "paymentKey": "payment-key",
+                                  "orderId": "HANDDAM-1234567890abcdef",
+                                  "amount": 15000
+                                }
+                                """)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("LOCK_ACQUISITION_TIMEOUT"))
+                .andExpect(jsonPath("$.error.message").value("현재 동일한 작업을 처리 중입니다. 잠시 후 다시 시도해 주세요."))
                 .andExpect(jsonPath("$.error.traceId").value(not(emptyOrNullString())));
 
         verify(paymentService).confirm(MEMBER_ID, request);
