@@ -9,7 +9,8 @@ package com.white.handdam.board.service;
  *   <li>subscriber_id = memberId</li>
  *   <li>creator_id = creatorId</li>
  *   <li>subscription_level = PAID</li>
- *   <li>status = ACTIVE 또는 CANCEL_SCHEDULED(유료 기간 유지)</li>
+ *   <li>status = ACTIVE 또는 CANCEL_SCHEDULED</li>
+ *   <li>current_period_end_at 이 현재 시각보다 이후 (유료 기간 내)</li>
  * </ul>
  *
  * <p>구현체: {@link SubscriptionPaidSubscriptionChecker}

@@ -59,4 +59,15 @@ public class BoardAnswer extends BaseTimeEntity {
 		this.deleted = true;
 		this.deletedAt = Instant.now();
 	}
+
+	/**
+	 * 소프트 삭제된 공식 답변을 복구해 재등록한다.
+	 * UNIQUE(board_post_id) 때문에 새 INSERT 대신 기존 행을 되살린다.
+	 */
+	public void restore(String content, Long creatorId) {
+		this.content = content;
+		this.creatorId = creatorId;
+		this.deleted = false;
+		this.deletedAt = null;
+	}
 }

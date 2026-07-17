@@ -51,7 +51,8 @@ class BoardAnswerServiceTest {
 		CreateBoardAnswerRequest request = new CreateBoardAnswerRequest("공식 답변입니다.");
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		given(boardAnswerRepository.existsByBoardPostId(10L)).willReturn(false);
+		given(boardAnswerRepository.existsByBoardPostIdAndDeletedFalse(10L)).willReturn(false);
+		given(boardAnswerRepository.findByBoardPostId(10L)).willReturn(Optional.empty());
 		given(boardAnswerRepository.save(any(BoardAnswer.class))).willAnswer(invocation -> {
 			BoardAnswer answer = invocation.getArgument(0);
 			ReflectionTestUtils.setField(answer, "id", 50L);
@@ -99,11 +100,34 @@ class BoardAnswerServiceTest {
 		CreateBoardAnswerRequest request = new CreateBoardAnswerRequest("두 번째 답변");
 
 		given(boardPostRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(post));
-		given(boardAnswerRepository.existsByBoardPostId(10L)).willReturn(true);
+		given(boardAnswerRepository.existsByBoardPostIdAndDeletedFalse(10L)).willReturn(true);
 
 		assertThatThrownBy(() -> boardAnswerService.createAnswer(10L, creatorId, request))
 			.satisfies(ex -> assertErrorCode(ex, BoardErrorCode.BOARD_ANSWER_ALREADY_EXISTS));
 
+		verify(boardAnswerRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("소프트 삭제된 공식 답변이 있으면 복구해 재등록한다")
+	void restoresSoftDeletedAnswerInsteadOfInsert() {
+		Long creatorId = 1L;
+		BoardAnswer deleted = sampleAnswer(creatorId);
+		deleted.softDelete();
+		CreateBoardAnswerRequest request = new CreateBoardAnswerRequest("다시 등록한 답변");
+
+		given(boardPostRepository.findByIdAndDeletedFalse(10L))
+			.willReturn(Optional.of(deleted.getBoardPost()));
+		given(boardAnswerRepository.existsByBoardPostIdAndDeletedFalse(10L)).willReturn(false);
+		given(boardAnswerRepository.findByBoardPostId(10L)).willReturn(Optional.of(deleted));
+
+		BoardAnswerResponse result = boardAnswerService.createAnswer(10L, creatorId, request);
+
+		assertThat(result.id()).isEqualTo(50L);
+		assertThat(result.content()).isEqualTo("다시 등록한 답변");
+		assertThat(deleted.isDeleted()).isFalse();
+		assertThat(deleted.getDeletedAt()).isNull();
+		assertThat(deleted.getBoardPost().getStatus()).isEqualTo(BoardPostStatus.ANSWERED);
 		verify(boardAnswerRepository, never()).save(any());
 	}
 
