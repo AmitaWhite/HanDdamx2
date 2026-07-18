@@ -46,4 +46,7 @@ public class Poll extends BaseTimeEntity {
         if (endAt != null)   this.endAt    = endAt;
     }
 
+    public void close() {
+        this.closed = true;
+    }
 }

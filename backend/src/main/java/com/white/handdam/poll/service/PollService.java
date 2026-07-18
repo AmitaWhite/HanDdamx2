@@ -244,6 +244,29 @@ public class PollService {
         return PollResultResponse.from(poll, options, votes);
     }
 
+    // [LYJ-029] 투표 조기 종료
+    @Transactional
+    public Long closePoll(Long pollId, Long memberId) {
+        Poll poll = pollRepository.findById(pollId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
+
+        Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        if (!project.getCreatorId().equals(memberId)) {
+            throw new CustomException(PollErrorCode.POLL_FORBIDDEN);
+        }
+
+        if (!poll.isActive()) {
+            throw new CustomException(PollErrorCode.POLL_CLOSED);
+        }
+
+        poll.close();
+        return poll.getId();
+    }
 
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;

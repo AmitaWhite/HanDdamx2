@@ -638,52 +638,7 @@ class PollServiceTest {
                 .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
     }
 
-    // ---------------------------------------------------------------
-    // 헬퍼 (023에 추가되는 것들)
-    // ---------------------------------------------------------------
 
-    private Poll samplePoll(Long feedId) {
-        Poll poll = Poll.create(feedId, "좋아하는 언어는?", Instant.now().plusSeconds(3600));
-        ReflectionTestUtils.setField(poll, "id", 1L);
-        return poll;
-    }
-
-    private PollOption sampleOption(Long id, String optionText, int orderIndex) {
-        PollOption option = PollOption.create(1L, optionText, orderIndex);
-        ReflectionTestUtils.setField(option, "id", id);
-        return option;
-    }
-
-    // PollVote.create()는 LYJ-026에서 추가 예정 → ReflectionTestUtils로 직접 세팅
-    private PollVote sampleVote(Long pollOptionId) {
-        PollVote vote = mock(PollVote.class);
-        given(vote.getPollOptionId()).willReturn(pollOptionId);
-        return vote;
-    }
-
-    private Project sampleProject(Long creatorId) {
-        Project project = Project.builder()
-                .creatorId(creatorId)
-                .categoryId(1L)
-                .title("테스트 프로젝트")
-                .build();
-        ReflectionTestUtils.setField(project, "id", 1L);
-        return project;
-    }
-
-    private Poll sampleClosedPoll(Long feedId) {
-        // 이미 만료된 투표 (endAt이 과거)
-        Poll poll = Poll.create(feedId, "종료된 투표?", Instant.now().minusSeconds(3600));
-        ReflectionTestUtils.setField(poll, "id", 1L);
-        return poll;
-    }
-
-    private PollVote sampleVoteWithWeight(Long pollOptionId, short weight) {
-        PollVote vote = mock(PollVote.class);
-        given(vote.getPollOptionId()).willReturn(pollOptionId);
-        given(vote.getWeight()).willReturn(weight);
-        return vote;
-    }
 
     // ---------------------------------------------------------------
     // LYJ-028 가중치 반영 투표 결과 조회
@@ -778,4 +733,116 @@ class PollServiceTest {
         assertThat(pollService.getPollResults(1L, null)).isNotNull();
     }
 
+    // ---------------------------------------------------------------
+    // LYJ-029 투표 조기 종료
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-029] 크리에이터가 활성 투표 조기 종료 성공 - closed=true, pollId 반환")
+    void closePoll_success() {
+        Poll poll = samplePoll(1L); // active 상태
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(1L))); // creatorId=1L=memberId
+
+        Long result = pollService.closePoll(1L, 1L);
+
+        assertThat(result).isEqualTo(1L);
+        assertThat(poll.isClosed()).isTrue();  // closed=true 확인
+        assertThat(poll.isActive()).isFalse(); // 이후 참여 불가 확인
+    }
+
+    @Test
+    @DisplayName("[LYJ-029] 이미 종료된 투표에 close 요청 시 POLL_CLOSED 예외 발생")
+    void closePoll_alreadyClosed_throws() {
+        Poll poll = sampleClosedPoll(1L); // endAt이 과거 → isActive()=false
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(1L)));
+
+        assertThatThrownBy(() -> pollService.closePoll(1L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_CLOSED));
+    }
+
+    @Test
+    @DisplayName("[LYJ-029] 크리에이터가 아닌 사용자가 종료 시도 시 POLL_FORBIDDEN 예외 발생")
+    void closePoll_notOwner_throws() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L))); // creatorId=99L ≠ memberId=1L
+
+        assertThatThrownBy(() -> pollService.closePoll(1L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_FORBIDDEN));
+
+        assertThat(poll.isClosed()).isFalse(); // 종료 안 됨 확인
+    }
+
+    @Test
+    @DisplayName("[LYJ-029] 존재하지 않는 투표 종료 시도 시 POLL_NOT_FOUND 예외 발생")
+    void closePoll_pollNotFound_throws() {
+        given(pollRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pollService.closePoll(999L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_NOT_FOUND));
+    }
+
+    // ---------------------------------------------------------------
+    // 헬퍼 (023에 추가되는 것들)
+    // ---------------------------------------------------------------
+
+    private Poll samplePoll(Long feedId) {
+        Poll poll = Poll.create(feedId, "좋아하는 언어는?", Instant.now().plusSeconds(3600));
+        ReflectionTestUtils.setField(poll, "id", 1L);
+        return poll;
+    }
+
+    private PollOption sampleOption(Long id, String optionText, int orderIndex) {
+        PollOption option = PollOption.create(1L, optionText, orderIndex);
+        ReflectionTestUtils.setField(option, "id", id);
+        return option;
+    }
+
+    // PollVote.create()는 LYJ-026에서 추가 예정 → ReflectionTestUtils로 직접 세팅
+    private PollVote sampleVote(Long pollOptionId) {
+        PollVote vote = mock(PollVote.class);
+        given(vote.getPollOptionId()).willReturn(pollOptionId);
+        return vote;
+    }
+
+    private Project sampleProject(Long creatorId) {
+        Project project = Project.builder()
+            .creatorId(creatorId)
+            .categoryId(1L)
+            .title("테스트 프로젝트")
+            .build();
+        ReflectionTestUtils.setField(project, "id", 1L);
+        return project;
+    }
+
+    private Poll sampleClosedPoll(Long feedId) {
+        // 이미 만료된 투표 (endAt이 과거)
+        Poll poll = Poll.create(feedId, "종료된 투표?", Instant.now().minusSeconds(3600));
+        ReflectionTestUtils.setField(poll, "id", 1L);
+        return poll;
+    }
+
+    private PollVote sampleVoteWithWeight(Long pollOptionId, short weight) {
+        PollVote vote = mock(PollVote.class);
+        given(vote.getPollOptionId()).willReturn(pollOptionId);
+        given(vote.getWeight()).willReturn(weight);
+        return vote;
+    }
 }

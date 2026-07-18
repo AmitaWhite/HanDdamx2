@@ -92,4 +92,13 @@ public class PollController {
         return ApiResponse.success(pollService.getPollResults(pollId, memberId));
     }
 
+    // [LYJ-029] 투표 조기 종료
+    @PatchMapping("/api/polls/{pollId}/close")
+    public ApiResponse<Long> closePoll(
+        @PathVariable Long pollId,
+        @AuthenticationPrincipal AuthMember member
+    ) {
+        return ApiResponse.success(pollService.closePoll(pollId, member.id()));
+    }
+
 }
