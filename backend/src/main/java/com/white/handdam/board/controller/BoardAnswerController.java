@@ -9,13 +9,13 @@ import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,14 +28,14 @@ public class BoardAnswerController {
 	 * 크리에이터 공식 답변 작성.
 	 * 권한: 게시판 소유 크리에이터 (JWT 인증 필요)
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping("/api/premium-board/posts/{postId}/answer")
-	public ResponseEntity<ApiResponse<BoardAnswerResponse>> createAnswer(
+	public ApiResponse<BoardAnswerResponse> createAnswer(
 		@PathVariable Long postId,
 		@AuthenticationPrincipal AuthMember member,
 		@Valid @RequestBody CreateBoardAnswerRequest request
 	) {
-		BoardAnswerResponse response = boardAnswerService.createAnswer(postId, member.id(), request);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+		return ApiResponse.success(boardAnswerService.createAnswer(postId, member.id(), request));
 	}
 
 	/**
@@ -58,11 +58,11 @@ public class BoardAnswerController {
 	 * 권한: 답변 작성 크리에이터
 	 */
 	@DeleteMapping("/api/board-answers/{answerId}")
-	public ResponseEntity<ApiResponse<Void>> deleteAnswer(
+	public ApiResponse<Void> deleteAnswer(
 		@PathVariable Long answerId,
 		@AuthenticationPrincipal AuthMember member
 	) {
 		boardAnswerService.deleteAnswer(answerId, member.id());
-		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
+		return ApiResponse.noContent();
 	}
 }

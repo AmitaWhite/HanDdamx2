@@ -7,8 +7,6 @@ import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -55,11 +53,11 @@ public class BoardPostController {
 	 * 권한: 작성자
 	 */
 	@DeleteMapping("/{postId}")
-	public ResponseEntity<ApiResponse<Void>> deletePost(
+	public ApiResponse<Void> deletePost(
 		@PathVariable Long postId,
 		@AuthenticationPrincipal AuthMember member
 	) {
 		boardPostService.deletePost(postId, member.id());
-		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
+		return ApiResponse.noContent();
 	}
 }

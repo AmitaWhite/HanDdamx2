@@ -18,7 +18,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -59,8 +59,9 @@ public class PremiumBoardPostController {
 	 * 유료 게시판 게시글·이미지 작성.
 	 * images는 S3(LocalStack)에 업로드 후 url/storageKey 등으로 저장한다.
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<ApiResponse<BoardPostResponse>> createPost(
+	public ApiResponse<BoardPostResponse> createPost(
 		@PathVariable Long creatorId,
 		@AuthenticationPrincipal AuthMember member,
 		@RequestParam @NotBlank @Size(max = 255) String title,
@@ -68,12 +69,13 @@ public class PremiumBoardPostController {
 		@RequestParam @NotBlank String content,
 		@RequestPart(value = "images", required = false) List<MultipartFile> images
 	) {
-		BoardPostResponse response = boardPostService.createPost(
-			creatorId,
-			member.id(),
-			new CreateBoardPostRequest(title, type, content),
-			images
+		return ApiResponse.success(
+			boardPostService.createPost(
+				creatorId,
+				member.id(),
+				new CreateBoardPostRequest(title, type, content),
+				images
+			)
 		);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
 	}
 }

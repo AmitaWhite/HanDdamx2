@@ -8,13 +8,13 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,14 +29,14 @@ public class BoardPostImageController {
 	 * 기존 유료 게시글에 이미지 추가.
 	 * 권한: 작성자, 공식 답변 전(WAITING)만. (JWT 인증 필요)
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<ApiResponse<List<BoardPostImageResponse>>> addImages(
+	public ApiResponse<List<BoardPostImageResponse>> addImages(
 		@PathVariable Long postId,
 		@AuthenticationPrincipal AuthMember member,
 		@RequestPart("images") List<MultipartFile> images
 	) {
-		List<BoardPostImageResponse> response = boardPostService.addImages(postId, member.id(), images);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+		return ApiResponse.success(boardPostService.addImages(postId, member.id(), images));
 	}
 
 	/**
@@ -44,12 +44,12 @@ public class BoardPostImageController {
 	 * 권한: 작성자, 공식 답변 전(WAITING)만.
 	 */
 	@DeleteMapping("/{imageId}")
-	public ResponseEntity<ApiResponse<Void>> deleteImage(
+	public ApiResponse<Void> deleteImage(
 		@PathVariable Long postId,
 		@PathVariable Long imageId,
 		@AuthenticationPrincipal AuthMember member
 	) {
 		boardPostService.deleteImage(postId, imageId, member.id());
-		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
+		return ApiResponse.noContent();
 	}
 }

@@ -7,6 +7,7 @@ import com.white.handdam.chat.dto.response.ChatReadResponse;
 import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.entity.ChatRoom;
+import com.white.handdam.chat.event.ChatMessageSentEvent;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.websocket.publisher.ChatMessagePublisher;
@@ -15,6 +16,7 @@ import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,11 +29,15 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional(readOnly = true)
 public class ChatMessageService {
 
+	/** 이미지 메시지의 알림 미리보기 문구 (본문이 없으므로 고정 문구 사용). */
+	private static final String IMAGE_PREVIEW = "[이미지]";
+
 	private final ChatRoomService chatRoomService;
 	private final ChatMessageRepository chatMessageRepository;
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
 	private final ObjectStorage objectStorage;
 	private final ChatMessagePublisher chatMessagePublisher;
+	private final ApplicationEventPublisher eventPublisher;
 
 	/**
 	 * 채팅 메시지 내역 조회 (CHAT-006 / LDJ-020).
@@ -58,6 +64,7 @@ public class ChatMessageService {
 	 * 4. TEXT: content 필수 / IMAGE: image 파일 필수 → S3 업로드
 	 * 5. 메시지 저장 후 chat_room.last_message_at 갱신
 	 * 6. WebSocket 구독자(/sub/chat-rooms/{id})에게 브로드캐스트
+	 * 7. ChatMessageSentEvent 발행 (Phase 1: Spring Application Event, 오프라인 알림용)
 	 * </pre>
 	 */
 	@Transactional
@@ -88,6 +95,16 @@ public class ChatMessageService {
 
 		ChatMessageResponse response = ChatMessageConverter.toResponse(saved);
 		chatMessagePublisher.publish(room.getId(), response);
+
+		// TODO(NOTIFICATION): ChatMessageSentEvent 구독 리스너에서 알림 저장·전송 처리 (현재는 발행만)
+		eventPublisher.publishEvent(new ChatMessageSentEvent(
+			room.getId(),
+			saved.getId(),
+			senderId,
+			resolveRecipientId(room, senderId),
+			saved.getType(),
+			buildContentPreview(saved)
+		));
 		return response;
 	}
 
@@ -143,6 +160,25 @@ public class ChatMessageService {
 			.type(ChatMessageType.TEXT)
 			.content(trimmed)
 			.build();
+	}
+
+	/**
+	 * 채팅방 참여자 중 발신자가 아닌 쪽을 알림 수신자로 결정한다.
+	 * (creator ↔ member 1:1 구조 전제)
+	 */
+	private static Long resolveRecipientId(ChatRoom room, Long senderId) {
+		return room.getCreatorId().equals(senderId) ? room.getMemberId() : room.getCreatorId();
+	}
+
+	/**
+	 * 알림 미리보기 텍스트. TEXT 는 저장된 본문, IMAGE 는 {@link #IMAGE_PREVIEW} 고정 문구.
+	 * 길이 제한/포맷은 알림 도메인 리스너 책임(현재는 원문 그대로 전달).
+	 */
+	private static String buildContentPreview(ChatMessage message) {
+		if (message.getType() == ChatMessageType.IMAGE) {
+			return IMAGE_PREVIEW;
+		}
+		return message.getContent();
 	}
 
 	private ChatMessage buildImageMessage(Long chatRoomId, Long senderId, MultipartFile image) {
