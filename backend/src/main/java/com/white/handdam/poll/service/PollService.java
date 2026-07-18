@@ -10,6 +10,7 @@ import com.white.handdam.poll.dto.request.PollCreateRequest;
 import com.white.handdam.poll.dto.request.PollUpdateRequest;
 import com.white.handdam.poll.dto.request.PollVoteRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
+import com.white.handdam.poll.dto.response.PollResultResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
 import com.white.handdam.poll.entity.PollVote;
@@ -216,6 +217,33 @@ public class PollService {
         existingVote.changeOption(option.getId());
         return existingVote.getId();
     }
+
+    // [LYJ-028] 가중치 반영 투표 결과 조회
+    public PollResultResponse getPollResults(Long pollId, Long memberId) {
+        Poll poll = pollRepository.findById(pollId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
+
+        Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = (memberId != null && !isOwner)
+            ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
+            : null;
+
+        if (!canAccess(feed.getVisibility(), level, isOwner)) {
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        List<PollOption> options = pollOptionRepository.findByPollIdOrderByOrderIndex(pollId);
+        List<PollVote> votes = pollVoteRepository.findByPollId(pollId);
+
+        return PollResultResponse.from(poll, options, votes);
+    }
+
 
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;

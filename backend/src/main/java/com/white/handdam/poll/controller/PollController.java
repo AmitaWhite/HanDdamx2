@@ -6,6 +6,7 @@ import com.white.handdam.poll.dto.request.PollCreateRequest;
 import com.white.handdam.poll.dto.request.PollUpdateRequest;
 import com.white.handdam.poll.dto.request.PollVoteRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
+import com.white.handdam.poll.dto.response.PollResultResponse;
 import com.white.handdam.poll.service.PollService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +80,16 @@ public class PollController {
         @RequestBody PollVoteRequest request
     ) {
         return ApiResponse.success(pollService.changeVote(pollId, member.id(), request));
+    }
+
+    // [LYJ-028] 투표 결과 조회
+    @GetMapping("/api/polls/{pollId}/results")
+    public ApiResponse<PollResultResponse> getPollResults(
+        @PathVariable Long pollId,
+        @AuthenticationPrincipal AuthMember member
+    ) {
+        Long memberId = (member != null) ? member.id() : null;
+        return ApiResponse.success(pollService.getPollResults(pollId, memberId));
     }
 
 }

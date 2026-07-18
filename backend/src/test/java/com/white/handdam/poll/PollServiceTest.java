@@ -10,6 +10,7 @@ import com.white.handdam.poll.dto.request.PollCreateRequest;
 import com.white.handdam.poll.dto.request.PollUpdateRequest;
 import com.white.handdam.poll.dto.request.PollVoteRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
+import com.white.handdam.poll.dto.response.PollResultResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
 import com.white.handdam.poll.entity.PollVote;
@@ -675,6 +676,106 @@ class PollServiceTest {
         Poll poll = Poll.create(feedId, "종료된 투표?", Instant.now().minusSeconds(3600));
         ReflectionTestUtils.setField(poll, "id", 1L);
         return poll;
+    }
+
+    private PollVote sampleVoteWithWeight(Long pollOptionId, short weight) {
+        PollVote vote = mock(PollVote.class);
+        given(vote.getPollOptionId()).willReturn(pollOptionId);
+        given(vote.getWeight()).willReturn(weight);
+        return vote;
+    }
+
+    // ---------------------------------------------------------------
+    // LYJ-028 가중치 반영 투표 결과 조회
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-028] 투표 결과 조회 성공 - 선택지별 weight 합산 검증")
+    void getPollResults_success() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+            .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
+
+        // Java: 무료 2명(weight=1×2=2) + 유료 1명(weight=2) → 합산 4
+        // Kotlin: 무료 1명(weight=1) → 합산 1
+        // totalWeight = 5
+        // given() 안에서 중첩 stubbing 방지 — 미리 변수에 할당
+        PollVote javaFree1  = sampleVoteWithWeight(1L, (short) 1);
+        PollVote javaFree2  = sampleVoteWithWeight(1L, (short) 1);
+        PollVote javaPaid   = sampleVoteWithWeight(1L, (short) 2);
+        PollVote kotlinFree = sampleVoteWithWeight(2L, (short) 1);
+        given(pollVoteRepository.findByPollId(1L))
+            .willReturn(List.of(javaFree1, javaFree2, javaPaid, kotlinFree));
+
+        PollResultResponse result = pollService.getPollResults(1L, 1L);
+
+        assertThat(result.totalWeight()).isEqualTo(5);
+        assertThat(result.options()).hasSize(2);
+
+        PollResultResponse.OptionResult java = result.options().get(0);
+        assertThat(java.optionId()).isEqualTo(1L);
+        assertThat(java.weight()).isEqualTo(4);
+
+        PollResultResponse.OptionResult kotlin = result.options().get(1);
+        assertThat(kotlin.optionId()).isEqualTo(2L);
+        assertThat(kotlin.weight()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[LYJ-028] 투표 참여자가 없으면 totalWeight=0, 모든 선택지 weight=0")
+    void getPollResults_noVotes() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+            .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
+        given(pollVoteRepository.findByPollId(1L)).willReturn(List.of());
+
+        PollResultResponse result = pollService.getPollResults(1L, 1L);
+
+        assertThat(result.totalWeight()).isEqualTo(0);
+        result.options().forEach(o -> assertThat(o.weight()).isEqualTo(0));
+    }
+
+    @Test
+    @DisplayName("[LYJ-028] FREE_SUBSCRIBER 피드 비구독자 결과 조회 시 FEED_FORBIDDEN 예외 발생")
+    void getPollResults_forbidden() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+
+        assertThatThrownBy(() -> pollService.getPollResults(1L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("[LYJ-028] 비로그인(memberId=null)도 PUBLIC 피드 결과 조회 가능")
+    void getPollResults_anonymous_public() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+            .willReturn(List.of(sampleOption(1L, "Java", 0)));
+        given(pollVoteRepository.findByPollId(1L)).willReturn(List.of());
+
+        assertThat(pollService.getPollResults(1L, null)).isNotNull();
     }
 
 }
