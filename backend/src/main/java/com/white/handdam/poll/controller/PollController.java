@@ -4,6 +4,7 @@ import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
 import com.white.handdam.poll.dto.request.PollUpdateRequest;
+import com.white.handdam.poll.dto.request.PollVoteRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.service.PollService;
 import jakarta.validation.Valid;
@@ -57,6 +58,17 @@ public class PollController {
     ) {
         pollService.deletePoll(pollId, member.id());
         return ApiResponse.success(null);
+    }
+
+    // [LYJ-026] 투표 참여
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping("/api/polls/{pollId}/votes")
+    public ApiResponse<Long> vote(
+        @PathVariable Long pollId,
+        @AuthenticationPrincipal AuthMember member,
+        @RequestBody PollVoteRequest request
+    ) {
+        return ApiResponse.success(pollService.vote(pollId, member.id(), request));
     }
 
 

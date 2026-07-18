@@ -8,6 +8,7 @@ import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
 import com.white.handdam.poll.dto.request.PollUpdateRequest;
+import com.white.handdam.poll.dto.request.PollVoteRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
@@ -140,6 +141,45 @@ public class PollService {
         pollVoteRepository.deleteByPollId(pollId);
         pollOptionRepository.deleteByPollId(pollId);
         pollRepository.delete(poll);
+    }
+
+    // [LYJ-026] 투표 참여
+    @Transactional
+    public Long vote(Long pollId, Long memberId, PollVoteRequest request) {
+        Poll poll = pollRepository.findById(pollId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
+
+        if (!poll.isActive()) {
+            throw new CustomException(PollErrorCode.POLL_CLOSED);
+        }
+
+        Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        boolean isOwner = project.getCreatorId().equals(memberId);
+        String level = isOwner ? null
+            : subscriptionLevelChecker.getLevel(memberId, project.getCreatorId());
+
+        if (!canAccess(feed.getVisibility(), level, isOwner)) {
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        if (pollVoteRepository.existsByPollIdAndMemberId(pollId, memberId)) {
+            throw new CustomException(PollErrorCode.POLL_ALREADY_VOTED);
+        }
+
+        PollOption option = pollOptionRepository.findById(request.optionId())
+            .filter(o -> o.getPollId().equals(pollId))
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_OPTION_INVALID));
+
+        short weight       = "PAID".equals(level) ? (short) 2 : (short) 1;
+        String snapshot    = "PAID".equals(level) ? "PAID" : "FREE";
+
+        PollVote vote = PollVote.create(pollId, option.getId(), memberId, weight, snapshot);
+        return pollVoteRepository.save(vote).getId();
     }
 
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {

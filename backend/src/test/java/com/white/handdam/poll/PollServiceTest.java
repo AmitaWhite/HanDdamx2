@@ -8,6 +8,7 @@ import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
 import com.white.handdam.poll.dto.request.PollUpdateRequest;
+import com.white.handdam.poll.dto.request.PollVoteRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
@@ -397,6 +398,138 @@ class PollServiceTest {
             .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                 .isEqualTo(PollErrorCode.POLL_NOT_FOUND));
     }
+    // ---------------------------------------------------------------
+    // LYJ-026 투표 참여
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-026] PUBLIC 피드 비구독자 투표 성공 - weight=1, snapshot=FREE")
+    void vote_public_notSubscribed_success() {
+        Poll poll = samplePoll(1L); // active 상태
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L))); // 비소유자
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null); // 비구독
+        given(pollVoteRepository.existsByPollIdAndMemberId(1L, 1L)).willReturn(false);
+        given(pollOptionRepository.findById(2L))
+            .willReturn(Optional.of(sampleOption(2L, "Kotlin", 1)));
+        given(pollVoteRepository.save(any(PollVote.class))).willAnswer(inv -> {
+            PollVote v = inv.getArgument(0);
+            ReflectionTestUtils.setField(v, "id", 100L);
+            return v;
+        });
+
+        Long voteId = pollService.vote(1L, 1L, new PollVoteRequest(2L));
+
+        assertThat(voteId).isEqualTo(100L);
+
+        // 저장된 vote의 weight, snapshot 검증
+        ArgumentCaptor<PollVote> captor = ArgumentCaptor.forClass(PollVote.class);
+        verify(pollVoteRepository).save(captor.capture());
+        assertThat(captor.getValue().getWeight()).isEqualTo((short) 1);
+        assertThat(captor.getValue().getSubscriptionLevelSnapshot()).isEqualTo("FREE");
+    }
+
+    @Test
+    @DisplayName("[LYJ-026] PAID 구독자 투표 성공 - weight=2, snapshot=PAID")
+    void vote_paidSubscriber_weightTwo() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PAID_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn("PAID");
+        given(pollVoteRepository.existsByPollIdAndMemberId(1L, 1L)).willReturn(false);
+        given(pollOptionRepository.findById(2L))
+            .willReturn(Optional.of(sampleOption(2L, "Kotlin", 1)));
+        given(pollVoteRepository.save(any(PollVote.class))).willAnswer(inv -> {
+            PollVote v = inv.getArgument(0);
+            ReflectionTestUtils.setField(v, "id", 101L);
+            return v;
+        });
+
+        pollService.vote(1L, 1L, new PollVoteRequest(2L));
+
+        ArgumentCaptor<PollVote> captor = ArgumentCaptor.forClass(PollVote.class);
+        verify(pollVoteRepository).save(captor.capture());
+        assertThat(captor.getValue().getWeight()).isEqualTo((short) 2);
+        assertThat(captor.getValue().getSubscriptionLevelSnapshot()).isEqualTo("PAID");
+    }
+
+    @Test
+    @DisplayName("[LYJ-026] 종료된 투표에 참여 시 POLL_CLOSED 예외 발생")
+    void vote_closedPoll_throws() {
+        Poll poll = sampleClosedPoll(1L); // closed=true or 만료된 투표
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+
+        assertThatThrownBy(() -> pollService.vote(1L, 1L, new PollVoteRequest(2L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_CLOSED));
+
+        verify(pollVoteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("[LYJ-026] 이미 투표한 사용자가 재참여 시 POLL_ALREADY_VOTED 예외 발생")
+    void vote_alreadyVoted_throws() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+        given(pollVoteRepository.existsByPollIdAndMemberId(1L, 1L)).willReturn(true); // 이미 참여
+
+        assertThatThrownBy(() -> pollService.vote(1L, 1L, new PollVoteRequest(2L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_ALREADY_VOTED));
+    }
+
+    @Test
+    @DisplayName("[LYJ-026] 이 투표에 속하지 않는 선택지 선택 시 POLL_OPTION_INVALID 예외 발생")
+    void vote_invalidOption_throws() {
+        Poll poll = samplePoll(1L); // feedId=1, pollId=1
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+        given(pollVoteRepository.existsByPollIdAndMemberId(1L, 1L)).willReturn(false);
+
+        // optionId=99는 다른 poll(pollId=2)에 속함 → 현재 poll(1)과 불일치
+        PollOption wrongOption = sampleOption(99L, "다른투표선택지", 0);
+        ReflectionTestUtils.setField(wrongOption, "pollId", 2L); // pollId 강제 설정
+        given(pollOptionRepository.findById(99L)).willReturn(Optional.of(wrongOption));
+
+        assertThatThrownBy(() -> pollService.vote(1L, 1L, new PollVoteRequest(99L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_OPTION_INVALID));
+    }
+
+    @Test
+    @DisplayName("[LYJ-026] FREE_SUBSCRIBER 피드 비구독자 접근 시 FEED_FORBIDDEN 예외 발생")
+    void vote_freeSubscriberFeed_notSubscribed_forbidden() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null); // 비구독
+
+        assertThatThrownBy(() -> pollService.vote(1L, 1L, new PollVoteRequest(2L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+    }
 
 
     // ---------------------------------------------------------------
@@ -431,4 +564,12 @@ class PollServiceTest {
         ReflectionTestUtils.setField(project, "id", 1L);
         return project;
     }
+
+    private Poll sampleClosedPoll(Long feedId) {
+        // 이미 만료된 투표 (endAt이 과거)
+        Poll poll = Poll.create(feedId, "종료된 투표?", Instant.now().minusSeconds(3600));
+        ReflectionTestUtils.setField(poll, "id", 1L);
+        return poll;
+    }
+
 }

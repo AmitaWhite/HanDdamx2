@@ -13,4 +13,8 @@ public interface PollVoteRepository extends JpaRepository<PollVote, Long> {
 
     // [LYJ-025]
     void deleteByPollId(Long pollId);
+
+    // [LYJ-026]
+    boolean existsByPollIdAndMemberId(Long pollId, Long memberId);
+
 }
