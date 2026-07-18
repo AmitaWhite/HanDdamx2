@@ -106,4 +106,9 @@ public class Member extends BaseTimeEntity {
         this.profileImageUrl = profileImageUrl;
         this.profileImageStorageKey = profileImageStorageKey;
     }
+
+    public void clearProfileImage() {
+        this.profileImageUrl = null;
+        this.profileImageStorageKey = null;
+    }
 }

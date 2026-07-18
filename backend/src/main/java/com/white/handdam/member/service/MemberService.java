@@ -84,4 +84,24 @@ public class MemberService {
         return MemberProfileResponse.from(member);
     }
 
+    // KSY-018
+    @Transactional
+    public MemberProfileResponse deleteProfileImage(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new CustomException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        String storageKey = member.getProfileImageStorageKey();
+        if(storageKey != null) {
+            member.clearProfileImage();
+            try {
+                objectStorage.delete(storageKey);
+            } catch (Exception e) {
+                log.warn("프로필 이미지 삭제 실패, storageKey={}", storageKey, e);
+            }
+        }
+
+        return MemberProfileResponse.from(member);
+
+    }
+
 }

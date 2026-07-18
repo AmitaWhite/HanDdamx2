@@ -36,4 +36,9 @@ public class MemberController {
         return ApiResponse.success(memberService.updateProfileImage(authMember.id(), image));
     }
 
+    @DeleteMapping(value = "/me/profile-image")
+    public ApiResponse<MemberProfileResponse> deleteProfileImage(@AuthenticationPrincipal AuthMember authMember) {
+        return ApiResponse.success(memberService.deleteProfileImage(authMember.id()));
+    }
+
 }
