@@ -8,7 +8,6 @@ import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -44,13 +44,13 @@ public class AdminCategoryController {
     /**
      * 카테고리 생성
      */
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping
-    public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
+    public ApiResponse<CategoryResponse> createCategory(
             @AuthenticationPrincipal AuthMember member,
             @RequestBody CreateCategoryRequest request
     ) {
-        CategoryResponse response = categoryService.createCategory(member.id(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+        return ApiResponse.success(categoryService.createCategory(member.id(), request));
     }
 
     /**
