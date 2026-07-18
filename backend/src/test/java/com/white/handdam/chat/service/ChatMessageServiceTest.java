@@ -253,6 +253,8 @@ class ChatMessageServiceTest {
 		ArgumentCaptor<ChatMessageSentEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageSentEvent.class);
 		verify(eventPublisher).publishEvent(eventCaptor.capture());
 		ChatMessageSentEvent event = eventCaptor.getValue();
+		assertThat(event.chatRoomId()).isEqualTo(10L);
+		assertThat(event.messageId()).isEqualTo(202L);
 		assertThat(event.type()).isEqualTo(ChatMessageType.IMAGE);
 		assertThat(event.senderId()).isEqualTo(memberId);
 		assertThat(event.recipientId()).isEqualTo(creatorId);

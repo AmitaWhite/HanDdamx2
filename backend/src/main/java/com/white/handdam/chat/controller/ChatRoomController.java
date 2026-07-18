@@ -8,10 +8,10 @@ import com.white.handdam.chat.service.ChatRoomService;
 import com.white.handdam.chat.service.ChatRoomService.CreateOrGetResult;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -31,17 +31,14 @@ public class ChatRoomController {
 	 * 권한: 활성 유료 구독자 (JWT 인증 필요)
 	 */
 	@PostMapping("/api/creators/{creatorId}/chat-rooms")
-	public ApiResponse<ChatRoomResponse> createOrGetChatRoom(
+	public ResponseEntity<ApiResponse<ChatRoomResponse>> createOrGetChatRoom(
 		@PathVariable Long creatorId,
-		@AuthenticationPrincipal AuthMember member,
-		HttpServletResponse response
+		@AuthenticationPrincipal AuthMember member
 	) {
 		CreateOrGetResult result = chatRoomService.createOrGetChatRoom(creatorId, member.id());
 		//새로만든방이면 201 반환, 기존방이면 200 반환
-		if (result.created()) {
-			response.setStatus(HttpStatus.CREATED.value());
-		}
-		return ApiResponse.success(result.room());
+		HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
+		return ResponseEntity.status(status).body(ApiResponse.success(result.room()));
 	}
 
 	/**

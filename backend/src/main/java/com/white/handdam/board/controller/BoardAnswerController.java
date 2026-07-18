@@ -57,7 +57,6 @@ public class BoardAnswerController {
 	 * 공식 답변 소프트 삭제.
 	 * 권한: 답변 작성 크리에이터
 	 */
-	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/api/board-answers/{answerId}")
 	public ApiResponse<Void> deleteAnswer(
 		@PathVariable Long answerId,

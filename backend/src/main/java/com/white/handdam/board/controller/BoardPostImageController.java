@@ -43,7 +43,6 @@ public class BoardPostImageController {
 	 * 게시글 이미지 삭제.
 	 * 권한: 작성자, 공식 답변 전(WAITING)만.
 	 */
-	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{imageId}")
 	public ApiResponse<Void> deleteImage(
 		@PathVariable Long postId,

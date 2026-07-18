@@ -85,7 +85,6 @@ public class BoardCommentController {
 	 * 댓글·대댓글 소프트 삭제 (LDJ-016).
 	 * 권한: 해당 댓글 작성자
 	 */
-	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/api/board-comments/{commentId}")
 	public ApiResponse<Void> deleteComment(
 		@PathVariable Long commentId,

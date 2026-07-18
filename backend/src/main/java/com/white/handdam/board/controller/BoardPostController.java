@@ -7,7 +7,6 @@ import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -54,7 +52,6 @@ public class BoardPostController {
 	 * 유료 게시글 소프트 삭제.
 	 * 권한: 작성자
 	 */
-	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@DeleteMapping("/{postId}")
 	public ApiResponse<Void> deletePost(
 		@PathVariable Long postId,
