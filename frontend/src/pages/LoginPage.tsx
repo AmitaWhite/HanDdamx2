@@ -1,38 +1,33 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { AuthFormShell } from "@/components/auth/AuthFormShell";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/features/auth/AuthContext";
-import { ApiError, backendOrigin } from "@/lib/api";
+import { useSubmitState } from "@/features/auth/useSubmitState";
+import { backendOrigin } from "@/lib/api";
 
 export function LoginPage() {
 	const { login } = useAuth();
 	const navigate = useNavigate();
+	const { loading, error, run } = useSubmitState(
+		"로그인에 실패했습니다. 다시 시도해 주세요.",
+	);
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [error, setError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(false);
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		setError(null);
-		setLoading(true);
-		try {
+		await run(async () => {
 			await login(email, password);
 			navigate(paths.home, { replace: true });
-		} catch (err) {
-			setError(
-				err instanceof ApiError
-					? err.message
-					: "로그인에 실패했습니다. 다시 시도해 주세요.",
-			);
-		} finally {
-			setLoading(false);
-		}
+		});
 	}
 
 	function loginWithGoogle() {
@@ -40,29 +35,11 @@ export function LoginPage() {
 	}
 
 	return (
-		<div className="flex min-h-[calc(100vh-72px)] items-center justify-center px-margin-mobile py-12">
-			<div className="flex w-full max-w-[440px] flex-col items-center">
-				{/* 브랜드 */}
-				<div className="mb-10 text-center">
-					<h1 className="mb-2 text-headline-lg font-display text-on-surface">
-						한땀한땀
-					</h1>
-					<p className="text-body-md text-secondary">
-						공예 작가와 팬을 잇는 구독 플랫폼
-					</p>
-				</div>
-
-				{/* 로그인 카드 */}
+		<AuthPageShell>
+			<AuthFormShell title="한땀한땀">
 				<Card className="w-full p-8 md:p-10">
 					<form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
-						{error && (
-							<p
-								role="alert"
-								className="rounded bg-error-container px-4 py-3 text-label-md font-label-md text-on-error-container"
-							>
-								{error}
-							</p>
-						)}
+						{error && <Alert>{error}</Alert>}
 
 						<Input
 							label="이메일"
@@ -111,7 +88,6 @@ export function LoginPage() {
 					</div>
 				</Card>
 
-				{/* 간편 로그인 */}
 				<div className="mt-10 w-full">
 					<div className="mb-6 flex items-center gap-4">
 						<span className="h-px flex-grow bg-outline-variant" />
@@ -130,7 +106,7 @@ export function LoginPage() {
 						구글로 계속하기
 					</Button>
 				</div>
-			</div>
-		</div>
+			</AuthFormShell>
+		</AuthPageShell>
 	);
 }

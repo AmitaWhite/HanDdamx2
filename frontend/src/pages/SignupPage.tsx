@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { AuthFormShell } from "@/components/auth/AuthFormShell";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { AuthStatusPanel } from "@/components/auth/AuthStatusPanel";
+import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import {
 	checkEmailAvailability,
 	checkNicknameAvailability,
-	resendVerificationEmail,
 	signupRequest,
 } from "@/features/auth/authApi";
+import { useResendVerification } from "@/features/auth/useResendVerification";
+import { useSubmitState } from "@/features/auth/useSubmitState";
 import {
 	PASSWORD_HINT,
 	validateEmail,
@@ -18,7 +22,6 @@ import {
 	validatePassword,
 	validatePasswordConfirm,
 } from "@/features/auth/validation";
-import { ApiError } from "@/lib/api";
 
 type Errors = Partial<
 	Record<"nickname" | "email" | "password" | "passwordConfirm", string>
@@ -31,14 +34,15 @@ export function SignupPage() {
 	const [passwordConfirm, setPasswordConfirm] = useState("");
 
 	const [errors, setErrors] = useState<Errors>({});
-	const [serverError, setServerError] = useState<string | null>(null);
-	const [submitting, setSubmitting] = useState(false);
+	const {
+		loading: submitting,
+		error: serverError,
+		run,
+	} = useSubmitState("회원가입에 실패했습니다. 다시 시도해 주세요.");
 
 	/** 가입 성공 시 인증 안내 화면으로 전환 (가입한 이메일 보관) */
 	const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
-	const [resend, setResend] = useState<"idle" | "sending" | "sent" | "error">(
-		"idle",
-	);
+	const { status: resend, resend: resendEmail } = useResendVerification();
 
 	function setFieldError(field: keyof Errors, message?: string) {
 		setErrors((prev) => ({ ...prev, [field]: message }));
@@ -71,7 +75,6 @@ export function SignupPage() {
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		setServerError(null);
 
 		const next: Errors = {
 			nickname: validateNickname(nickname) ?? undefined,
@@ -83,50 +86,30 @@ export function SignupPage() {
 		setErrors(next);
 		if (Object.values(next).some(Boolean)) return;
 
-		setSubmitting(true);
-		try {
+		await run(async () => {
 			await signupRequest(email, password, nickname);
 			setSignedUpEmail(email);
-		} catch (err) {
-			setServerError(
-				err instanceof ApiError
-					? err.message
-					: "회원가입에 실패했습니다. 다시 시도해 주세요.",
-			);
-		} finally {
-			setSubmitting(false);
-		}
-	}
-
-	async function onResend() {
-		if (!signedUpEmail) return;
-		setResend("sending");
-		try {
-			await resendVerificationEmail(signedUpEmail);
-			setResend("sent");
-		} catch {
-			setResend("error");
-		}
+		});
 	}
 
 	// --- 가입 완료: 이메일 인증 안내 ---
 	if (signedUpEmail) {
 		return (
-			<div className="flex min-h-[calc(100vh-72px)] items-center justify-center px-margin-mobile py-12">
-				<Card className="w-full max-w-[440px] p-8 text-center md:p-10">
-					<div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-						<Icon name="mark_email_unread" className="text-[32px]" />
-					</div>
-					<h1 className="mb-2 text-headline-md font-display text-on-surface">
-						인증 메일을 보냈습니다
-					</h1>
-					<p className="mb-6 text-body-md text-secondary">
-						<span className="font-bold text-on-surface">{signedUpEmail}</span>{" "}
-						로 보낸 메일의 링크를 눌러 인증을 완료해 주세요.
-						<br />
-						링크는 <span className="font-bold">10분</span> 동안 유효합니다.
-					</p>
-
+			<AuthPageShell>
+				<AuthStatusPanel
+					variant="primary"
+					icon="mark_email_unread"
+					title="인증 메일을 보냈습니다"
+					withCard
+					description={
+						<>
+							<span className="font-bold text-on-surface">{signedUpEmail}</span>{" "}
+							로 보낸 메일의 링크를 눌러 인증을 완료해 주세요.
+							<br />
+							링크는 <span className="font-bold">10분</span> 동안 유효합니다.
+						</>
+					}
+				>
 					{resend === "sent" && (
 						<p className="mb-4 text-label-md font-label-md text-primary">
 							인증 메일을 다시 보냈습니다.
@@ -142,7 +125,7 @@ export function SignupPage() {
 						<Button
 							variant="secondary"
 							fullWidth
-							onClick={onResend}
+							onClick={() => resendEmail(signedUpEmail)}
 							disabled={resend === "sending"}
 						>
 							{resend === "sending" ? "보내는 중…" : "인증 메일 다시 보내기"}
@@ -153,34 +136,18 @@ export function SignupPage() {
 							</Button>
 						</Link>
 					</div>
-				</Card>
-			</div>
+				</AuthStatusPanel>
+			</AuthPageShell>
 		);
 	}
 
 	// --- 가입 폼 ---
 	return (
-		<div className="flex min-h-[calc(100vh-72px)] items-center justify-center px-margin-mobile py-12">
-			<div className="flex w-full max-w-[440px] flex-col items-center">
-				<div className="mb-10 text-center">
-					<h1 className="mb-2 text-headline-lg font-display text-on-surface">
-						회원가입
-					</h1>
-					<p className="text-body-md text-secondary">
-						공예 작가와 팬을 잇는 구독 플랫폼
-					</p>
-				</div>
-
+		<AuthPageShell>
+			<AuthFormShell title="회원가입">
 				<Card className="w-full p-8 md:p-10">
 					<form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
-						{serverError && (
-							<p
-								role="alert"
-								className="rounded bg-error-container px-4 py-3 text-label-md font-label-md text-on-error-container"
-							>
-								{serverError}
-							</p>
-						)}
+						{serverError && <Alert>{serverError}</Alert>}
 
 						<Input
 							label="닉네임"
@@ -261,7 +228,7 @@ export function SignupPage() {
 						</Link>
 					</p>
 				</Card>
-			</div>
-		</div>
+			</AuthFormShell>
+		</AuthPageShell>
 	);
 }

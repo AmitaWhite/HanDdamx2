@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { paths } from "@/app/paths";
-import { Icon } from "@/components/ui/Icon";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { AuthStatusPanel } from "@/components/auth/AuthStatusPanel";
 import { useAuth } from "@/features/auth/AuthContext";
 
 /**
@@ -22,29 +23,25 @@ export function OAuthCallbackPage() {
 			.catch(() => setFailed(true));
 	}, [completeOAuth, navigate]);
 
+	if (failed) {
+		return (
+			<AuthPageShell padded={false} className="flex-col gap-4 text-center">
+				<p className="text-body-md text-on-surface">
+					구글 로그인에 실패했습니다.
+				</p>
+				<Link
+					to={paths.login}
+					className="text-label-md font-label-md font-bold text-primary hover:underline"
+				>
+					로그인으로 돌아가기
+				</Link>
+			</AuthPageShell>
+		);
+	}
+
 	return (
-		<div className="flex min-h-[calc(100vh-72px)] flex-col items-center justify-center gap-4 px-margin-mobile text-center">
-			{failed ? (
-				<>
-					<p className="text-body-md text-on-surface">
-						구글 로그인에 실패했습니다.
-					</p>
-					<Link
-						to={paths.login}
-						className="text-label-md font-label-md font-bold text-primary hover:underline"
-					>
-						로그인으로 돌아가기
-					</Link>
-				</>
-			) : (
-				<>
-					<Icon
-						name="progress_activity"
-						className="animate-spin text-[32px] text-primary"
-					/>
-					<p className="text-body-md text-secondary">로그인 처리 중…</p>
-				</>
-			)}
-		</div>
+		<AuthPageShell padded={false} className="flex-col gap-4 text-center">
+			<AuthStatusPanel variant="loading" description="로그인 처리 중…" />
+		</AuthPageShell>
 	);
 }
