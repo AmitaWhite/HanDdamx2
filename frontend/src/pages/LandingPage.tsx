@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
+import { LinkButton } from "@/components/ui/LinkButton";
+import { useAuth } from "@/features/auth/AuthContext";
+// 실험(lab): 히어로 물방울 글래스모피즘. 실험 종료 시 이 import 와 아래 사용처를 원복.
+import { WaterHero } from "@/lab/WaterHero";
 
 const img = (seed: string, w = 800, h = 600) =>
 	`https://picsum.photos/seed/${seed}/${w}/${h}`;
@@ -83,6 +87,8 @@ const records = [
 ];
 
 export function LandingPage() {
+	const { isAuthenticated } = useAuth();
+
 	return (
 		<>
 			{/* Hero */}
@@ -106,23 +112,22 @@ export function LandingPage() {
 						됩니다.
 					</p>
 					<div className="flex flex-wrap gap-4">
-						<Link to={paths.home}>
-							<Button size="lg">작가 둘러보기</Button>
-						</Link>
-						<Link to={paths.login}>
-							<Button size="lg" variant="secondary">
+						<LinkButton to={paths.home} size="lg">
+							작가 둘러보기
+						</LinkButton>
+						{!isAuthenticated && (
+							<LinkButton to={paths.login} size="lg" variant="secondary">
 								로그인 후 구독 피드 보기
 								<Icon name="arrow_forward" />
-							</Button>
-						</Link>
+							</LinkButton>
+						)}
 					</div>
 				</div>
 				<div className="w-full flex-1">
-					<div className="aspect-[4/3] overflow-hidden rounded-2xl shadow-card-hover">
-						<img
+					<div className="aspect-[4/3] [perspective:1200px]">
+						<WaterHero
 							src={img("hero-pottery", 900, 700)}
 							alt="공방에서 작업 중인 공예 작가"
-							className="h-full w-full object-cover"
 						/>
 					</div>
 				</div>

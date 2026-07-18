@@ -2,12 +2,12 @@ import type { ButtonHTMLAttributes } from "react";
 import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost";
-type Size = "sm" | "md" | "lg";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost";
+export type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-	variant?: Variant;
-	size?: Size;
+	variant?: ButtonVariant;
+	size?: ButtonSize;
 	fullWidth?: boolean;
 }
 
@@ -16,7 +16,7 @@ const base =
 	"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 " +
 	"disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
 
-const variants: Record<Variant, string> = {
+const variants: Record<ButtonVariant, string> = {
 	// #C62839 → hover #A30424
 	primary: "bg-primary text-on-primary hover:bg-primary-hover shadow-sm",
 	secondary:
@@ -26,11 +26,34 @@ const variants: Record<Variant, string> = {
 	ghost: "text-on-surface hover:bg-surface-container-low",
 };
 
-const sizes: Record<Size, string> = {
+const sizes: Record<ButtonSize, string> = {
 	sm: "h-9 px-4 text-label-md",
 	md: "h-11 px-5 text-body-md",
 	lg: "h-14 px-8 text-body-md",
 };
+
+interface ButtonClassNameOptions {
+	variant?: ButtonVariant;
+	size?: ButtonSize;
+	fullWidth?: boolean;
+	className?: string;
+}
+
+/** Button과 동일한 스타일 클래스를 계산. LinkButton 등 button 이외 요소에 재사용. */
+export function buttonClassName({
+	variant = "primary",
+	size = "md",
+	fullWidth,
+	className,
+}: ButtonClassNameOptions) {
+	return cn(
+		base,
+		variants[variant],
+		sizes[size],
+		fullWidth && "w-full",
+		className,
+	);
+}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 	(
@@ -47,13 +70,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 		<button
 			ref={ref}
 			type={type}
-			className={cn(
-				base,
-				variants[variant],
-				sizes[size],
-				fullWidth && "w-full",
-				className,
-			)}
+			className={buttonClassName({ variant, size, fullWidth, className })}
 			{...props}
 		/>
 	),

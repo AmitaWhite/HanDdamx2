@@ -1,10 +1,15 @@
 import { createBrowserRouter } from "react-router-dom";
+import { GuestOnlyRoute } from "@/features/auth/GuestOnlyRoute";
 import { ConsumerLayout } from "@/layouts/ConsumerLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { PublicLayout } from "@/layouts/PublicLayout";
+import { EmailVerifyPage } from "@/pages/EmailVerifyPage";
 import { HomePage } from "@/pages/HomePage";
 import { LandingPage } from "@/pages/LandingPage";
+import { LoginPage } from "@/pages/LoginPage";
+import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
+import { SignupPage } from "@/pages/SignupPage";
 import { paths } from "./paths";
 
 /**
@@ -18,12 +23,26 @@ export const router = createBrowserRouter([
 			{ path: paths.landing, element: <LandingPage /> },
 			{
 				path: paths.login,
-				element: <PagePlaceholder title="로그인" source="login.html" />,
+				element: (
+					<GuestOnlyRoute>
+						<LoginPage />
+					</GuestOnlyRoute>
+				),
 			},
 			{
 				path: paths.signup,
-				element: <PagePlaceholder title="회원가입" source="signup.html" />,
+				element: (
+					<GuestOnlyRoute>
+						<SignupPage />
+					</GuestOnlyRoute>
+				),
 			},
+			{
+				path: paths.forgotPassword,
+				element: <PagePlaceholder title="비밀번호 찾기" />,
+			},
+			{ path: paths.oauthCallback, element: <OAuthCallbackPage /> },
+			{ path: paths.emailVerify, element: <EmailVerifyPage /> },
 		],
 	},
 	{

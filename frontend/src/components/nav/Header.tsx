@@ -1,8 +1,8 @@
 import { Link, NavLink } from "react-router-dom";
 import { paths } from "@/app/paths";
-import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { ProfileMenu } from "./ProfileMenu";
 
 /** 소비자 앱 상단 헤더 (72px, backdrop-blur). 모바일에선 중앙 네비/검색을 숨기고 하단 탭바로 대체. */
 export function Header() {
@@ -46,9 +46,7 @@ export function Header() {
 						icon="notifications"
 						label="알림"
 					/>
-					<Link to={paths.mypage} aria-label="내 프로필" className="ml-1">
-						<Avatar size={36} className="ring-1 ring-outline-variant" />
-					</Link>
+					<ProfileMenu />
 				</div>
 			</nav>
 		</header>

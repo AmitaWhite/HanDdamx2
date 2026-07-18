@@ -1,33 +1,18 @@
-import { Link, Outlet } from "react-router-dom";
-import { paths } from "@/app/paths";
-import { Button } from "@/components/ui/Button";
+import { Outlet } from "react-router-dom";
+import { Header } from "@/components/nav/Header";
+import { PublicHeader } from "@/components/nav/PublicHeader";
+import { useAuth } from "@/features/auth/AuthContext";
 
-/** 비로그인(랜딩/로그인/회원가입) 레이아웃: 미니멀 헤더 + 본문. */
+/**
+ * 비로그인 전용 페이지(랜딩/로그인/회원가입/이메일인증 등)의 레이아웃.
+ * 로그인 상태로 진입하면 소비자 앱과 동일한 헤더(Header)를 그대로 재사용한다.
+ */
 export function PublicLayout() {
+	const { isAuthenticated } = useAuth();
+
 	return (
 		<div className="min-h-screen bg-background">
-			<header className="fixed top-0 z-50 w-full border-b border-outline-variant bg-surface/95 backdrop-blur-[10px]">
-				<nav className="container-page flex h-[72px] items-center justify-between">
-					<Link
-						to={paths.landing}
-						className="text-headline-md font-display font-bold text-primary"
-					>
-						한땀한땀
-					</Link>
-					<div className="flex items-center gap-3">
-						<Link to={paths.login}>
-							<Button variant="ghost" size="sm">
-								로그인
-							</Button>
-						</Link>
-						<Link to={paths.signup}>
-							<Button variant="primary" size="sm">
-								회원가입
-							</Button>
-						</Link>
-					</div>
-				</nav>
-			</header>
+			{isAuthenticated ? <Header /> : <PublicHeader />}
 			<main className="pt-[72px]">
 				<Outlet />
 			</main>
