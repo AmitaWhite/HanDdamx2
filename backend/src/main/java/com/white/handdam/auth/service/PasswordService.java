@@ -60,6 +60,7 @@ public class PasswordService {
     }
 
     // KSY-011
+    @Transactional
     public void changePassword(Long memberId, String currentPassword, String newPassword) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
