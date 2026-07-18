@@ -7,10 +7,14 @@ import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
+import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.entity.Poll;
+import com.white.handdam.poll.entity.PollOption;
+import com.white.handdam.poll.entity.PollVote;
 import com.white.handdam.poll.exception.PollErrorCode;
 import com.white.handdam.poll.repository.PollOptionRepository;
 import com.white.handdam.poll.repository.PollRepository;
+import com.white.handdam.poll.repository.PollVoteRepository;
 import com.white.handdam.poll.service.PollService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,8 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PollServiceTest {
@@ -40,6 +43,7 @@ class PollServiceTest {
     @Mock private PollOptionRepository pollOptionRepository;
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
     @InjectMocks private PollService pollService;
+    @Mock private PollVoteRepository pollVoteRepository;
 
     // ---------------------------------------------------------------
     // LYJ-022 투표 생성
@@ -117,6 +121,124 @@ class PollServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // LYJ-023 투표 조회
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-023] PUBLIC 피드 투표 조회 성공 - 미참여 시 myVotedOptionId = null")
+    void getPoll_success_notVoted() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+                .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
+        given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L)).willReturn(Optional.empty());
+
+        PollResponse result = pollService.getPoll(1L, 1L);
+
+        assertThat(result.pollId()).isEqualTo(1L);
+        assertThat(result.options()).hasSize(2);
+        assertThat(result.myVotedOptionId()).isNull();    // 미참여 → null
+        assertThat(result.active()).isTrue();
+    }
+
+    @Test
+    @DisplayName("[LYJ-023] PUBLIC 피드 투표 조회 성공 - 참여한 경우 myVotedOptionId 반환")
+    void getPoll_success_voted() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+                .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
+
+        // 선택지 1번(Java)을 선택한 투표 내역
+        PollVote myVote = sampleVote(1L);
+        given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L)).willReturn(Optional.of(myVote));
+
+        PollResponse result = pollService.getPoll(1L, 1L);
+
+        assertThat(result.myVotedOptionId()).isEqualTo(1L);  // 내가 선택한 optionId
+    }
+
+    @Test
+    @DisplayName("[LYJ-023] 비로그인(memberId=null)은 선택지는 볼 수 있지만 myVotedOptionId = null")
+    void getPoll_success_anonymous() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+                .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
+        // memberId=null이면 pollVoteRepository 호출 자체가 안 됨 → mock 설정 불필요
+
+        PollResponse result = pollService.getPoll(1L, null);  // 비로그인
+
+        assertThat(result.options()).hasSize(2);
+        assertThat(result.myVotedOptionId()).isNull();
+    }
+
+    @Test
+    @DisplayName("[LYJ-023] 존재하지 않는 pollId 조회 시 POLL_NOT_FOUND 예외 발생")
+    void getPoll_pollNotFound() {
+        given(pollRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pollService.getPoll(999L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(PollErrorCode.POLL_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-023] 투표가 속한 피드가 삭제됐으면 FEED_NOT_FOUND 예외 발생")
+    void getPoll_feedNotFound() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pollService.getPoll(1L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[LYJ-023] FREE_SUBSCRIBER 피드는 비구독자에게 FEED_FORBIDDEN 예외 발생")
+    void getPoll_freeSubscriberFeed_forbidden() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+                .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
+        // level=null(TODO)이므로 FREE_SUBSCRIBER 피드는 현재 항상 FORBIDDEN
+
+        assertThatThrownBy(() -> pollService.getPoll(1L, 1L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("[LYJ-023] 선택지가 orderIndex 순서대로 반환된다")
+    void getPoll_optionsOrderedByIndex() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
+                .willReturn(List.of(
+                        sampleOption(1L, "Java",   0),
+                        sampleOption(2L, "Kotlin", 1),
+                        sampleOption(3L, "Python", 2)
+                ));
+        given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L)).willReturn(Optional.empty());
+
+        PollResponse result = pollService.getPoll(1L, 1L);
+
+        assertThat(result.options()).extracting("orderIndex")
+                .containsExactly(0, 1, 2);   // 순서 보장 확인
+        assertThat(result.options()).extracting("optionText")
+                .containsExactly("Java", "Kotlin", "Python");
+    }
+
+
+    // ---------------------------------------------------------------
     // 헬퍼
     // ---------------------------------------------------------------
 
@@ -139,4 +261,29 @@ class PollServiceTest {
                 options
         );
     }
+
+    // ---------------------------------------------------------------
+    // 헬퍼 (023에 추가되는 것들)
+    // ---------------------------------------------------------------
+
+    private Poll samplePoll(Long feedId) {
+        Poll poll = Poll.create(feedId, "좋아하는 언어는?", Instant.now().plusSeconds(3600));
+        ReflectionTestUtils.setField(poll, "id", 1L);
+        return poll;
+    }
+
+    private PollOption sampleOption(Long id, String optionText, int orderIndex) {
+        PollOption option = PollOption.create(1L, optionText, orderIndex);
+        ReflectionTestUtils.setField(option, "id", id);
+        return option;
+    }
+
+    // PollVote.create()는 LYJ-026에서 추가 예정 → ReflectionTestUtils로 직접 세팅
+    private PollVote sampleVote(Long pollOptionId) {
+        PollVote vote = mock(PollVote.class);
+        given(vote.getPollOptionId()).willReturn(pollOptionId);
+        return vote;
+    }
+
+
 }

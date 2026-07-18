@@ -3,6 +3,7 @@ package com.white.handdam.poll.controller;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
+import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.service.PollService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,4 +27,15 @@ public class PollController {
     ) {
         return ApiResponse.success(pollService.createPoll(feedId, member.id(), request));
     }
+
+    // [LYJ-023] 투표 선택지, 내 참여 조회
+    @GetMapping("/api/polls/{pollId}")
+    public ApiResponse<PollResponse> getPoll(
+            @PathVariable Long pollId,
+            @AuthenticationPrincipal AuthMember member
+    ) {
+        Long memberId = (member != null) ? member.id() : null;
+        return ApiResponse.success(pollService.getPoll(pollId, memberId));
+    }
+
 }
