@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
+import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
 // 실험(lab): 히어로 물방울 글래스모피즘. 실험 종료 시 이 import 와 아래 사용처를 원복.
 import { WaterHero } from "@/lab/WaterHero";
@@ -111,16 +112,14 @@ export function LandingPage() {
 						됩니다.
 					</p>
 					<div className="flex flex-wrap gap-4">
-						<Link to={paths.home}>
-							<Button size="lg">작가 둘러보기</Button>
-						</Link>
+						<LinkButton to={paths.home} size="lg">
+							작가 둘러보기
+						</LinkButton>
 						{!isAuthenticated && (
-							<Link to={paths.login}>
-								<Button size="lg" variant="secondary">
-									로그인 후 구독 피드 보기
-									<Icon name="arrow_forward" />
-								</Button>
-							</Link>
+							<LinkButton to={paths.login} size="lg" variant="secondary">
+								로그인 후 구독 피드 보기
+								<Icon name="arrow_forward" />
+							</LinkButton>
 						)}
 					</div>
 				</div>

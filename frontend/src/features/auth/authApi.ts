@@ -1,4 +1,4 @@
-import { http, unwrap } from "@/lib/api";
+import { http, unwrap, unwrapVoid } from "@/lib/api";
 import type {
 	AvailabilityResponse,
 	LoginResponse,
@@ -16,9 +16,9 @@ export function refreshRequest() {
 	return unwrap<TokenRefreshResponse>(http.post("/auth/token/refresh"));
 }
 
-/** 로그아웃 — 서버가 refresh 쿠키 삭제. 응답은 noContent(data=null)라 unwrap 미사용 */
+/** 로그아웃 — 서버가 refresh 쿠키 삭제. 응답은 noContent(data=null)라 unwrapVoid 사용 */
 export async function logoutRequest() {
-	await http.post("/auth/logout");
+	await unwrapVoid(http.post("/auth/logout"));
 }
 
 /** 회원가입 — 성공 시 서버가 인증 메일을 자동 발송한다(별도 발송 호출 불필요) */
@@ -46,12 +46,12 @@ export function checkNicknameAvailability(nickname: string) {
 	);
 }
 
-/** 이메일 인증 확정 (메일 링크의 token). noContent 응답이라 unwrap 미사용 */
+/** 이메일 인증 확정 (메일 링크의 token). noContent 응답이라 unwrapVoid 사용 */
 export async function confirmEmailVerification(token: string) {
-	await http.post("/auth/email-verifications/confirm", { token });
+	await unwrapVoid(http.post("/auth/email-verifications/confirm", { token }));
 }
 
-/** 인증 메일 재발송. noContent 응답이라 unwrap 미사용 */
+/** 인증 메일 재발송. noContent 응답이라 unwrapVoid 사용 */
 export async function resendVerificationEmail(email: string) {
-	await http.post("/auth/email-verifications/resend", { email });
+	await unwrapVoid(http.post("/auth/email-verifications/resend", { email }));
 }

@@ -5,6 +5,7 @@ import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { AuthStatusPanel } from "@/components/auth/AuthStatusPanel";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { LinkButton } from "@/components/ui/LinkButton";
 import { confirmEmailVerification } from "@/features/auth/authApi";
 import { useResendVerification } from "@/features/auth/useResendVerification";
 import { validateEmail } from "@/features/auth/validation";
@@ -64,11 +65,9 @@ export function EmailVerifyPage() {
 					description="이제 로그인하고 이용하실 수 있습니다."
 					withCard
 				>
-					<Link to={paths.login}>
-						<Button size="lg" fullWidth>
-							로그인하러 가기
-						</Button>
-					</Link>
+					<LinkButton to={paths.login} size="lg" fullWidth>
+						로그인하러 가기
+					</LinkButton>
 				</AuthStatusPanel>
 			</AuthPageShell>
 		);

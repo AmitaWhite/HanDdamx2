@@ -39,7 +39,6 @@ export function ProfileMenu() {
 			<button
 				type="button"
 				aria-label="프로필 메뉴"
-				aria-haspopup="true"
 				aria-expanded={open}
 				onClick={() => setOpen((v) => !v)}
 			>
@@ -47,13 +46,9 @@ export function ProfileMenu() {
 			</button>
 
 			{open && (
-				<div
-					role="menu"
-					className="absolute right-0 top-full z-50 mt-2 min-w-[180px] rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-2 shadow-card-hover"
-				>
+				<div className="absolute right-0 top-full z-50 mt-2 min-w-[180px] rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-2 shadow-card-hover">
 					<Link
 						to={paths.mypage}
-						role="menuitem"
 						onClick={() => setOpen(false)}
 						className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-label-md font-label-md text-on-surface hover:bg-surface-container-low"
 					>
@@ -63,7 +58,6 @@ export function ProfileMenu() {
 					<div className="my-1 h-px bg-outline-variant/50" />
 					<button
 						type="button"
-						role="menuitem"
 						onClick={handleLogout}
 						className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-label-md font-label-md text-on-surface hover:bg-surface-container-low"
 					>

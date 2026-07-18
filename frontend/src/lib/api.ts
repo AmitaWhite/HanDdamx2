@@ -63,6 +63,22 @@ export async function unwrap<T>(
 	return body.data;
 }
 
+/**
+ * noContent(data=null) 응답용. unwrap()과 달리 data===null 은 정상 허용하되,
+ * success:false 는 여전히 ApiError 로 변환한다(HTTP 200 이면서 success:false 인 경우 대비).
+ */
+export async function unwrapVoid(
+	promise: Promise<{ data: ApiResponse<unknown> }>,
+): Promise<void> {
+	const { data: body } = await promise;
+	if (!body.success) {
+		throw new ApiError(
+			body.error?.code ?? "UNKNOWN",
+			body.error?.message ?? "요청에 실패했습니다.",
+		);
+	}
+}
+
 export class ApiError extends Error {
 	constructor(
 		public code: string,

@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { LinkButton } from "@/components/ui/LinkButton";
 import {
 	checkEmailAvailability,
 	checkNicknameAvailability,
@@ -130,11 +131,9 @@ export function SignupPage() {
 						>
 							{resend === "sending" ? "보내는 중…" : "인증 메일 다시 보내기"}
 						</Button>
-						<Link to={paths.login}>
-							<Button variant="ghost" fullWidth>
-								로그인하러 가기
-							</Button>
-						</Link>
+						<LinkButton to={paths.login} variant="ghost" fullWidth>
+							로그인하러 가기
+						</LinkButton>
 					</div>
 				</AuthStatusPanel>
 			</AuthPageShell>

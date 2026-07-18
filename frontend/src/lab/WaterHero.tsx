@@ -1,17 +1,17 @@
-import { useEffect, useRef } from 'react';
-import './water-hero.css';
+import { useEffect, useRef } from "react";
+import "./water-hero.css";
 
 /**
  * 실험용 WebGL2 물방울 글래스모피즘 히어로.
  * 호버 시 물이 맺히며 굴절/광택, 해제 시 노이즈를 따라 말라 사라진다.
- * ⚠️ lab 전용 — 디자인 시스템/토큰 규칙과 무관. 삭제해도 앱에 영향 없음.
+ * ⚠️ lab 전용 — 디자인 시스템/토큰 규칙과 무관.
  */
 
 // ── 튜닝 파라미터 ──────────────────────────────────────────
 const PARAMS = {
-  wetInSpeed: 3.2, // 물 맺히는 속도(클수록 빠름)
-  dryOutSpeed: 1.1, // 마르는 속도(작을수록 천천히)
-  tiltDeg: 5, // 마우스에 따른 3D 기울기 최대 각도
+	wetInSpeed: 3.2, // 물 맺히는 속도(클수록 빠름)
+	dryOutSpeed: 1.1, // 마르는 속도(작을수록 천천히)
+	tiltDeg: 5, // 마우스에 따른 3D 기울기 최대 각도
 };
 
 const VERT = `#version 300 es
@@ -91,203 +91,247 @@ void main(){
 }`;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
-  const sh = gl.createShader(type)!;
-  gl.shaderSource(sh, src);
-  gl.compileShader(sh);
-  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-    console.error('[WaterHero] shader:', gl.getShaderInfoLog(sh));
-    gl.deleteShader(sh);
-    return null;
-  }
-  return sh;
+	const sh = gl.createShader(type)!;
+	gl.shaderSource(sh, src);
+	gl.compileShader(sh);
+	if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+		console.error("[WaterHero] shader:", gl.getShaderInfoLog(sh));
+		gl.deleteShader(sh);
+		return null;
+	}
+	return sh;
 }
 
 export function WaterHero({
-  src,
-  alt = '',
-  className,
+	src,
+	alt = "",
+	className,
 }: {
-  src: string;
-  alt?: string;
-  className?: string;
+	src: string;
+	alt?: string;
+	className?: string;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+	const rootRef = useRef<HTMLDivElement>(null);
+	const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    const root = rootRef.current!;
-    const canvas = canvasRef.current!;
-    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, antialias: true });
-    if (!gl) return; // 미지원 → 아래 <img> 폴백 그대로
+	useEffect(() => {
+		const root = rootRef.current!;
+		const canvas = canvasRef.current!;
+		const gl = canvas.getContext("webgl2", {
+			premultipliedAlpha: false,
+			antialias: true,
+		});
+		if (!gl) return; // 미지원 → 아래 <img> 폴백 그대로
 
-    const program = gl.createProgram()!;
-    const vs = compile(gl, gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
-    if (!vs || !fs) return;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('[WaterHero] link:', gl.getProgramInfoLog(program));
-      return;
-    }
-    gl.useProgram(program);
+		const program = gl.createProgram()!;
+		const vs = compile(gl, gl.VERTEX_SHADER, VERT);
+		const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+		if (!vs || !fs) return;
+		gl.attachShader(program, vs);
+		gl.attachShader(program, fs);
+		gl.linkProgram(program);
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			console.error("[WaterHero] link:", gl.getProgramInfoLog(program));
+			return;
+		}
+		gl.useProgram(program);
 
-    // 풀스크린 삼각형
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const aPos = gl.getAttribLocation(program, 'aPos');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+		// 풀스크린 삼각형
+		const buf = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array([-1, -1, 3, -1, -1, 3]),
+			gl.STATIC_DRAW,
+		);
+		const aPos = gl.getAttribLocation(program, "aPos");
+		gl.enableVertexAttribArray(aPos);
+		gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    const u = {
-      tex: gl.getUniformLocation(program, 'uTex'),
-      time: gl.getUniformLocation(program, 'uTime'),
-      wet: gl.getUniformLocation(program, 'uWet'),
-      mouse: gl.getUniformLocation(program, 'uMouse'),
-      aspect: gl.getUniformLocation(program, 'uAspect'),
-      imgAspect: gl.getUniformLocation(program, 'uImgAspect'),
-    };
+		const u = {
+			tex: gl.getUniformLocation(program, "uTex"),
+			time: gl.getUniformLocation(program, "uTime"),
+			wet: gl.getUniformLocation(program, "uWet"),
+			mouse: gl.getUniformLocation(program, "uMouse"),
+			aspect: gl.getUniformLocation(program, "uAspect"),
+			imgAspect: gl.getUniformLocation(program, "uImgAspect"),
+		};
 
-    // 텍스처
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    // 로드 전 1px 플레이스홀더
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([200, 200, 200, 255]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		// 텍스처
+		const tex = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, tex);
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+		// 로드 전 1px 플레이스홀더
+		gl.texImage2D(
+			gl.TEXTURE_2D,
+			0,
+			gl.RGBA,
+			1,
+			1,
+			0,
+			gl.RGBA,
+			gl.UNSIGNED_BYTE,
+			new Uint8Array([200, 200, 200, 255]),
+		);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    let imgAspect = 1;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      imgAspect = img.naturalWidth / img.naturalHeight;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      draw(performance.now());
-    };
-    img.src = src;
+		let imgAspect = 1;
+		let textureReady = false;
+		const img = new Image();
+		img.crossOrigin = "anonymous";
+		img.onload = () => {
+			imgAspect = img.naturalWidth / img.naturalHeight;
+			gl.bindTexture(gl.TEXTURE_2D, tex);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+			textureReady = true;
+			draw(performance.now());
+		};
+		img.onerror = () => {
+			// 로드 실패: 캔버스를 계속 투명 상태로 두어 <img> 폴백이 그대로 보이게 한다.
+		};
+		img.src = src;
 
-    // 상태
-    let wet = 0;
-    let target = 0;
-    let mouse = [0.5, 0.5];
-    let raf = 0;
-    let running = false;
-    let last = performance.now();
-    const start = performance.now();
+		// 상태
+		let wet = 0;
+		let target = 0;
+		let mouse = [0.5, 0.5];
+		let raf = 0;
+		let running = false;
+		let last = performance.now();
+		const start = performance.now();
 
-    function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.round(root.clientWidth * dpr));
-      const h = Math.max(1, Math.round(root.clientHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-        gl!.viewport(0, 0, w, h);
-      }
-    }
+		function resize() {
+			const dpr = Math.min(window.devicePixelRatio || 1, 2);
+			const w = Math.max(1, Math.round(root.clientWidth * dpr));
+			const h = Math.max(1, Math.round(root.clientHeight * dpr));
+			if (canvas.width !== w || canvas.height !== h) {
+				canvas.width = w;
+				canvas.height = h;
+				gl!.viewport(0, 0, w, h);
+			}
+		}
 
-    function draw(now: number) {
-      const dt = Math.min((now - last) / 1000, 0.05);
-      last = now;
-      const speed = target > wet ? PARAMS.wetInSpeed : PARAMS.dryOutSpeed;
-      wet += (target - wet) * Math.min(dt * speed, 1);
-      if (Math.abs(target - wet) < 0.001) wet = target;
+		function draw(now: number) {
+			if (!textureReady) return; // 텍스처 로드 전엔 캔버스를 투명하게 두어 <img> 폴백이 보이게 한다.
+			const dt = Math.min((now - last) / 1000, 0.05);
+			last = now;
+			const speed = target > wet ? PARAMS.wetInSpeed : PARAMS.dryOutSpeed;
+			wet += (target - wet) * Math.min(dt * speed, 1);
+			if (Math.abs(target - wet) < 0.001) wet = target;
 
-      resize();
-      gl!.useProgram(program);
-      gl!.bindTexture(gl!.TEXTURE_2D, tex);
-      gl!.uniform1i(u.tex, 0);
-      gl!.uniform1f(u.time, (now - start) / 1000);
-      gl!.uniform1f(u.wet, wet);
-      gl!.uniform2f(u.mouse, mouse[0], mouse[1]);
-      gl!.uniform1f(u.aspect, canvas.width / canvas.height);
-      gl!.uniform1f(u.imgAspect, imgAspect);
-      gl!.drawArrays(gl!.TRIANGLES, 0, 3);
+			resize();
+			gl!.useProgram(program);
+			gl!.bindTexture(gl!.TEXTURE_2D, tex);
+			gl!.uniform1i(u.tex, 0);
+			gl!.uniform1f(u.time, (now - start) / 1000);
+			gl!.uniform1f(u.wet, wet);
+			gl!.uniform2f(u.mouse, mouse[0], mouse[1]);
+			gl!.uniform1f(u.aspect, canvas.width / canvas.height);
+			gl!.uniform1f(u.imgAspect, imgAspect);
+			gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
-      // 물이 다 마르면 루프 정지(마지막 dry 프레임은 원본과 동일)
-      if (wet <= 0.0005 && target === 0) {
-        running = false;
-        return;
-      }
-      raf = requestAnimationFrame(draw);
-    }
+			// 물이 다 마르면 루프 정지(마지막 dry 프레임은 원본과 동일)
+			if (wet <= 0.0005 && target === 0) {
+				running = false;
+				return;
+			}
+			raf = requestAnimationFrame(draw);
+		}
 
-    function ensureRunning() {
-      if (!running) {
-        running = true;
-        last = performance.now();
-        raf = requestAnimationFrame(draw);
-      }
-    }
+		function ensureRunning() {
+			if (!running) {
+				running = true;
+				last = performance.now();
+				raf = requestAnimationFrame(draw);
+			}
+		}
 
-    // 부유: 틸트(rx/ry) + 틸트-반응 그림자(sx/sy)를 CSS 변수로 갱신.
-    // (transform 을 직접 쓰지 않고 변수만 바꿔 CSS의 lift 와 합성)
-    function setFloat(rx: number, ry: number, sx: number, sy: number) {
-      root.style.setProperty('--rx', `${rx}deg`);
-      root.style.setProperty('--ry', `${ry}deg`);
-      root.style.setProperty('--sx', `${sx}px`);
-      root.style.setProperty('--sy', `${sy}px`);
-    }
+		// 부유: 틸트(rx/ry) + 틸트-반응 그림자(sx/sy)를 CSS 변수로 갱신.
+		// (transform 을 직접 쓰지 않고 변수만 바꿔 CSS의 lift 와 합성)
+		function setFloat(rx: number, ry: number, sx: number, sy: number) {
+			root.style.setProperty("--rx", `${rx}deg`);
+			root.style.setProperty("--ry", `${ry}deg`);
+			root.style.setProperty("--sx", `${sx}px`);
+			root.style.setProperty("--sy", `${sy}px`);
+		}
 
-    // 이벤트
-    function onEnter() {
-      target = 1;
-      root.dataset.wet = 'true';
-      ensureRunning();
-    }
-    function onLeave() {
-      target = 0;
-      root.dataset.wet = 'false';
-      setFloat(0, 0, 0, 0); // 안착(리프트만) 복귀
-      ensureRunning();
-    }
-    function onMove(e: PointerEvent) {
-      const r = root.getBoundingClientRect();
-      const mx = (e.clientX - r.left) / r.width;
-      const my = (e.clientY - r.top) / r.height;
-      mouse = [mx, 1 - my]; // uv y-flip
-      const t = PARAMS.tiltDeg;
-      // 그림자는 틸트 반대 방향으로 이동 → 물리적으로 "판이 기운다" 느낌
-      setFloat((0.5 - my) * t, (mx - 0.5) * t, (0.5 - mx) * 18, (0.5 - my) * 10);
-      root.dataset.wet = 'true';
-    }
+		// 이벤트
+		function onEnter() {
+			target = 1;
+			root.dataset.wet = "true";
+			ensureRunning();
+		}
+		function onLeave() {
+			target = 0;
+			root.dataset.wet = "false";
+			setFloat(0, 0, 0, 0); // 안착(리프트만) 복귀
+			ensureRunning();
+		}
+		function onMove(e: PointerEvent) {
+			const r = root.getBoundingClientRect();
+			const mx = (e.clientX - r.left) / r.width;
+			const my = (e.clientY - r.top) / r.height;
+			mouse = [mx, 1 - my]; // uv y-flip
+			const t = PARAMS.tiltDeg;
+			// 그림자는 틸트 반대 방향으로 이동 → 물리적으로 "판이 기운다" 느낌
+			setFloat(
+				(0.5 - my) * t,
+				(mx - 0.5) * t,
+				(0.5 - mx) * 18,
+				(0.5 - my) * 10,
+			);
+			root.dataset.wet = "true";
+		}
 
-    root.addEventListener('pointerenter', onEnter);
-    root.addEventListener('pointerleave', onLeave);
-    root.addEventListener('pointermove', onMove);
+		root.addEventListener("pointerenter", onEnter);
+		root.addEventListener("pointerleave", onLeave);
+		root.addEventListener("pointermove", onMove);
 
-    // 테스트/디버그용: window.__waterHero.wet(0~1) 로 강제 (스크린샷 확인용)
-    (window as unknown as Record<string, unknown>).__waterHero = {
-      wet: (v: number) => {
-        target = v;
-        root.dataset.wet = v > 0 ? 'true' : 'false';
-        ensureRunning();
-      },
-    };
+		// 정지 상태에서도 컨테이너 크기가 바뀌면 한 프레임 다시 그려 종횡비를 갱신한다.
+		const resizeObserver = new ResizeObserver(() => ensureRunning());
+		resizeObserver.observe(root);
 
-    draw(performance.now());
+		// 테스트/디버그용: window.__waterHero.wet(0~1) 로 강제 (스크린샷 확인용)
+		(window as unknown as Record<string, unknown>).__waterHero = {
+			wet: (v: number) => {
+				target = v;
+				root.dataset.wet = v > 0 ? "true" : "false";
+				ensureRunning();
+			},
+		};
 
-    return () => {
-      cancelAnimationFrame(raf);
-      root.removeEventListener('pointerenter', onEnter);
-      root.removeEventListener('pointerleave', onLeave);
-      root.removeEventListener('pointermove', onMove);
-      gl.deleteProgram(program);
-      gl.deleteTexture(tex);
-      gl.deleteBuffer(buf);
-    };
-  }, [src]);
+		return () => {
+			cancelAnimationFrame(raf);
+			resizeObserver.disconnect();
+			root.removeEventListener("pointerenter", onEnter);
+			root.removeEventListener("pointerleave", onLeave);
+			root.removeEventListener("pointermove", onMove);
+			img.onload = null;
+			img.onerror = null;
+			delete (window as unknown as Record<string, unknown>).__waterHero;
+			gl.deleteShader(vs);
+			gl.deleteShader(fs);
+			gl.deleteProgram(program);
+			gl.deleteTexture(tex);
+			gl.deleteBuffer(buf);
+		};
+	}, [src]);
 
-  return (
-    <div ref={rootRef} className={`lab-water-hero ${className ?? ''}`} data-wet="false">
-      <img className="lab-water-hero__img" src={src} alt={alt} />
-      <canvas ref={canvasRef} className="lab-water-hero__canvas" aria-hidden="true" />
-    </div>
-  );
+	return (
+		<div
+			ref={rootRef}
+			className={`lab-water-hero ${className ?? ""}`}
+			data-wet="false"
+		>
+			<img className="lab-water-hero__img" src={src} alt={alt} />
+			<canvas
+				ref={canvasRef}
+				className="lab-water-hero__canvas"
+				aria-hidden="true"
+			/>
+		</div>
+	);
 }

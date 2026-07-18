@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
-import { Button } from "@/components/ui/Button";
+import { LinkButton } from "@/components/ui/LinkButton";
 
 /** 비로그인 상태의 공개 페이지(랜딩/로그인/회원가입 등) 헤더. */
 export function PublicHeader() {
@@ -14,16 +14,12 @@ export function PublicHeader() {
 					한땀한땀
 				</Link>
 				<div className="flex items-center gap-3">
-					<Link to={paths.login}>
-						<Button variant="ghost" size="sm">
-							로그인
-						</Button>
-					</Link>
-					<Link to={paths.signup}>
-						<Button variant="primary" size="sm">
-							회원가입
-						</Button>
-					</Link>
+					<LinkButton to={paths.login} variant="ghost" size="sm">
+						로그인
+					</LinkButton>
+					<LinkButton to={paths.signup} variant="primary" size="sm">
+						회원가입
+					</LinkButton>
 				</div>
 			</nav>
 		</header>
