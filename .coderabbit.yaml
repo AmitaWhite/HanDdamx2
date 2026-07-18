@@ -7,6 +7,13 @@ reviews:
     - "!**/build/**"
     - "!**/.gradle/**"
     - "!**/gradle-wrapper.jar"
+  tools:
+    gitleaks:
+      enabled: true
+    yamllint:
+      enabled: true
+    actionlint:
+      enabled: true
   auto_review:
     enabled: true
     drafts: false
@@ -14,11 +21,3 @@ reviews:
       - "dev"
 chat:
   auto_reply: true
-
-tools:
-  gitleaks:
-    enabled: true
-  yamllint:
-    enabled: true
-  actionlint:
-    enabled: true
