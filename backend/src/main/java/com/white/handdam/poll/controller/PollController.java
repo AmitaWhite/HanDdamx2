@@ -71,5 +71,14 @@ public class PollController {
         return ApiResponse.success(pollService.vote(pollId, member.id(), request));
     }
 
+    // [LYJ-027] 내 투표 선택지 변경
+    @PatchMapping("/api/polls/{pollId}/votes/me")
+    public ApiResponse<Long> changeVote(
+        @PathVariable Long pollId,
+        @AuthenticationPrincipal AuthMember member,
+        @RequestBody PollVoteRequest request
+    ) {
+        return ApiResponse.success(pollService.changeVote(pollId, member.id(), request));
+    }
 
 }

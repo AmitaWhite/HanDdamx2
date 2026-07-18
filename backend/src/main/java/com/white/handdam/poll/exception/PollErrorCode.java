@@ -12,6 +12,7 @@ public enum PollErrorCode implements ErrorCode {
     POLL_FORBIDDEN(HttpStatus.FORBIDDEN, "투표에 대한 권한이 없습니다."),
     POLL_OPTION_INVALID(HttpStatus.BAD_REQUEST, "이 투표에 속하지 않는 선택지입니다."),
     POLL_ALREADY_VOTED(HttpStatus.CONFLICT, "이미 참여한 투표입니다."),
+    POLL_NOT_VOTED(HttpStatus.BAD_REQUEST, "아직 참여하지 않은 투표입니다."),
     ;
 
     private final HttpStatus status;

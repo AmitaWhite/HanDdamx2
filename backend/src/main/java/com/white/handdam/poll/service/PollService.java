@@ -182,6 +182,41 @@ public class PollService {
         return pollVoteRepository.save(vote).getId();
     }
 
+    // [LYJ-027] 내 투표 선택지 변경
+    @Transactional
+    public Long changeVote(Long pollId, Long memberId, PollVoteRequest request) {
+        Poll poll = pollRepository.findById(pollId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
+
+        if (!poll.isActive()) {
+            throw new CustomException(PollErrorCode.POLL_CLOSED);
+        }
+
+        Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        boolean isOwner = project.getCreatorId().equals(memberId);
+        String level = isOwner ? null
+            : subscriptionLevelChecker.getLevel(memberId, project.getCreatorId());
+
+        if (!canAccess(feed.getVisibility(), level, isOwner)) {
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        PollVote existingVote = pollVoteRepository.findByPollIdAndMemberId(pollId, memberId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_VOTED));
+
+        PollOption option = pollOptionRepository.findById(request.optionId())
+            .filter(o -> o.getPollId().equals(pollId))
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_OPTION_INVALID));
+
+        existingVote.changeOption(option.getId());
+        return existingVote.getId();
+    }
+
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;
         return switch (visibility) {

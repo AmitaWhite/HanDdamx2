@@ -531,6 +531,111 @@ class PollServiceTest {
                 .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
     }
 
+    // ---------------------------------------------------------------
+    // LYJ-027 내 투표 선택지 변경
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-027] 선택지 변경 성공 - 기존 vote의 optionId가 바뀐다")
+    void changeVote_success() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+
+        // 기존에 선택지 1번(Java)으로 투표한 상태
+        PollVote existingVote = PollVote.create(1L, 1L, 1L, (short) 1, "FREE");
+        ReflectionTestUtils.setField(existingVote, "id", 10L);
+        given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L))
+            .willReturn(Optional.of(existingVote));
+
+        // 2번(Kotlin)으로 변경 요청
+        given(pollOptionRepository.findById(2L))
+            .willReturn(Optional.of(sampleOption(2L, "Kotlin", 1)));
+
+        Long result = pollService.changeVote(1L, 1L, new PollVoteRequest(2L));
+
+        assertThat(result).isEqualTo(10L);
+        assertThat(existingVote.getPollOptionId()).isEqualTo(2L); // optionId 변경 확인
+    }
+
+    @Test
+    @DisplayName("[LYJ-027] 아직 투표하지 않은 사용자가 변경 시도 시 POLL_NOT_VOTED 예외 발생")
+    void changeVote_notVoted_throws() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+        given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L))
+            .willReturn(Optional.empty()); // 투표 내역 없음
+
+        assertThatThrownBy(() -> pollService.changeVote(1L, 1L, new PollVoteRequest(2L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_NOT_VOTED));
+    }
+
+    @Test
+    @DisplayName("[LYJ-027] 종료된 투표 선택지 변경 시도 시 POLL_CLOSED 예외 발생")
+    void changeVote_closedPoll_throws() {
+        Poll poll = sampleClosedPoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+
+        assertThatThrownBy(() -> pollService.changeVote(1L, 1L, new PollVoteRequest(2L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_CLOSED));
+    }
+
+    @Test
+    @DisplayName("[LYJ-027] 이 투표에 속하지 않는 선택지로 변경 시 POLL_OPTION_INVALID 예외 발생")
+    void changeVote_invalidOption_throws() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+
+        PollVote existingVote = PollVote.create(1L, 1L, 1L, (short) 1, "FREE");
+        ReflectionTestUtils.setField(existingVote, "id", 10L);
+        given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L))
+            .willReturn(Optional.of(existingVote));
+
+        // 다른 투표의 선택지 요청
+        PollOption wrongOption = sampleOption(99L, "다른투표선택지", 0);
+        ReflectionTestUtils.setField(wrongOption, "pollId", 2L); // pollId=2 → 불일치
+        given(pollOptionRepository.findById(99L)).willReturn(Optional.of(wrongOption));
+
+        assertThatThrownBy(() -> pollService.changeVote(1L, 1L, new PollVoteRequest(99L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_OPTION_INVALID));
+    }
+
+    @Test
+    @DisplayName("[LYJ-027] FREE_SUBSCRIBER 피드 비구독자가 변경 시도 시 FEED_FORBIDDEN 예외 발생")
+    void changeVote_forbidden_throws() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L)));
+        given(subscriptionLevelChecker.getLevel(1L, 99L)).willReturn(null);
+
+        assertThatThrownBy(() -> pollService.changeVote(1L, 1L, new PollVoteRequest(2L)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+    }
 
     // ---------------------------------------------------------------
     // 헬퍼 (023에 추가되는 것들)

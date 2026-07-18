@@ -45,4 +45,7 @@ public class PollVote extends BaseTimeEntity {
         return v;
     }
 
+    public void changeOption(Long newPollOptionId) {
+        this.pollOptionId = newPollOptionId;
+    }
 }
