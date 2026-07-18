@@ -16,6 +16,8 @@ import com.white.handdam.poll.repository.PollOptionRepository;
 import com.white.handdam.poll.repository.PollRepository;
 import com.white.handdam.poll.repository.PollVoteRepository;
 import com.white.handdam.poll.service.PollService;
+import com.white.handdam.project.entity.Project;
+import com.white.handdam.project.repository.ProjectRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,9 +43,10 @@ class PollServiceTest {
     @Mock private FeedRepository feedRepository;
     @Mock private PollRepository pollRepository;
     @Mock private PollOptionRepository pollOptionRepository;
+    @Mock private PollVoteRepository pollVoteRepository;
+    @Mock private ProjectRepository projectRepository;
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
     @InjectMocks private PollService pollService;
-    @Mock private PollVoteRepository pollVoteRepository;
 
     // ---------------------------------------------------------------
     // LYJ-022 투표 생성
@@ -54,6 +57,7 @@ class PollServiceTest {
     void createPoll_success() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
         given(pollRepository.existsByFeedId(1L)).willReturn(false);
 
         // save() 호출 시 JPA가 id를 채워주는 것을 Mockito로 흉내냄
@@ -74,6 +78,7 @@ class PollServiceTest {
     void createPoll_success_optionsSavedCorrectly() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
         given(pollRepository.existsByFeedId(1L)).willReturn(false);
         given(pollRepository.save(any(Poll.class))).willAnswer(invocation -> {
             Poll p = invocation.getArgument(0);
@@ -109,6 +114,7 @@ class PollServiceTest {
     void createPoll_pollAlreadyExists() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
         given(pollRepository.existsByFeedId(1L)).willReturn(true); // 이미 투표 존재
 
         assertThatThrownBy(() -> pollService.createPoll(1L, 1L, sampleRequest(2)))
@@ -130,6 +136,7 @@ class PollServiceTest {
         Poll poll = samplePoll(1L);
         given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
                 .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
         given(pollVoteRepository.findByPollIdAndMemberId(1L, 1L)).willReturn(Optional.empty());
@@ -148,6 +155,7 @@ class PollServiceTest {
         Poll poll = samplePoll(1L);
         given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
                 .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
 
@@ -166,6 +174,7 @@ class PollServiceTest {
         Poll poll = samplePoll(1L);
         given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
                 .willReturn(List.of(sampleOption(1L, "Java", 0), sampleOption(2L, "Kotlin", 1)));
         // memberId=null이면 pollVoteRepository 호출 자체가 안 됨 → mock 설정 불필요
@@ -207,7 +216,8 @@ class PollServiceTest {
         given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
         given(feedRepository.findByIdAndDeletedFalse(1L))
                 .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
-        // level=null(TODO)이므로 FREE_SUBSCRIBER 피드는 현재 항상 FORBIDDEN
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
+        // memberId=1L, creatorId=99L → 비소유자, level=null → FREE_SUBSCRIBER 피드는 FORBIDDEN
 
         assertThatThrownBy(() -> pollService.getPoll(1L, 1L))
                 .isInstanceOf(CustomException.class)
@@ -221,6 +231,7 @@ class PollServiceTest {
         Poll poll = samplePoll(1L);
         given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(pollOptionRepository.findByPollIdOrderByOrderIndex(1L))
                 .willReturn(List.of(
                         sampleOption(1L, "Java",   0),
@@ -285,5 +296,13 @@ class PollServiceTest {
         return vote;
     }
 
-
+    private Project sampleProject(Long creatorId) {
+        Project project = Project.builder()
+                .creatorId(creatorId)
+                .categoryId(1L)
+                .title("테스트 프로젝트")
+                .build();
+        ReflectionTestUtils.setField(project, "id", 1L);
+        return project;
+    }
 }

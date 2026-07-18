@@ -15,6 +15,9 @@ import com.white.handdam.poll.exception.PollErrorCode;
 import com.white.handdam.poll.repository.PollOptionRepository;
 import com.white.handdam.poll.repository.PollRepository;
 import com.white.handdam.poll.repository.PollVoteRepository;
+import com.white.handdam.project.entity.Project;
+import com.white.handdam.project.exception.ProjectErrorCode;
+import com.white.handdam.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,17 +34,20 @@ public class PollService {
     private final PollRepository pollRepository;
     private final PollOptionRepository pollOptionRepository;
     private final PollVoteRepository pollVoteRepository;
+    private final ProjectRepository projectRepository;
+    private final SubscriptionLevelChecker subscriptionLevelChecker;
 
-    // [LYJ-022] 기존 피드에 투표 추가
+    // [LYJ-022] 기존 피드에 투표 추가 (크리에이터만 가능)
     @Transactional
     public Long createPoll(Long feedId, Long memberId, PollCreateRequest request) {
-        feedRepository.findByIdAndDeletedFalse(feedId)
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
 
-        // TODO: Project 엔티티 추가 후 사용
-        // if (!project.getCreatorId().equals(memberId)) {
-        //     throw new CustomException(PollErrorCode.POLL_FORBIDDEN);
-        // }
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+                .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        if (!project.getCreatorId().equals(memberId)) {
+            throw new CustomException(PollErrorCode.POLL_FORBIDDEN);
+        }
 
         if (pollRepository.existsByFeedId(feedId)) {
             throw new CustomException(PollErrorCode.POLL_ALREADY_EXISTS);
@@ -52,9 +58,7 @@ public class PollService {
 
         List<PollOption> options = new ArrayList<>();
         for (int i = 0; i < request.options().size(); i++) {
-            String optionText = request.options().get(i);
-            PollOption option = PollOption.create(poll.getId(), optionText, i);
-            options.add(option);
+            options.add(PollOption.create(poll.getId(), request.options().get(i), i));
         }
         pollOptionRepository.saveAll(options);
 
@@ -63,16 +67,18 @@ public class PollService {
 
     // [LYJ-023] 투표 선택지 + 내 참여 조회
     public PollResponse getPoll(Long pollId, Long memberId) {
-
         Poll poll = pollRepository.findById(pollId)
                 .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
 
         Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
 
-        // TODO: Project 엔티티 추가 후 creatorId → isOwner / level 확인
-        boolean isOwner = false;
-        String level = null;
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+                .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = (memberId != null && !isOwner)
+                ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
+                : null;
         if (!canAccess(feed.getVisibility(), level, isOwner)) {
             throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
         }
@@ -82,7 +88,7 @@ public class PollService {
         Long myVotedOptionId = null;
         if (memberId != null) {
             myVotedOptionId = pollVoteRepository.findByPollIdAndMemberId(pollId, memberId)
-                    .map(vote -> vote.getPollOptionId())
+                    .map(PollVote::getPollOptionId)
                     .orElse(null);
         }
 

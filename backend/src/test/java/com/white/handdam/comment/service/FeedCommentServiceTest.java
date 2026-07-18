@@ -14,6 +14,8 @@ import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.repository.MemberRepository;
+import com.white.handdam.project.entity.Project;
+import com.white.handdam.project.repository.ProjectRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +39,7 @@ class FeedCommentServiceTest {
     @Mock private FeedRepository feedRepository;
     @Mock private FeedCommentRepository feedCommentRepository;
     @Mock private MemberRepository memberRepository;
+    @Mock private ProjectRepository projectRepository;
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
     @InjectMocks private FeedCommentService feedCommentService;
 
@@ -48,6 +51,7 @@ class FeedCommentServiceTest {
     void getComments_public_returnsNestedStructure() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         FeedComment parent1 = sampleComment(1L, 1L, null, (short) 0, "첫 댓글");
         FeedComment parent2 = sampleComment(2L, 1L, null, (short) 0, "두번째 댓글");
@@ -82,6 +86,7 @@ class FeedCommentServiceTest {
     void getComments_noComments_returnsEmpty() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(feedCommentRepository.findByFeedIdAndDeletedFalseOrderByCreatedAtAsc(1L))
                 .willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of());
@@ -96,6 +101,7 @@ class FeedCommentServiceTest {
     void getComments_freeSubscriberFeed_forbiddenForGuest() {
         Feed feed = sampleFeed(Visibility.FREE_SUBSCRIBER);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         assertThatThrownBy(() -> feedCommentService.getComments(1L, null))
                 .isInstanceOf(CustomException.class)
@@ -110,6 +116,7 @@ class FeedCommentServiceTest {
     void createComment_public_success() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         FeedComment saved = FeedComment.create(1L, 1L, null, (short) 0, "테스트 댓글");
         ReflectionTestUtils.setField(saved, "id", 10L);
@@ -136,6 +143,7 @@ class FeedCommentServiceTest {
     void createComment_freeSubscriberFeed_forbidden() {
         Feed feed = sampleFeed(Visibility.FREE_SUBSCRIBER);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         assertThatThrownBy(() -> feedCommentService.createComment(1L, 1L, new FeedCommentCreateRequest("댓글")))
                 .isInstanceOf(CustomException.class)
@@ -151,6 +159,7 @@ class FeedCommentServiceTest {
     void createReply_public_success() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         FeedComment parent = sampleComment(10L, 1L, null, (short) 0, "부모 댓글");
         given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(parent));
@@ -180,6 +189,7 @@ class FeedCommentServiceTest {
     void createReply_parentNotFound() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(feedCommentRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> feedCommentService.createReply(1L, 999L, 1L, new FeedCommentCreateRequest("대댓글")))
@@ -193,6 +203,7 @@ class FeedCommentServiceTest {
     void createReply_parentBelongsToAnotherFeed() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         FeedComment parent = sampleComment(10L, 1L, null, (short) 0, "다른 피드 댓글");
         ReflectionTestUtils.setField(parent, "feedId", 5L); // feedId=1 요청인데 5 소속 댓글
@@ -209,6 +220,7 @@ class FeedCommentServiceTest {
     void createReply_parentIsAlreadyReply() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
 
         FeedComment parent = sampleComment(10L, 1L, 5L, (short) 1, "이미 대댓글"); // depth=1
         given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(parent));
@@ -412,5 +424,15 @@ class FeedCommentServiceTest {
         Member m = Member.createLocalMember("test@test.com", "pw", nickname);
         ReflectionTestUtils.setField(m, "id", id);
         return m;
+    }
+
+    private Project sampleProject(Long creatorId) {
+        Project project = Project.builder()
+                .creatorId(creatorId)
+                .categoryId(1L)
+                .title("테스트 프로젝트")
+                .build();
+        ReflectionTestUtils.setField(project, "id", 1L);
+        return project;
     }
 }
