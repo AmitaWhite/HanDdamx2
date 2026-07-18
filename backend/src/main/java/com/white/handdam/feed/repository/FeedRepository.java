@@ -5,6 +5,8 @@ import com.white.handdam.feed.entity.Visibility;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.List;
 
@@ -91,4 +93,8 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
     // 프로젝트 피드 목록
     Slice<Feed> findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
             Long projectId, List<Visibility> visibility, Pageable pageable);
+
+    // 프로젝트 목록 피드 수 배치 조회
+    @Query("SELECT f.projectId, COUNT(f) FROM Feed f WHERE f.projectId IN :projectIds AND f.deleted = false GROUP BY f.projectId")
+    List<Object[]> countByProjectIdInAndDeletedFalse(@Param("projectIds") List<Long> projectIds);
 }
