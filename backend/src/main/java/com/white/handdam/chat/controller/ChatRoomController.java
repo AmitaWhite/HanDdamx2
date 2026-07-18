@@ -46,10 +46,10 @@ public class ChatRoomController {
 	 * 권한: 로그인 사용자(본인이 creator 또는 member인 방만)
 	 */
 	@GetMapping("/api/chat-rooms")
-	public ResponseEntity<ApiResponse<List<ChatRoomListItemResponse>>> getMyChatRooms(
+	public ApiResponse<List<ChatRoomListItemResponse>> getMyChatRooms(
 		@AuthenticationPrincipal AuthMember member
 	) {
-		return ResponseEntity.ok(ApiResponse.success(chatRoomService.getMyChatRooms(member.id())));
+		return ApiResponse.success(chatRoomService.getMyChatRooms(member.id()));
 	}
 
 	/**
@@ -57,11 +57,11 @@ public class ChatRoomController {
 	 * 권한: 해당 채팅방 참여자(creator 또는 member)
 	 */
 	@GetMapping("/api/chat-rooms/{chatRoomId}")
-	public ResponseEntity<ApiResponse<ChatRoomResponse>> getChatRoom(
+	public ApiResponse<ChatRoomResponse> getChatRoom(
 		@PathVariable Long chatRoomId,
 		@AuthenticationPrincipal AuthMember member
 	) {
-		return ResponseEntity.ok(ApiResponse.success(chatRoomService.getChatRoom(chatRoomId, member.id())));
+		return ApiResponse.success(chatRoomService.getChatRoom(chatRoomId, member.id()));
 	}
 
 	/**

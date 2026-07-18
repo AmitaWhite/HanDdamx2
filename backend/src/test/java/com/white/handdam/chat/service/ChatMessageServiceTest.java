@@ -15,6 +15,7 @@ import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.entity.ChatRoom;
 import com.white.handdam.chat.entity.ChatRoomStatus;
+import com.white.handdam.chat.event.ChatMessageSentEvent;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.websocket.publisher.ChatMessagePublisher;
@@ -31,6 +32,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +59,9 @@ class ChatMessageServiceTest {
 
 	@Mock
 	private ChatMessagePublisher chatMessagePublisher;
+
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private ChatMessageService chatMessageService;
@@ -179,6 +184,16 @@ class ChatMessageServiceTest {
 		assertThat(response.content()).isEqualTo("안녕하세요");
 		assertThat(room.getLastMessageAt()).isEqualTo(Instant.parse("2026-07-17T01:00:00Z"));
 		verify(objectStorage, never()).upload(any(), any());
+
+		ArgumentCaptor<ChatMessageSentEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageSentEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		ChatMessageSentEvent event = eventCaptor.getValue();
+		assertThat(event.chatRoomId()).isEqualTo(10L);
+		assertThat(event.messageId()).isEqualTo(200L);
+		assertThat(event.senderId()).isEqualTo(memberId);
+		assertThat(event.recipientId()).isEqualTo(creatorId);
+		assertThat(event.type()).isEqualTo(ChatMessageType.TEXT);
+		assertThat(event.contentPreview()).isEqualTo("안녕하세요");
 	}
 
 	@Test
@@ -234,6 +249,16 @@ class ChatMessageServiceTest {
 		ArgumentCaptor<ChatMessage> captor = ArgumentCaptor.forClass(ChatMessage.class);
 		verify(chatMessageRepository).save(captor.capture());
 		assertThat(captor.getValue().getImageStorageKey()).isEqualTo("chat/10/key.jpg");
+
+		ArgumentCaptor<ChatMessageSentEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageSentEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		ChatMessageSentEvent event = eventCaptor.getValue();
+		assertThat(event.chatRoomId()).isEqualTo(10L);
+		assertThat(event.messageId()).isEqualTo(202L);
+		assertThat(event.type()).isEqualTo(ChatMessageType.IMAGE);
+		assertThat(event.senderId()).isEqualTo(memberId);
+		assertThat(event.recipientId()).isEqualTo(creatorId);
+		assertThat(event.contentPreview()).isEqualTo("[이미지]");
 	}
 
 	@Test

@@ -10,7 +10,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -42,28 +42,28 @@ public class BoardCommentController {
 	 * 일반 댓글 작성 (BOARD-013).
 	 * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping("/api/premium-board/posts/{postId}/comments")
-	public ResponseEntity<ApiResponse<BoardCommentResponse>> createComment(
+	public ApiResponse<BoardCommentResponse> createComment(
 		@PathVariable Long postId,
 		@AuthenticationPrincipal AuthMember member,
 		@Valid @RequestBody CreateBoardCommentRequest request
 	) {
-		BoardCommentResponse response = boardCommentService.createComment(postId, member.id(), request);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+		return ApiResponse.success(boardCommentService.createComment(postId, member.id(), request));
 	}
 
 	/**
 	 * 대댓글 작성 (BOARD-014).
 	 * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자
 	 */
+	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping("/api/board-comments/{commentId}/replies")
-	public ResponseEntity<ApiResponse<BoardCommentResponse>> createReply(
+	public ApiResponse<BoardCommentResponse> createReply(
 		@PathVariable Long commentId,
 		@AuthenticationPrincipal AuthMember member,
 		@Valid @RequestBody CreateBoardCommentRequest request
 	) {
-		BoardCommentResponse response = boardCommentService.createReply(commentId, member.id(), request);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+		return ApiResponse.success(boardCommentService.createReply(commentId, member.id(), request));
 	}
 
 	/**
@@ -86,11 +86,11 @@ public class BoardCommentController {
 	 * 권한: 해당 댓글 작성자
 	 */
 	@DeleteMapping("/api/board-comments/{commentId}")
-	public ResponseEntity<ApiResponse<Void>> deleteComment(
+	public ApiResponse<Void> deleteComment(
 		@PathVariable Long commentId,
 		@AuthenticationPrincipal AuthMember member
 	) {
 		boardCommentService.deleteComment(commentId, member.id());
-		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.noContent());
+		return ApiResponse.noContent();
 	}
 }

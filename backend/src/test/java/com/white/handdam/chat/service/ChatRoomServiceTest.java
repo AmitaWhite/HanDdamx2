@@ -15,6 +15,7 @@ import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.entity.ChatRoom;
 import com.white.handdam.chat.entity.ChatRoomStatus;
+import com.white.handdam.chat.event.ChatRoomCreatedEvent;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.repository.ChatRoomRepository;
@@ -27,9 +28,11 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +46,9 @@ class ChatRoomServiceTest {
 
 	@Mock
 	private PaidSubscriptionChecker paidSubscriptionChecker;
+
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private ChatRoomService chatRoomService;
@@ -72,6 +78,13 @@ class ChatRoomServiceTest {
 		assertThat(room.memberId()).isEqualTo(memberId);
 		assertThat(room.status()).isEqualTo(ChatRoomStatus.ACTIVE);
 		verify(chatRoomRepository).save(any(ChatRoom.class));
+
+		ArgumentCaptor<ChatRoomCreatedEvent> eventCaptor = ArgumentCaptor.forClass(ChatRoomCreatedEvent.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		ChatRoomCreatedEvent event = eventCaptor.getValue();
+		assertThat(event.chatRoomId()).isEqualTo(10L);
+		assertThat(event.creatorId()).isEqualTo(creatorId);
+		assertThat(event.memberId()).isEqualTo(memberId);
 	}
 
 	@Test
@@ -93,6 +106,7 @@ class ChatRoomServiceTest {
 		assertThat(result.created()).isFalse();
 		assertThat(result.room().id()).isEqualTo(7L);
 		verify(chatRoomRepository, never()).save(any());
+		verify(eventPublisher, never()).publishEvent(any(ChatRoomCreatedEvent.class));
 	}
 
 	@Test
