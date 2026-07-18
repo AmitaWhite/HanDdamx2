@@ -9,6 +9,7 @@ export const paths = {
 	signup: "/signup",
 	forgotPassword: "/forgot-password",
 	oauthCallback: "/oauth/callback",
+	emailVerify: "/email-verify",
 
 	// --- Consumer (소비자 앱) ---
 	home: "/home",

@@ -2,11 +2,13 @@ import { createBrowserRouter } from "react-router-dom";
 import { ConsumerLayout } from "@/layouts/ConsumerLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { PublicLayout } from "@/layouts/PublicLayout";
+import { EmailVerifyPage } from "@/pages/EmailVerifyPage";
 import { HomePage } from "@/pages/HomePage";
 import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
+import { SignupPage } from "@/pages/SignupPage";
 import { paths } from "./paths";
 
 /**
@@ -19,15 +21,13 @@ export const router = createBrowserRouter([
 		children: [
 			{ path: paths.landing, element: <LandingPage /> },
 			{ path: paths.login, element: <LoginPage /> },
-			{
-				path: paths.signup,
-				element: <PagePlaceholder title="회원가입" source="signup.html" />,
-			},
+			{ path: paths.signup, element: <SignupPage /> },
 			{
 				path: paths.forgotPassword,
 				element: <PagePlaceholder title="비밀번호 찾기" />,
 			},
 			{ path: paths.oauthCallback, element: <OAuthCallbackPage /> },
+			{ path: paths.emailVerify, element: <EmailVerifyPage /> },
 		],
 	},
 	{

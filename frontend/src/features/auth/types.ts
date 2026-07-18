@@ -20,6 +20,25 @@ export interface TokenRefreshResponse {
 	accessToken: string;
 }
 
+/** POST /api/auth/signup 요청 */
+export interface SignupRequest {
+	email: string;
+	password: string;
+	nickname: string;
+}
+
+/** POST /api/auth/signup 응답 */
+export interface SignupResponse {
+	memberId: number;
+	email: string;
+	nickname: string;
+}
+
+/** GET /api/auth/{email,nickname}-availability 응답 */
+export interface AvailabilityResponse {
+	available: boolean;
+}
+
 /** 앱 전역에서 쓰는 로그인 사용자 정보 */
 export interface AuthUser {
 	memberId: number;
