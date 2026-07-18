@@ -56,7 +56,6 @@ public class SecurityConfig {
                         "/api/feeds/*",
                         "/api/feeds/*/comments",
                         "/api/categories",
-                        "/api/projects/*",
                         "/api/creators/*/projects",
         };
 
@@ -69,6 +68,8 @@ public class SecurityConfig {
                                                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers(PERMIT_ALL).permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/projects/*").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/projects/*/feeds").permitAll()
                                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(ex -> ex

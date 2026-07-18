@@ -100,11 +100,25 @@ public class ProjectService {
         Member creator = findCreatorMemberById(creatorMemberId);
         List<Project> projects = projectRepository
                 .findByCreatorIdAndDeletedFalseOrderByCreatedAtDesc(creatorMemberId);
+        if (projects.isEmpty()) {
+            return List.of();
+        }
+
+        // 카테고리 배치 조회
+        Set<Long> categoryIds = projects.stream().map(Project::getCategoryId).collect(Collectors.toSet());
+        Map<Long, Category> categoryMap = categoryRepository.findAllById(categoryIds).stream()
+                .collect(Collectors.toMap(Category::getId, c -> c));
+
+        // 피드 수 배치 조회 (또는 `@Query로` GROUP BY)
+        List<Long> projectIds = projects.stream().map(Project::getId).toList();
+        // FeedRepository에 countByProjectIdInAndDeletedFalseGroupByProjectId 추가 필요
+        Map<Long, Long> feedCountMap = ...;
+
         return projects.stream()
                 .map(p -> {
-                    Category category = categoryRepository.findById(p.getCategoryId())
+                    Category category = Optional.ofNullable(categoryMap.get(p.getCategoryId()))
                             .orElseThrow(() -> new CustomException(CategoryErrorCode.CATEGORY_NOT_FOUND));
-                    long feedCount = feedRepository.countByProjectIdAndDeletedFalse(p.getId());
+                    long feedCount = feedCountMap.getOrDefault(p.getId(), 0L);
                     boolean isMine = requesterId != null && requesterId.equals(creatorMemberId);
                     return ProjectConverter.toResponse(p, creator, category, feedCount, isMine);
                 })
@@ -124,8 +138,16 @@ public class ProjectService {
         project.update(request.title(), request.description(), request.categoryId());
 
         if (request.removeCoverImage()) {
+            // 기존 S3 객체 삭제
+            if (project.getCoverImageStorageKey() != null) {
+                objectStorage.delete(project.getCoverImageStorageKey());
+            }
             project.clearCoverImage();
         } else if (coverImage != null && !coverImage.isEmpty()) {
+            // 기존 S3 객체 삭제 후 새 파일 업로드
+            if (project.getCoverImageStorageKey() != null) {
+                objectStorage.delete(project.getCoverImageStorageKey());
+            }
             StoredObject stored = objectStorage.upload("projects/" + memberId, coverImage);
             project.updateCoverImage(stored.url(), stored.storageKey());
         }

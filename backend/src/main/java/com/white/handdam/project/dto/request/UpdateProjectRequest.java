@@ -1,11 +1,11 @@
 package com.white.handdam.project.dto.request;
 
-/**
- * 프로젝트 수정 요청 DTO
- */
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public record UpdateProjectRequest(
-        String title,
+        @NotBlank String title,
         String description,
-        Long categoryId,
+        @NotNull Long categoryId,
         boolean removeCoverImage
 ) {}

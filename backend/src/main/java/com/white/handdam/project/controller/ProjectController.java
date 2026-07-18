@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.Valid;
 
 /**
  * 프로젝트 API 컨트롤러
@@ -42,7 +43,7 @@ public class ProjectController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ProjectResponse> createProject(
             @AuthenticationPrincipal AuthMember member,
-            @RequestPart("metadata") CreateProjectRequest request,
+            @RequestPart("metadata") @Valid CreateProjectRequest request,
             @RequestPart(value = "coverImage", required = false) MultipartFile coverImage
     ) {
         return ApiResponse.success(projectService.createProject(member.id(), request, coverImage));
@@ -69,7 +70,7 @@ public class ProjectController {
     public ApiResponse<ProjectResponse> updateProject(
             @AuthenticationPrincipal AuthMember member,
             @PathVariable Long projectId,
-            @RequestPart("metadata") UpdateProjectRequest request,
+            @RequestPart("metadata") @Valid UpdateProjectRequest request,
             @RequestPart(value = "coverImage", required = false) MultipartFile coverImage
     ) {
         return ApiResponse.success(

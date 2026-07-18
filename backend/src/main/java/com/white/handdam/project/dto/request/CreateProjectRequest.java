@@ -1,6 +1,10 @@
 package com.white.handdam.project.dto.request;
 
-/**
- * 프로젝트 생성 요청 DTO
- */
-public record CreateProjectRequest(String title, String description, Long categoryId) {}
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record CreateProjectRequest(
+        @NotBlank String title,
+        String description,
+        @NotNull Long categoryId
+) {}
