@@ -97,4 +97,8 @@ public class Member extends BaseTimeEntity {
     }
 
     public void changeRoleToCreator() { this.role = Role.CREATOR; }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
 }
