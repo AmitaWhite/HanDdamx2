@@ -3,6 +3,7 @@ package com.white.handdam.poll.controller;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
+import com.white.handdam.poll.dto.request.PollUpdateRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.service.PollService;
 import jakarta.validation.Valid;
@@ -36,6 +37,16 @@ public class PollController {
     ) {
         Long memberId = (member != null) ? member.id() : null;
         return ApiResponse.success(pollService.getPoll(pollId, memberId));
+    }
+
+    // [LYJ-024] 투표 질문·종료일 수정
+    @PatchMapping("/api/polls/{pollId}")
+    public ApiResponse<Long> updatePoll(
+        @PathVariable Long pollId,
+        @AuthenticationPrincipal AuthMember member,
+        @RequestBody PollUpdateRequest request
+    ) {
+        return ApiResponse.success(pollService.updatePoll(pollId, member.id(), request));
     }
 
 }

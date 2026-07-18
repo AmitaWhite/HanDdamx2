@@ -7,6 +7,7 @@ import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
+import com.white.handdam.poll.dto.request.PollUpdateRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
@@ -247,6 +248,76 @@ class PollServiceTest {
         assertThat(result.options()).extracting("optionText")
                 .containsExactly("Java", "Kotlin", "Python");
     }
+
+    // ---------------------------------------------------------------
+// LYJ-024 투표 질문·종료일 수정
+// ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-024] 투표 질문·종료일 수정 성공 - pollId 반환")
+    void updatePoll_success() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(1L))); // creatorId=1L = memberId=1L
+
+        Instant newEndAt = Instant.now().plusSeconds(7200);
+        Long result = pollService.updatePoll(1L, 1L,
+            new PollUpdateRequest("수정된 질문", newEndAt));
+
+        assertThat(result).isEqualTo(1L);
+        assertThat(poll.getQuestion()).isEqualTo("수정된 질문");
+        assertThat(poll.getEndAt()).isEqualTo(newEndAt);
+    }
+
+    @Test
+    @DisplayName("[LYJ-024] question만 수정해도 endAt은 기존 값 유지")
+    void updatePoll_onlyQuestion() {
+        Poll poll = samplePoll(1L);
+        Instant originalEndAt = poll.getEndAt();
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(1L)));
+
+        pollService.updatePoll(1L, 1L, new PollUpdateRequest("새 질문", null));
+
+        assertThat(poll.getQuestion()).isEqualTo("새 질문");
+        assertThat(poll.getEndAt()).isEqualTo(originalEndAt); // 변경 없음
+    }
+
+    @Test
+    @DisplayName("[LYJ-024] 크리에이터가 아닌 사용자가 수정 시 POLL_FORBIDDEN 예외 발생")
+    void updatePoll_notOwner_forbidden() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L))); // creatorId=99L ≠ memberId=1L
+
+        assertThatThrownBy(() -> pollService.updatePoll(1L, 1L,
+            new PollUpdateRequest("수정 시도", null)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("[LYJ-024] 존재하지 않는 투표 수정 시 POLL_NOT_FOUND 예외 발생")
+    void updatePoll_pollNotFound() {
+        given(pollRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pollService.updatePoll(999L, 1L,
+            new PollUpdateRequest("질문", null)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_NOT_FOUND));
+    }
+
 
 
     // ---------------------------------------------------------------

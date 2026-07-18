@@ -40,4 +40,10 @@ public class Poll extends BaseTimeEntity {
     public boolean isActive(){
         return !closed && Instant.now().isBefore(endAt);
     }
+
+    public void update(String question, Instant endAt) {
+        if (question != null) this.question = question;
+        if (endAt != null)   this.endAt    = endAt;
+    }
+
 }

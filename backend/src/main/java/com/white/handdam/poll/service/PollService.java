@@ -7,6 +7,7 @@ import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.poll.dto.request.PollCreateRequest;
+import com.white.handdam.poll.dto.request.PollUpdateRequest;
 import com.white.handdam.poll.dto.response.PollResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
@@ -94,6 +95,27 @@ public class PollService {
 
         return PollResponse.from(poll, options, myVotedOptionId);
     }
+
+    // [LYJ-024] 투표 질문·종료일 수정
+    @Transactional
+    public Long updatePoll(Long pollId, Long memberId, PollUpdateRequest request) {
+        Poll poll = pollRepository.findById(pollId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
+
+        Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        if (!project.getCreatorId().equals(memberId)) {
+            throw new CustomException(PollErrorCode.POLL_FORBIDDEN);
+        }
+
+        poll.update(request.question(), request.endAt());
+        return poll.getId();
+    }
+
 
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;
