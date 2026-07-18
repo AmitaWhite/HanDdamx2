@@ -4,6 +4,7 @@ import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.dto.request.MemberUpdateRequest;
 import com.white.handdam.member.dto.response.MemberProfileResponse;
+import com.white.handdam.member.dto.response.MemberPublicProfileResponse;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.exception.MemberErrorCode;
 import com.white.handdam.member.repository.MemberRepository;
@@ -101,7 +102,13 @@ public class MemberService {
         }
 
         return MemberProfileResponse.from(member);
+    }
 
+    // KSY-019
+    public MemberPublicProfileResponse getPublicProfile (Long memberId) {
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new CustomException(MemberErrorCode.MEMBER_NOT_FOUND));
+        return MemberPublicProfileResponse.from(member);
     }
 
 }

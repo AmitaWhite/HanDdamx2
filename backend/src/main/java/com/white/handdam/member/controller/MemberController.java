@@ -4,6 +4,7 @@ import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.member.dto.request.MemberUpdateRequest;
 import com.white.handdam.member.dto.response.MemberProfileResponse;
+import com.white.handdam.member.dto.response.MemberPublicProfileResponse;
 import com.white.handdam.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,11 @@ public class MemberController {
     @DeleteMapping(value = "/me/profile-image")
     public ApiResponse<MemberProfileResponse> deleteProfileImage(@AuthenticationPrincipal AuthMember authMember) {
         return ApiResponse.success(memberService.deleteProfileImage(authMember.id()));
+    }
+
+    @GetMapping("/{memberId}")
+    public ApiResponse<MemberPublicProfileResponse> getPublicProfile (@PathVariable Long memberId) {
+        return ApiResponse.success(memberService.getPublicProfile(memberId));
     }
 
 }
