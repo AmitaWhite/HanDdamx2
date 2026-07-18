@@ -44,9 +44,20 @@ public class PollController {
     public ApiResponse<Long> updatePoll(
         @PathVariable Long pollId,
         @AuthenticationPrincipal AuthMember member,
-        @RequestBody PollUpdateRequest request
+        @Valid @RequestBody PollUpdateRequest request
     ) {
         return ApiResponse.success(pollService.updatePoll(pollId, member.id(), request));
     }
+
+    // [LYJ-025] 투표 삭제
+    @DeleteMapping("/api/polls/{pollId}")
+    public ApiResponse<Void> deletePoll(
+        @PathVariable Long pollId,
+        @AuthenticationPrincipal AuthMember member
+    ) {
+        pollService.deletePoll(pollId, member.id());
+        return ApiResponse.success(null);
+    }
+
 
 }

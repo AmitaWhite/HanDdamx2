@@ -20,6 +20,7 @@ import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +56,11 @@ public class PollService {
         }
 
         Poll poll = Poll.create(feedId, request.question(), request.endAt());
-        pollRepository.save(poll);
+        try {
+            pollRepository.save(poll);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(PollErrorCode.POLL_ALREADY_EXISTS);
+        }
 
         List<PollOption> options = new ArrayList<>();
         for (int i = 0; i < request.options().size(); i++) {
@@ -116,6 +121,26 @@ public class PollService {
         return poll.getId();
     }
 
+    // [LYJ-025] 투표 삭제 (크리에이터 전용)
+    @Transactional
+    public void deletePoll(Long pollId, Long memberId) {
+        Poll poll = pollRepository.findById(pollId)
+            .orElseThrow(() -> new CustomException(PollErrorCode.POLL_NOT_FOUND));
+
+        Feed feed = feedRepository.findByIdAndDeletedFalse(poll.getFeedId())
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        if (!project.getCreatorId().equals(memberId)) {
+            throw new CustomException(PollErrorCode.POLL_FORBIDDEN);
+        }
+
+        pollVoteRepository.deleteByPollId(pollId);
+        pollOptionRepository.deleteByPollId(pollId);
+        pollRepository.delete(poll);
+    }
 
     private boolean canAccess(Visibility visibility, String level, boolean isOwner) {
         if (isOwner) return true;

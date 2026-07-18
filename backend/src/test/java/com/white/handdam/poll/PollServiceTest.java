@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -343,6 +344,60 @@ class PollServiceTest {
                 options
         );
     }
+
+    // ---------------------------------------------------------------
+    // LYJ-025 투표 삭제
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("[LYJ-025] 크리에이터가 투표 삭제 성공 - vote→option→poll 순으로 삭제")
+    void deletePoll_success() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(1L))); // creatorId=1L
+
+        pollService.deletePoll(1L, 1L);
+
+        // 삭제 순서 검증 (InOrder)
+        InOrder order = inOrder(pollVoteRepository, pollOptionRepository, pollRepository);
+        order.verify(pollVoteRepository).deleteByPollId(1L);
+        order.verify(pollOptionRepository).deleteByPollId(1L);
+        order.verify(pollRepository).delete(poll);
+    }
+
+    @Test
+    @DisplayName("[LYJ-025] 크리에이터가 아닌 사용자가 삭제 시 POLL_FORBIDDEN 예외 발생")
+    void deletePoll_notOwner_forbidden() {
+        Poll poll = samplePoll(1L);
+        given(pollRepository.findById(1L)).willReturn(Optional.of(poll));
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L))); // creatorId=99L ≠ memberId=1L
+
+        assertThatThrownBy(() -> pollService.deletePoll(1L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_FORBIDDEN));
+
+        // 권한 없으면 삭제 시도 없어야 함
+        verify(pollRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("[LYJ-025] 존재하지 않는 투표 삭제 시 POLL_NOT_FOUND 예외 발생")
+    void deletePoll_pollNotFound() {
+        given(pollRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pollService.deletePoll(999L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(PollErrorCode.POLL_NOT_FOUND));
+    }
+
 
     // ---------------------------------------------------------------
     // 헬퍼 (023에 추가되는 것들)

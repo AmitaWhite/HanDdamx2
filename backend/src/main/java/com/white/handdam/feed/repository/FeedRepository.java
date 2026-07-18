@@ -44,7 +44,7 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
             WHERE p.id = f.projectId
               AND f.deleted = false
               AND p.deleted = false
-              AND f.visibility = 'PUBLIC'
+              AND f.visibility = com.white.handdam.feed.entity.Visibility.PUBLIC
               AND (:categoryId IS NULL OR p.categoryId = :categoryId)
             ORDER BY f.createdAt DESC
             """)

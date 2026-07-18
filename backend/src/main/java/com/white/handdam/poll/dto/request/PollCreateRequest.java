@@ -15,6 +15,6 @@ public record PollCreateRequest(
         Instant endAt,
 
         @NotNull
-        @Size(min = 2, message = "선택지는 2개 이상이어야 합니다")
+        @Size(min = 2, max = 10, message = "선택지는 2개 이상 10개 이하여야 합니다")
         List<@NotBlank @Size(max = 200) String> options
 ) {}
