@@ -8,10 +8,10 @@ import com.white.handdam.chat.service.ChatRoomService;
 import com.white.handdam.chat.service.ChatRoomService.CreateOrGetResult;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -31,14 +31,17 @@ public class ChatRoomController {
 	 * 권한: 활성 유료 구독자 (JWT 인증 필요)
 	 */
 	@PostMapping("/api/creators/{creatorId}/chat-rooms")
-	public ResponseEntity<ApiResponse<ChatRoomResponse>> createOrGetChatRoom(
+	public ApiResponse<ChatRoomResponse> createOrGetChatRoom(
 		@PathVariable Long creatorId,
-		@AuthenticationPrincipal AuthMember member
+		@AuthenticationPrincipal AuthMember member,
+		HttpServletResponse response
 	) {
 		CreateOrGetResult result = chatRoomService.createOrGetChatRoom(creatorId, member.id());
 		//새로만든방이면 201 반환, 기존방이면 200 반환
-		HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
-		return ResponseEntity.status(status).body(ApiResponse.success(result.room()));
+		if (result.created()) {
+			response.setStatus(HttpStatus.CREATED.value());
+		}
+		return ApiResponse.success(result.room());
 	}
 
 	/**
@@ -46,10 +49,10 @@ public class ChatRoomController {
 	 * 권한: 로그인 사용자(본인이 creator 또는 member인 방만)
 	 */
 	@GetMapping("/api/chat-rooms")
-	public ResponseEntity<ApiResponse<List<ChatRoomListItemResponse>>> getMyChatRooms(
+	public ApiResponse<List<ChatRoomListItemResponse>> getMyChatRooms(
 		@AuthenticationPrincipal AuthMember member
 	) {
-		return ResponseEntity.ok(ApiResponse.success(chatRoomService.getMyChatRooms(member.id())));
+		return ApiResponse.success(chatRoomService.getMyChatRooms(member.id()));
 	}
 
 	/**
@@ -57,11 +60,11 @@ public class ChatRoomController {
 	 * 권한: 해당 채팅방 참여자(creator 또는 member)
 	 */
 	@GetMapping("/api/chat-rooms/{chatRoomId}")
-	public ResponseEntity<ApiResponse<ChatRoomResponse>> getChatRoom(
+	public ApiResponse<ChatRoomResponse> getChatRoom(
 		@PathVariable Long chatRoomId,
 		@AuthenticationPrincipal AuthMember member
 	) {
-		return ResponseEntity.ok(ApiResponse.success(chatRoomService.getChatRoom(chatRoomId, member.id())));
+		return ApiResponse.success(chatRoomService.getChatRoom(chatRoomId, member.id()));
 	}
 
 	/**
