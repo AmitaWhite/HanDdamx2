@@ -20,7 +20,10 @@ public enum AuthErrorCode implements ErrorCode {
     EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "이메일 인증이 필요합니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 refresh token입니다. 다시 로그인해주세요."),
 
-    MAIL_SEND_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.");
+    MAIL_SEND_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수를 초과했습니다. 잠시 후 다시 시도해주세요."),
+
+    INVALID_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
+    OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD(HttpStatus.BAD_REQUEST, "OAuth 계정은 비밀번호를 변경할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
