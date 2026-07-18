@@ -10,6 +10,7 @@ import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardAnswerRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
 import com.white.handdam.global.exception.CustomException;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +29,11 @@ public class BoardAnswerService {
 	 * <pre>
 	 * 1. 삭제되지 않은 게시글 조회 (없으면 404)
 	 * 2. 게시판 소유 크리에이터만 허용 (아니면 403)
-	 * 3. 이미 답변이 있으면 409
-	 * 4. board_answer 저장
-	 * 5. board_post.status = ANSWERED
+	 * 3. 활성 답변이 있으면 409
+	 * 4. 소프트 삭제된 답변이 있으면 복구(restore) 후 재등록
+	 *    — UNIQUE(board_post_id) 때문에 INSERT 대신 기존 행 재사용
+	 * 5. 없으면 board_answer 신규 저장
+	 * 6. board_post.status = ANSWERED
 	 * </pre>
 	 */
 	@Transactional
@@ -44,20 +47,32 @@ public class BoardAnswerService {
 
 		assertCanCreateAnswer(post, requesterId);
 
-		if (boardAnswerRepository.existsByBoardPostId(postId)) {
-			//"이미 공식 답변이 등록된 게시글입니다."
+		if (boardAnswerRepository.existsByBoardPostIdAndDeletedFalse(postId)) {
 			throw new CustomException(BoardErrorCode.BOARD_ANSWER_ALREADY_EXISTS);
 		}
 
-		BoardAnswer answer = BoardAnswer.builder()
-			.boardPost(post)
-			.creatorId(requesterId)
-			.content(request.content())
-			.build();
+		// 활성 답변은 위에서 이미 막았으므로, 여기 있으면 소프트 삭제된 행이다.
+		// UNIQUE(board_post_id) 때문에 INSERT 대신 기존 행을 재사용한다.
+		Optional<BoardAnswer> existing = boardAnswerRepository.findByBoardPostId(postId);
+		BoardAnswer saved;
+		if (existing.isPresent()) {// 조회 결과가 있으면 true
+			// 소프트 삭제 답변 복구: content/creator 갱신, deleted=false
+			BoardAnswer answer = existing.get();
+			answer.restore(request.content(), requesterId);
+			saved = answer; // 영속 엔티티라 save 호출 없이 dirty checking 으로 UPDATE
+		} else {
+			// 해당 게시글에 답변 행이 한 번도 없으면 신규 INSERT
+			saved = boardAnswerRepository.save(
+				BoardAnswer.builder()
+					.boardPost(post)
+					.creatorId(requesterId)
+					.content(request.content())
+					.build()
+			);
+		}
 
-		BoardAnswer saved = boardAnswerRepository.save(answer);
+		// 게시글 상태를 WAITING → ANSWERED 로 전환
 		post.markAnswered();
-
 		return BoardAnswerConverter.toResponse(saved);
 	}
 
