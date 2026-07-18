@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
+import { GuestOnlyRoute } from "@/features/auth/GuestOnlyRoute";
 import { ConsumerLayout } from "@/layouts/ConsumerLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { PublicLayout } from "@/layouts/PublicLayout";
@@ -20,8 +21,22 @@ export const router = createBrowserRouter([
 		element: <PublicLayout />,
 		children: [
 			{ path: paths.landing, element: <LandingPage /> },
-			{ path: paths.login, element: <LoginPage /> },
-			{ path: paths.signup, element: <SignupPage /> },
+			{
+				path: paths.login,
+				element: (
+					<GuestOnlyRoute>
+						<LoginPage />
+					</GuestOnlyRoute>
+				),
+			},
+			{
+				path: paths.signup,
+				element: (
+					<GuestOnlyRoute>
+						<SignupPage />
+					</GuestOnlyRoute>
+				),
+			},
 			{
 				path: paths.forgotPassword,
 				element: <PagePlaceholder title="비밀번호 찾기" />,
