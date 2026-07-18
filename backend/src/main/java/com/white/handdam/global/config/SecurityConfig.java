@@ -27,13 +27,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-        private final JwtTokenProvider jwtTokenProvider;
-        private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-        private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
-        private final CustomOAuth2UserService customOAuth2UserService;
-        private final OAuth2SuccessHandler oAuth2SuccessHandler;
-        private final OAuth2FailureHandler oAuth2FailureHandler;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler;
 
         // auth 도메인에 로그인/재발급 등 신규 공개 엔드포인트가 추가되면 이 목록도 같이 갱신해야 한다.
         private static final String[] PERMIT_ALL = {
@@ -43,7 +43,7 @@ public class SecurityConfig {
                         "/api/auth/email-verifications/**",
                         "/api/auth/login",
                         "/api/auth/token/refresh",
-                        "/swagger-ui/**", "/v3/api-docs/**",
+                        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
                         "/actuator/health",
                         // handshake만 공개. STOMP CONNECT JWT는 StompAuthChannelInterceptor에서 검증
                         "/ws",
@@ -60,33 +60,32 @@ public class SecurityConfig {
                         "/api/creators/*/projects",
         };
 
-        @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-                return http.csrf(AbstractHttpConfigurer::disable)
-                                .cors(cors -> {
-                                })
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers(PERMIT_ALL).permitAll()
-                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                                                .anyRequest().authenticated())
-                                .exceptionHandling(ex -> ex
-                                                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
-                                                .accessDeniedHandler(jwtAccessDeniedHandler))
-                                .oauth2Login(oauth2 -> oauth2
-                                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-                                        .successHandler(oAuth2SuccessHandler)
-                                        .failureHandler(oAuth2FailureHandler)
-                                )
-                                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
-                                                UsernamePasswordAuthenticationFilter.class)
-                                .build();
-        }
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http.csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> {
+                })
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PERMIT_ALL).permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated())
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler))
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                        .successHandler(oAuth2SuccessHandler)
+                        .failureHandler(oAuth2FailureHandler))
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
+                        UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
 
-        @Bean
-        public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder();
-        }
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
 }

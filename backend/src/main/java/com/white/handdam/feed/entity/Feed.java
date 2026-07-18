@@ -65,4 +65,15 @@ public class Feed extends BaseTimeEntity {
     public void delete(){
         this.deleted = true;
     }
+
+    // [LYJ-020] 좋아요 증가
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    // [LYJ-021] 좋아요 감소
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) this.likeCount--;
+    }
+
 }
