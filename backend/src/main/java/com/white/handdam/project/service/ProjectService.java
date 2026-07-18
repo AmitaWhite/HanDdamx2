@@ -112,7 +112,12 @@ public class ProjectService {
         // 피드 수 배치 조회 (또는 `@Query로` GROUP BY)
         List<Long> projectIds = projects.stream().map(Project::getId).toList();
         // FeedRepository에 countByProjectIdInAndDeletedFalseGroupByProjectId 추가 필요
-        Map<Long, Long> feedCountMap = ...;
+        Map<Long, Long> feedCountMap = feedRepository.countByProjectIdInAndDeletedFalse(projectIds)
+            .stream()
+            .collect(Collectors.toMap(
+                row -> (Long) row[0],
+                row -> (Long) row[1]
+            ));
 
         return projects.stream()
                 .map(p -> {
