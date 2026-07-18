@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
+import java.util.List;
 
 public interface FeedRepository extends JpaRepository<Feed, Long> {
     Optional<Feed> findByIdAndDeletedFalse(Long id);
@@ -81,4 +82,13 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
     //         Pageable pageable
     // );
 
+    // 프로젝트 삭제 전 피드 수 검증
+    long countByProjectIdAndDeletedFalse(Long projectId);
+
+    // 프로젝트에 포함된 피드 목록 조회
+    Slice<Feed> findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(Long projectId, Pageable pageable);
+
+    // 프로젝트 피드 목록
+    Slice<Feed> findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
+            Long projectId, List<Visibility> visibility, Pageable pageable);
 }

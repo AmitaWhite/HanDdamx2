@@ -12,13 +12,14 @@ import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.entity.Role;
 import com.white.handdam.member.repository.MemberRepository;
+import com.white.handdam.project.repository.ProjectRepository;
+import com.white.handdam.storage.ObjectStorage;
+import com.white.handdam.storage.StoredObject;
 import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.white.handdam.storage.ObjectStorage;
-import com.white.handdam.storage.StoredObject;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -33,6 +34,7 @@ public class CreatorProfileService {
     private final MemberRepository memberRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final ObjectStorage objectStorage;
+    private final ProjectRepository projectRepository;
 
     /**
      * 크리에이터 공개 프로필 조회
@@ -56,13 +58,15 @@ public class CreatorProfileService {
         // 4) 구독자 수 조회
         long subscriberCount = subscriptionRepository.countByCreatorId(creatorMemberId);
 
-        // 5) 본인 여부
+        // 5) 프로젝트 수, 피드 수 조회
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(creatorMemberId);
+        long feedCount = 0L;
+        // 6) 본인 여부
         boolean isMine = creatorMemberId.equals(requesterId);
 
-        // Project 엔티티 구현 후 projectCount, feedCount 실값으로 교체
         return CreatorProfileConverter.toResponse(
                 profile, creator, subscription,
-                subscriberCount, 0L, 0L, isMine
+                subscriberCount, projectCount, feedCount, isMine
         );
     }
 
@@ -77,14 +81,13 @@ public class CreatorProfileService {
         CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
 
-        // 3) 구독자 수
+        // 3) 구독자 수, 프로젝트 수, 피드 수 조회
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-
-        // 4) 본인 조회 → subscription null, isMine=true 고정
-        // Project 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
                 profile, creator, null,
-                subscriberCount, 0L, 0L, true
+                subscriberCount, projectCount, feedCount, true
         );
     }
 
@@ -100,9 +103,10 @@ public class CreatorProfileService {
         profile.updateProfile(request.introduction(), request.benefitsDescription());
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-        // Project 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
-                profile, creator, null, subscriberCount, 0L, 0L, true);
+                profile, creator, null, subscriberCount, projectCount, feedCount, true);
     }
 
     /**
@@ -118,14 +122,14 @@ public class CreatorProfileService {
         CreatorProfile profile = creatorProfileRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
 
-        // S3 업로드 후 프로필 갱신
         StoredObject stored = objectStorage.upload("creator-profiles/" + memberId, image);
         profile.updateRepresentativeImage(stored.url(), stored.storageKey());
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-        // Project 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
-                profile, creator, null, subscriberCount, 0L, 0L, true);
+                profile, creator, null, subscriberCount, projectCount, feedCount, true);
     }
 
     /**
@@ -140,9 +144,10 @@ public class CreatorProfileService {
         profile.clearRepresentativeImage();
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-        // roject 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
-                profile, creator, null, subscriberCount, 0L, 0L, true);
+                profile, creator, null, subscriberCount, projectCount, feedCount, true);
     }
 
     /**
@@ -162,9 +167,10 @@ public class CreatorProfileService {
         profile.updateCoverImage(stored.url(), stored.storageKey());
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-        // Project 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
-                profile, creator, null, subscriberCount, 0L, 0L, true);
+                profile, creator, null, subscriberCount, projectCount, feedCount, true);
     }
 
     /**
@@ -179,9 +185,10 @@ public class CreatorProfileService {
         profile.clearCoverImage();
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-        // Project 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
-                profile, creator, null, subscriberCount, 0L, 0L, true);
+                profile, creator, null, subscriberCount, projectCount, feedCount, true);
     }
 
     /**
@@ -200,9 +207,10 @@ public class CreatorProfileService {
         profile.updateSubscriptionPrice(request.subscriptionPrice());
 
         long subscriberCount = subscriptionRepository.countByCreatorId(memberId);
-        // Project 구현 후 projectCount, feedCount 교체
+        long projectCount = projectRepository.countByCreatorIdAndDeletedFalse(memberId);
+        long feedCount = 0L;
         return CreatorProfileConverter.toResponse(
-                profile, creator, null, subscriberCount, 0L, 0L, true);
+                profile, creator, null, subscriberCount, projectCount, feedCount, true);
     }
 
     /**

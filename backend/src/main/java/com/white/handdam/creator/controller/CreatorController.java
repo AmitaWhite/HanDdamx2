@@ -1,9 +1,11 @@
 package com.white.handdam.creator.controller;
 
 import com.white.handdam.creator.dto.response.CreatorProfileResponse;
+import com.white.handdam.project.dto.response.ProjectResponse;
 import com.white.handdam.creator.dto.request.UpdateCreatorProfileRequest;
 import com.white.handdam.creator.dto.request.UpdateSubscriptionPriceRequest;
 import com.white.handdam.creator.service.CreatorProfileService;
+import com.white.handdam.project.service.ProjectService;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 /**
  * 크리에이터 프로필 API 컨트롤러
@@ -28,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class CreatorController {
 
     private final CreatorProfileService creatorProfileService;
+    private final ProjectService projectService;
 
     /**
      * 내 크리에이터 프로필 조회
@@ -96,6 +100,30 @@ public class CreatorController {
     ) {
         CreatorProfileResponse response = creatorProfileService.clearCoverImage(member.id());
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 특정 크리에이터 프로젝트 목록 조회
+     * 권한: 전체 (비로그인 포함)
+     */
+    @GetMapping("/{creatorId}/projects")
+    public ApiResponse<List<ProjectResponse>> getCreatorProjects(
+            @PathVariable Long creatorId,
+            @AuthenticationPrincipal AuthMember member
+    ) {
+        Long requesterId = member != null ? member.id() : null;
+        return ApiResponse.success(projectService.getCreatorProjects(creatorId, requesterId));
+    }
+
+    /**
+     * 내 프로젝트 관리 목록
+     * 권한: 크리에이터
+     */
+    @GetMapping("/me/projects")
+    public ApiResponse<List<ProjectResponse>> getMyProjects(
+            @AuthenticationPrincipal AuthMember member
+    ) {
+        return ApiResponse.success(projectService.getCreatorProjects(member.id(), member.id()));
     }
 
     /**

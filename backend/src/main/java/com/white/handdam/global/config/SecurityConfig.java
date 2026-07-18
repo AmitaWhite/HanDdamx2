@@ -55,6 +55,9 @@ public class SecurityConfig {
                         "/api/feeds/public",
                         "/api/feeds/*",
                         "/api/feeds/*/comments",
+                        "/api/categories",
+                        "/api/projects/*",
+                        "/api/creators/*/projects",
         };
 
         @Bean
