@@ -7,6 +7,8 @@ export const paths = {
 	landing: "/",
 	login: "/login",
 	signup: "/signup",
+	forgotPassword: "/forgot-password",
+	oauthCallback: "/oauth/callback",
 
 	// --- Consumer (소비자 앱) ---
 	home: "/home",

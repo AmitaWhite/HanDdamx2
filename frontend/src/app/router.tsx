@@ -4,6 +4,8 @@ import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { PublicLayout } from "@/layouts/PublicLayout";
 import { HomePage } from "@/pages/HomePage";
 import { LandingPage } from "@/pages/LandingPage";
+import { LoginPage } from "@/pages/LoginPage";
+import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
 import { paths } from "./paths";
 
@@ -16,14 +18,16 @@ export const router = createBrowserRouter([
 		element: <PublicLayout />,
 		children: [
 			{ path: paths.landing, element: <LandingPage /> },
-			{
-				path: paths.login,
-				element: <PagePlaceholder title="로그인" source="login.html" />,
-			},
+			{ path: paths.login, element: <LoginPage /> },
 			{
 				path: paths.signup,
 				element: <PagePlaceholder title="회원가입" source="signup.html" />,
 			},
+			{
+				path: paths.forgotPassword,
+				element: <PagePlaceholder title="비밀번호 찾기" />,
+			},
+			{ path: paths.oauthCallback, element: <OAuthCallbackPage /> },
 		],
 	},
 	{
