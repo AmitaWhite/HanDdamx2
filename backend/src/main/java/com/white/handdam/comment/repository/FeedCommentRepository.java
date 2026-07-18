@@ -1,6 +1,7 @@
 package com.white.handdam.comment.repository;
 
 import com.white.handdam.comment.entity.FeedComment;
+import com.white.handdam.feed.entity.Feed;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -12,5 +13,8 @@ public interface FeedCommentRepository extends JpaRepository<FeedComment, Long> 
 
     // [LYJ-017]
     Optional<FeedComment> findByIdAndDeletedFalse(Long id);
+
+    // [LYJ-019]
+     List<FeedComment> findByParentCommentIdAndDeletedFalse(Long parentCommentId);
 
 }

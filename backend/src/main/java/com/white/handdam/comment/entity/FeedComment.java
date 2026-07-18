@@ -49,4 +49,16 @@ public class FeedComment extends BaseTimeEntity {
         c.content = content;
         return c;
     }
+
+    // [LYJ-018] 댓글 내용 수정
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
+    // [LYJ-019] 댓글 소프트 삭제
+    public void delete() {
+        this.deleted = true;
+        this.deletedAt = Instant.now();
+    }
+
 }

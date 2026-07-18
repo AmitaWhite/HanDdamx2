@@ -103,6 +103,12 @@ toss:
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
 
+subscription:
+  expiration:
+    enabled: ${SUBSCRIPTION_EXPIRATION_ENABLED:true}
+    cron: "${SUBSCRIPTION_EXPIRATION_CRON:0 */10 * * * *}"
+    batch-size: ${SUBSCRIPTION_EXPIRATION_BATCH_SIZE:100}
+
 
 ---
 # =====================================================================
@@ -135,13 +141,28 @@ spring:
     username: test
     password: test
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-client-id
+            client-secret: test-client-secret
+            scope: email, profile
+
 jwt:
-  secret: test_secret_do_not_use_in_prod
+  secret: test_secret_do_not_use_in_prod_ci_pipeline_only
   access-expiration: 3600000
   refresh-expiration: 1209600000
 
 app:
   frontend-base-url: http://localhost:3000
+
+subscription:
+  expiration:
+    enabled: false
+    cron: "0 */10 * * * *"
+    batch-size: 100
 
 toss:
   secret-key: test_secret_do_not_use
@@ -233,3 +254,9 @@ toss:
 springdoc:
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}
+
+subscription:
+  expiration:
+    enabled: ${SUBSCRIPTION_EXPIRATION_ENABLED:true}
+    cron: "${SUBSCRIPTION_EXPIRATION_CRON:0 */10 * * * *}"
+    batch-size: ${SUBSCRIPTION_EXPIRATION_BATCH_SIZE:100}

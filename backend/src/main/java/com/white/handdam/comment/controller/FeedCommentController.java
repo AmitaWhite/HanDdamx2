@@ -1,6 +1,7 @@
 package com.white.handdam.comment.controller;
 
 import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
+import com.white.handdam.comment.dto.request.FeedCommentUpdateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentIdResponse;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.service.FeedCommentService;
@@ -54,4 +55,28 @@ public class FeedCommentController {
         Long commentId = feedCommentService.createReply(feedId, parentCommentId, member.id(), request);
         return ApiResponse.success(new FeedCommentIdResponse(commentId));
     }
+
+    // [LYJ-018] PATCH /api/feeds/{feedId}/comments/{commentId}
+    @PatchMapping("/api/feeds/{feedId}/comments/{commentId}")
+    public ApiResponse<FeedCommentIdResponse> updateComment(
+            @PathVariable Long feedId,
+            @PathVariable Long commentId,
+            @AuthenticationPrincipal AuthMember member,
+            @Valid @RequestBody FeedCommentUpdateRequest request
+    ){
+        Long id = feedCommentService.updateComment(feedId, commentId, member.id(), request);
+        return ApiResponse.success(new FeedCommentIdResponse(id));
+    }
+
+    // [LYJ-019] DELETE /api/feeds/{feedId}/comments/{commentId}
+    @DeleteMapping("/api/feeds/{feedId}/comments/{commentId}")
+    public ApiResponse<Void> deleteComment(
+            @PathVariable Long feedId,
+            @PathVariable Long commentId,
+            @AuthenticationPrincipal AuthMember member
+    ) {
+        feedCommentService.deleteComment(feedId, commentId, member.id());
+        return ApiResponse.noContent();
+    }
+
 }

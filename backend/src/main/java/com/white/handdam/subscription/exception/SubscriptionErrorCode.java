@@ -57,6 +57,16 @@ public enum SubscriptionErrorCode implements ErrorCode {
     SUBSCRIPTION_STATE_CONFLICT(
             HttpStatus.CONFLICT,
             "The subscription state is inconsistent."
+    ),
+
+    SUBSCRIPTION_EXPIRATION_NOT_ALLOWED(
+            HttpStatus.CONFLICT,
+            "This subscription cannot be expired in its current state."
+    ),
+
+    SUBSCRIPTION_PERIOD_NOT_ENDED(
+            HttpStatus.CONFLICT,
+            "The subscription period has not ended yet."
     );
 
     private final HttpStatus status;
