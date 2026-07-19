@@ -3,18 +3,34 @@ import { GuestOnlyRoute } from "@/features/auth/GuestOnlyRoute";
 import { ConsumerLayout } from "@/layouts/ConsumerLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { PublicLayout } from "@/layouts/PublicLayout";
+import { ChatPage } from "@/pages/ChatPage";
+import { CreatePostPage } from "@/pages/CreatePostPage";
+import { CreatorPage } from "@/pages/CreatorPage";
+import { DashboardPostsPage } from "@/pages/DashboardPostsPage";
+import { DashboardProjectPage } from "@/pages/DashboardProjectPage";
+import { DashboardProjectsPage } from "@/pages/DashboardProjectsPage";
 import { EmailVerifyPage } from "@/pages/EmailVerifyPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { HomePage } from "@/pages/HomePage";
 import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { MyPage } from "@/pages/MyPage";
+import { MyPageSettingsPage } from "@/pages/MyPageSettingsPage";
+import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
+import { PostDetailPage } from "@/pages/PostDetailPage";
+import { QnaBoardPage } from "@/pages/QnaBoardPage";
+import { QnaPostPage } from "@/pages/QnaPostPage";
 import { SignupPage } from "@/pages/SignupPage";
+import { SubscribeCompletePage } from "@/pages/SubscribeCompletePage";
+import { SubscribeFeedPage } from "@/pages/SubscribeFeedPage";
+import { SubscribeSelectPage } from "@/pages/SubscribeSelectPage";
 import { paths } from "./paths";
 
 /**
  * 라우트 = stitch 19개 화면을 3개 존으로 정리한 결과.
- * 아직 이관 안 된 화면은 PagePlaceholder(원본 파일명 표기)로 둔다.
+ * 전 화면 목데이터(src/mocks/)로 채워져 있음 — 실제 API 연동은 화면별로 점진 적용 예정.
  */
 export const router = createBrowserRouter([
 	{
@@ -37,10 +53,7 @@ export const router = createBrowserRouter([
 					</GuestOnlyRoute>
 				),
 			},
-			{
-				path: paths.forgotPassword,
-				element: <PagePlaceholder title="비밀번호 찾기" />,
-			},
+			{ path: paths.forgotPassword, element: <ForgotPasswordPage /> },
 			{ path: paths.oauthCallback, element: <OAuthCallbackPage /> },
 			{ path: paths.emailVerify, element: <EmailVerifyPage /> },
 		],
@@ -49,91 +62,26 @@ export const router = createBrowserRouter([
 		element: <ConsumerLayout />,
 		children: [
 			{ path: paths.home, element: <HomePage /> },
-			{
-				path: paths.feed,
-				element: (
-					<PagePlaceholder title="구독 피드" source="subscribe-feed.html" />
-				),
-			},
-			{
-				path: paths.notifications,
-				element: <PagePlaceholder title="알림" source="notifications.html" />,
-			},
-			{
-				path: paths.chat,
-				element: <PagePlaceholder title="메시지" source="chat.html" />,
-			},
-			{
-				path: paths.mypage,
-				element: <PagePlaceholder title="마이페이지" source="mypage.html" />,
-			},
-			{
-				path: paths.mypageSettings,
-				element: (
-					<PagePlaceholder title="프로필 설정" source="mypage-settings.html" />
-				),
-			},
-			{
-				path: paths.creator(),
-				element: (
-					<PagePlaceholder title="크리에이터 상세" source="creator.html" />
-				),
-			},
-			{
-				path: paths.creatorQna(),
-				element: <PagePlaceholder title="Q&A 게시판" source="qna-board.html" />,
-			},
-			{
-				path: paths.qnaPost(),
-				element: <PagePlaceholder title="Q&A 게시글" source="qna-post.html" />,
-			},
-			{
-				path: paths.postDetail(),
-				element: (
-					<PagePlaceholder title="게시물 상세" source="post-detail.html" />
-				),
-			},
-			{
-				path: paths.subscribeSelect(),
-				element: (
-					<PagePlaceholder title="구독 선택" source="subscribe-select.html" />
-				),
-			},
-			{
-				path: paths.subscribeComplete,
-				element: (
-					<PagePlaceholder title="구독 완료" source="subscribe-complete.html" />
-				),
-			},
+			{ path: paths.feed, element: <SubscribeFeedPage /> },
+			{ path: paths.notifications, element: <NotificationsPage /> },
+			{ path: paths.chat, element: <ChatPage /> },
+			{ path: paths.mypage, element: <MyPage /> },
+			{ path: paths.mypageSettings, element: <MyPageSettingsPage /> },
+			{ path: paths.creator(), element: <CreatorPage /> },
+			{ path: paths.creatorQna(), element: <QnaBoardPage /> },
+			{ path: paths.qnaPost(), element: <QnaPostPage /> },
+			{ path: paths.postDetail(), element: <PostDetailPage /> },
+			{ path: paths.subscribeSelect(), element: <SubscribeSelectPage /> },
+			{ path: paths.subscribeComplete, element: <SubscribeCompletePage /> },
 		],
 	},
 	{
 		element: <DashboardLayout />,
 		children: [
-			{
-				path: paths.dashboardProjects,
-				element: (
-					<PagePlaceholder title="프로젝트 목록" source="project-list.html" />
-				),
-			},
-			{
-				path: paths.dashboardProject(),
-				element: (
-					<PagePlaceholder title="프로젝트 상세" source="project-detail.html" />
-				),
-			},
-			{
-				path: paths.dashboardPosts,
-				element: (
-					<PagePlaceholder title="게시물 관리" source="post-management.html" />
-				),
-			},
-			{
-				path: paths.dashboardPostNew,
-				element: (
-					<PagePlaceholder title="새 게시물 작성" source="create-post.html" />
-				),
-			},
+			{ path: paths.dashboardProjects, element: <DashboardProjectsPage /> },
+			{ path: paths.dashboardProject(), element: <DashboardProjectPage /> },
+			{ path: paths.dashboardPosts, element: <DashboardPostsPage /> },
+			{ path: paths.dashboardPostNew, element: <CreatePostPage /> },
 		],
 	},
 	{ path: "*", element: <PagePlaceholder title="404" /> },
