@@ -5,6 +5,7 @@ import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.member.dto.request.MemberUpdateRequest;
 import com.white.handdam.member.dto.response.MemberProfileResponse;
 import com.white.handdam.member.dto.response.MemberPublicProfileResponse;
+import com.white.handdam.member.dto.response.MyBoardCommentResponse;
 import com.white.handdam.member.dto.response.MyFeedCommentResponse;
 import com.white.handdam.member.service.MemberService;
 import com.white.handdam.member.service.MyActivityService;
@@ -57,6 +58,12 @@ public class MemberController {
     public ApiResponse<Slice<MyFeedCommentResponse>> getMyFeedComments(@AuthenticationPrincipal AuthMember authMember,
                                                                        @PageableDefault(size=3) Pageable pageable) {
         return ApiResponse.success(myActivityService.getMyFeedComments(authMember.id(), pageable));
+    }
+
+    @GetMapping("/me/board-comments")
+    public ApiResponse<Slice<MyBoardCommentResponse>> getMyBoardComments(@AuthenticationPrincipal AuthMember authMember,
+                                                                         @PageableDefault(size=3) Pageable pageable) {
+        return ApiResponse.success(myActivityService.getMyBoardComments(authMember.id(), pageable));
     }
 
 }
