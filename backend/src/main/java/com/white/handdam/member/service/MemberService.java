@@ -100,8 +100,9 @@ public class MemberService {
             .orElseThrow(() -> new CustomException(MemberErrorCode.MEMBER_NOT_FOUND));
 
         String storageKey = member.getProfileImageStorageKey();
+
+        member.clearProfileImage();
         if(storageKey != null) {
-            member.clearProfileImage();
             try {
                 objectStorage.delete(storageKey);
             } catch (Exception e) {
