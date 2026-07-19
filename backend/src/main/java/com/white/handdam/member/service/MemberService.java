@@ -12,6 +12,7 @@ import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,6 +56,13 @@ public class MemberService {
         }
 
         member.updateNickname(request.nickname());
+
+        try {
+            memberRepository.flush(); // 동시 저장 예외 처리
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(MemberErrorCode.DUPLICATE_NICKNAME);
+        }
+
         return MemberProfileResponse.from(member);
     }
 
