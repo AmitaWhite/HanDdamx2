@@ -69,6 +69,7 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(PERMIT_ALL).permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/members/{memberId:[0-9]+}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/projects/*").permitAll()         // 상세 조회만 공개
                 .requestMatchers(HttpMethod.GET, "/api/projects/*/feeds").permitAll()   // 피드 목록만 공개
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
