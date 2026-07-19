@@ -23,4 +23,7 @@ public interface ObjectStorage {
 	 * @param storageKey 삭제할 객체 키
 	 */
 	void delete(String storageKey);
+
+    // [LYJ-031] 새로 추가: Presigned URL 생성
+    String generatePresignedUrl(String storageKey, int expireMinutes);
 }

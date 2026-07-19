@@ -13,6 +13,8 @@ public enum FeedErrorCode implements ErrorCode {
     // [LYJ-002, LYJ-030] 공개범위·잠금
     FREE_SUBSCRIPTION_REQUIRED(HttpStatus.FORBIDDEN, "무료 구독자만 접근할 수 있는 콘텐츠입니다."),
     PAID_SUBSCRIPTION_REQUIRED(HttpStatus.FORBIDDEN, "유료 구독자만 접근할 수 있는 콘텐츠입니다."),
+    // [LYJ-012, LYJ-013]
+    ATTACHMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "첨부파일을 찾을 수 없습니다."),
     ;
     private final HttpStatus status;
     private final String message;

@@ -1,18 +1,25 @@
 package com.white.handdam.feed.service;
 
+import com.white.handdam.feed.dto.request.AddAttachmentRequest;
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
+import com.white.handdam.feed.dto.response.AttachmentResponse;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedSummaryResponse;
+import com.white.handdam.feed.entity.AttachmentType;
 import com.white.handdam.feed.entity.Feed;
+import com.white.handdam.feed.entity.FeedAttachment;
 import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
+import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
+import com.white.handdam.storage.ObjectStorage;
+import com.white.handdam.storage.StoredObject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -45,6 +53,8 @@ class FeedServiceTest {
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
     @Mock private ProjectRepository projectRepository;
     @InjectMocks private FeedService feedService;
+    @Mock private FeedAttachmentRepository feedAttachmentRepository;
+    @Mock private ObjectStorage objectStorage;
 
     // ---------------------------------------------------------------
     // LYJ-001 피드 작성
@@ -411,6 +421,140 @@ class FeedServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // LYJ-012 피드 첨부파일 추가
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-012] 소유자가 이미지 파일을 첨부하면 AttachmentResponse를 반환한다")
+    void addAttachment_imageFile_success() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
+
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", "data".getBytes());
+        StoredObject stored = new StoredObject("feeds/1/attachments/uuid_photo.jpg",
+            "https://s3.amazonaws.com/feeds/1/attachments/uuid_photo.jpg", "photo.jpg");
+        given(objectStorage.upload("feeds/1/attachments", file)).willReturn(stored);
+
+        FeedAttachment saved = sampleUploadAttachment(AttachmentType.IMAGE, stored, "image/jpeg");
+        given(feedAttachmentRepository.save(any(FeedAttachment.class))).willReturn(saved);
+
+        AttachmentResponse result = feedService.addAttachment(1L, 1L, file, new AddAttachmentRequest(null));
+
+        assertThat(result.type()).isEqualTo(AttachmentType.IMAGE);
+        assertThat(result.originalName()).isEqualTo("photo.jpg");
+        verify(objectStorage).upload("feeds/1/attachments", file);
+    }
+
+    @Test
+    @DisplayName("[LYJ-012] 소유자가 VIDEO_LINK를 첨부하면 S3 업로드 없이 저장된다")
+    void addAttachment_videoLink_noS3Upload() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
+
+        FeedAttachment saved = sampleVideoLinkAttachment("https://youtu.be/abc");
+        given(feedAttachmentRepository.save(any(FeedAttachment.class))).willReturn(saved);
+
+        feedService.addAttachment(1L, 1L, null, new AddAttachmentRequest("https://youtu.be/abc"));
+
+        // S3 업로드 호출 없음 확인
+        verify(objectStorage, never()).upload(any(), any());
+        verify(feedAttachmentRepository).save(any(FeedAttachment.class));
+    }
+
+    @Test
+    @DisplayName("[LYJ-012] 소유자가 아닌 회원이 첨부파일 추가 시 FEED_FORBIDDEN 예외 발생")
+    void addAttachment_notOwner_forbidden() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L))); // creatorId=99, 요청자=1
+
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", "data".getBytes());
+
+        assertThatThrownBy(() -> feedService.addAttachment(1L, 1L, file, new AddAttachmentRequest(null)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+        verify(objectStorage, never()).upload(any(), any());
+    }
+
+    @Test
+    @DisplayName("[LYJ-012] 피드가 없으면 FEED_NOT_FOUND 예외 발생")
+    void addAttachment_feedNotFound_throws() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", "data".getBytes());
+
+        assertThatThrownBy(() -> feedService.addAttachment(999L, 1L, file, new AddAttachmentRequest(null)))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    // ---------------------------------------------------------------
+    // LYJ-013 피드 첨부파일 삭제
+    // ---------------------------------------------------------------
+    @Test
+    @DisplayName("[LYJ-013] 소유자가 S3 첨부파일을 삭제하면 S3 삭제 + 소프트 삭제가 호출된다")
+    void deleteAttachment_withStorageKey_deletesS3AndSoftDeletes() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
+
+        StoredObject stored = new StoredObject("feeds/1/attachments/uuid_photo.jpg", "https://...", "photo.jpg");
+        FeedAttachment attachment = sampleUploadAttachment(AttachmentType.IMAGE, stored, "image/jpeg");
+        given(feedAttachmentRepository.findByIdAndFeedIdAndDeletedFalse(10L, 1L))
+            .willReturn(Optional.of(attachment));
+
+        feedService.deleteAttachment(1L, 10L, 1L);
+
+        verify(objectStorage).delete("feeds/1/attachments/uuid_photo.jpg");
+        assertThat(attachment.isDeleted()).isTrue();
+        assertThat(attachment.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("[LYJ-013] VIDEO_LINK 첨부파일 삭제 시 S3 삭제 없이 소프트 삭제만 된다")
+    void deleteAttachment_videoLink_noS3Delete() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
+
+        FeedAttachment attachment = sampleVideoLinkAttachment("https://youtu.be/abc");
+        given(feedAttachmentRepository.findByIdAndFeedIdAndDeletedFalse(10L, 1L))
+            .willReturn(Optional.of(attachment));
+
+        feedService.deleteAttachment(1L, 10L, 1L);
+
+        // VIDEO_LINK는 storageKey=null → S3 삭제 호출 없음
+        verify(objectStorage, never()).delete(any());
+        assertThat(attachment.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("[LYJ-013] 소유자가 아닌 회원이 삭제 시 FEED_FORBIDDEN 예외 발생")
+    void deleteAttachment_notOwner_forbidden() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(99L))); // creatorId=99, 요청자=1
+
+        assertThatThrownBy(() -> feedService.deleteAttachment(1L, 10L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_FORBIDDEN));
+        verify(objectStorage, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("[LYJ-013] 첨부파일 ID가 없거나 이미 삭제된 경우 ATTACHMENT_NOT_FOUND 예외 발생")
+    void deleteAttachment_notFound_throws() {
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(1L)));
+        given(feedAttachmentRepository.findByIdAndFeedIdAndDeletedFalse(999L, 1L))
+            .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedService.deleteAttachment(1L, 999L, 1L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.ATTACHMENT_NOT_FOUND));
+    }
+
+    // ---------------------------------------------------------------
     // 헬퍼
     // ---------------------------------------------------------------
     private Feed sampleFeed(Visibility visibility) {
@@ -430,4 +574,19 @@ class FeedServiceTest {
         ReflectionTestUtils.setField(project, "id", 1L);
         return project;
     }
+
+    private FeedAttachment sampleUploadAttachment(AttachmentType type, StoredObject stored, String mimeType) {
+        FeedAttachment a = FeedAttachment.ofUpload(1L, type, stored, 1024L, mimeType);
+        ReflectionTestUtils.setField(a, "id", 10L);
+        ReflectionTestUtils.setField(a, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+        return a;
+    }
+
+    private FeedAttachment sampleVideoLinkAttachment(String url) {
+        FeedAttachment a = FeedAttachment.ofVideoLink(1L, url);
+        ReflectionTestUtils.setField(a, "id", 10L);
+        ReflectionTestUtils.setField(a, "createdAt", Instant.parse("2026-07-15T00:00:00Z"));
+        return a;
+    }
+
 }

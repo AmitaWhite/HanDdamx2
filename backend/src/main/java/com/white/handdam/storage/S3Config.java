@@ -9,6 +9,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 /**
  * AWS S3 클라이언트 빈 설정.
@@ -54,4 +55,25 @@ public class S3Config {
 		// 설정이 끝난 클라이언트를 Spring 빈으로 등록
 		return builder.build();
 	}
+
+    // [LYJ-031] S3Presigner 빈 추가
+    @Bean
+    public S3Presigner s3Presigner(AwsProperties awsProperties) {
+        var builder = S3Presigner.builder()
+            .region(Region.of(awsProperties.getRegion()))
+            .credentialsProvider(StaticCredentialsProvider.create(
+                AwsBasicCredentials.create(
+                    awsProperties.getCredentials().getAccessKey(),
+                    awsProperties.getCredentials().getSecretKey()
+                )
+            ));
+        String endpoint = awsProperties.getS3().getEndpoint();
+        if (endpoint != null && !endpoint.isBlank()) {
+            builder.endpointOverride(URI.create(endpoint))
+                .serviceConfiguration(S3Configuration.builder()
+                    .pathStyleAccessEnabled(true)
+                    .build());
+        }
+        return builder.build();
+    }
 }
