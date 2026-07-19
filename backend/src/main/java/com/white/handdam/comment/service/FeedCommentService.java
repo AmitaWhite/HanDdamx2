@@ -14,6 +14,9 @@ import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.repository.MemberRepository;
+import com.white.handdam.project.entity.Project;
+import com.white.handdam.project.exception.ProjectErrorCode;
+import com.white.handdam.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,7 @@ public class FeedCommentService {
     private final FeedRepository feedRepository;
     private final FeedCommentRepository feedCommentRepository;
     private final MemberRepository memberRepository;
+    private final ProjectRepository projectRepository;
     private final SubscriptionLevelChecker subscriptionLevelChecker;
 
     // [LYJ-015] 피드 댓글·대댓글 목록 조회
@@ -37,9 +41,10 @@ public class FeedCommentService {
         Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
 
-        // TODO [LYJ-015] Project 엔티티 추가 후 creatorId 꺼내서 level 확인
-        boolean isOwner = false; // TODO: Project 추가 후 교체
-        String level = null;     // TODO: Project 추가 후 subscriptionLevelChecker.getLevel(memberId, creatorId)
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = isOwner ? null : subscriptionLevelChecker.getLevel(memberId, project.getCreatorId());
         if (!canAccess(feed.getVisibility(), level, isOwner)) {
             throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
         }
@@ -96,9 +101,11 @@ public class FeedCommentService {
         Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
 
-        // TODO [LYJ-016] Project 엔티티 추가 후 creatorId로 isOwner/level 판단
-        boolean isOwner = false;
-        String level = null;
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = isOwner ? null : subscriptionLevelChecker.getLevel(memberId, project.getCreatorId());
+
         if (!canAccess(feed.getVisibility(), level, isOwner)) {
             throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
         }
@@ -113,9 +120,11 @@ public class FeedCommentService {
         Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
 
-        // TODO [LYJ-017] Project 엔티티 추가 후 creatorId로 isOwner/level 판단
-        boolean isOwner = false;
-        String level = null;
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = isOwner ? null : subscriptionLevelChecker.getLevel(memberId, project.getCreatorId());
+
         if(!canAccess(feed.getVisibility(), level, isOwner)){
             throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
         }
