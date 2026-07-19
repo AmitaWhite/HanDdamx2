@@ -96,6 +96,28 @@ class NotificationRepositoryTest {
 		assertThat(notificationRepository.countByMemberIdAndIsReadFalse(MEMBER_ID)).isEqualTo(2L);
 	}
 
+	@Test
+	@DisplayName("전체 읽음 처리는 본인의 안 읽은 알림만 갱신한다")
+	void markAllAsRead() {
+		notificationRepository.saveAndFlush(notification(MEMBER_ID));
+		notificationRepository.saveAndFlush(notification(MEMBER_ID));
+
+		NotificationEntity alreadyRead = notification(MEMBER_ID);
+		alreadyRead.markAsRead();
+		notificationRepository.saveAndFlush(alreadyRead);
+
+		notificationRepository.saveAndFlush(notification(OTHER_MEMBER_ID));
+
+		// 이미 읽은 1건은 제외되고 안 읽은 2건만 갱신된다
+		int updated = notificationRepository.markAllAsRead(MEMBER_ID);
+
+		assertThat(updated).isEqualTo(2);
+		assertThat(notificationRepository.countByMemberIdAndIsReadFalse(MEMBER_ID)).isZero();
+		// 다른 회원의 알림은 그대로 안 읽음 상태여야 한다
+		assertThat(notificationRepository.countByMemberIdAndIsReadFalse(OTHER_MEMBER_ID))
+			.isEqualTo(1L);
+	}
+
 	private NotificationEntity notification(Long memberId) {
 		return NotificationEntity.builder()
 			.memberId(memberId)

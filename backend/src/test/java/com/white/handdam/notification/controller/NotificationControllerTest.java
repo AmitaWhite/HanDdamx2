@@ -4,6 +4,7 @@ import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.exception.GlobalExceptionHandler;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.member.entity.Role;
+import com.white.handdam.notification.dto.response.NotificationReadAllResponse;
 import com.white.handdam.notification.dto.response.NotificationResponse;
 import com.white.handdam.notification.entity.NotificationEntity.NotificationType;
 import com.white.handdam.notification.exception.NotificationErrorCode;
@@ -135,6 +136,21 @@ class NotificationControllerTest {
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.error.code").value("NOTIFICATION_NOT_FOUND"));
+	}
+
+	@Test
+	@DisplayName("PATCH /api/notifications/read-all - 갱신 건수를 반환한다")
+	void markAllAsRead() throws Exception {
+		authenticate();
+		when(notificationService.markAllAsRead(MEMBER_ID))
+			.thenReturn(new NotificationReadAllResponse(3L));
+
+		mockMvc.perform(patch("/api/notifications/read-all"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.data.updatedCount").value(3));
+
+		verify(notificationService).markAllAsRead(MEMBER_ID);
 	}
 
 	private void authenticate() {

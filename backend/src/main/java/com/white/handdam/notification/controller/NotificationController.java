@@ -3,6 +3,7 @@ package com.white.handdam.notification.controller;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.response.SliceResponse;
 import com.white.handdam.global.security.AuthMember;
+import com.white.handdam.notification.dto.response.NotificationReadAllResponse;
 import com.white.handdam.notification.dto.response.NotificationResponse;
 import com.white.handdam.notification.dto.response.UnreadCountResponse;
 import com.white.handdam.notification.service.NotificationService;
@@ -60,5 +61,15 @@ public class NotificationController {
 			@AuthenticationPrincipal AuthMember member) {
 		notificationService.markAsRead(notificationId, member.id());
 		return ApiResponse.noContent();
+	}
+
+	/**
+	 * 내 알림 전체 읽음 처리.
+	 * 권한: 로그인 사용자(본인 알림만)
+	 */
+	@PatchMapping("/api/notifications/read-all")
+	public ApiResponse<NotificationReadAllResponse> markAllAsRead(
+			@AuthenticationPrincipal AuthMember member) {
+		return ApiResponse.success(notificationService.markAllAsRead(member.id()));
 	}
 }

@@ -2,6 +2,7 @@ package com.white.handdam.notification.service;
 
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.notification.converter.NotificationConverter;
+import com.white.handdam.notification.dto.response.NotificationReadAllResponse;
 import com.white.handdam.notification.dto.response.NotificationResponse;
 import com.white.handdam.notification.entity.NotificationEntity;
 import com.white.handdam.notification.entity.NotificationEntity.NotificationType;
@@ -101,6 +102,16 @@ public class NotificationService {
 		}
 		// 더티 체킹으로 반영 (명시적 save 불필요)
 		notification.markAsRead();
+	}
+
+	/**
+	 * 내 알림 전체 읽음 처리.
+	 *
+	 * <p>쿼리에 {@code memberId} 조건이 있어 본인 알림만 갱신되므로 소유권 검사가 따로 필요 없다.
+	 */
+	@Transactional
+	public NotificationReadAllResponse markAllAsRead(Long memberId) {
+		return new NotificationReadAllResponse(notificationRepository.markAllAsRead(memberId));
 	}
 
 	/** message 컬럼 길이(500)를 넘지 않도록 자른다. */

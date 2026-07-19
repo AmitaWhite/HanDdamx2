@@ -1,6 +1,7 @@
 package com.white.handdam.notification.service;
 
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.notification.dto.response.NotificationReadAllResponse;
 import com.white.handdam.notification.dto.response.NotificationResponse;
 import com.white.handdam.notification.entity.NotificationEntity;
 import com.white.handdam.notification.entity.NotificationEntity.NotificationType;
@@ -192,6 +193,16 @@ class NotificationServiceTest {
 			.satisfies(e -> assertThat(((CustomException) e).getErrorCode())
 				.isEqualTo(NotificationErrorCode.NOTIFICATION_FORBIDDEN));
 		assertThat(notification.getIsRead()).isFalse();
+	}
+
+	@Test
+	@DisplayName("알림 전체 읽음 처리 성공 - 갱신 건수를 반환한다")
+	void markAllAsRead_success() {
+		given(notificationRepository.markAllAsRead(RECIPIENT_ID)).willReturn(3);
+
+		NotificationReadAllResponse response = notificationService.markAllAsRead(RECIPIENT_ID);
+
+		assertThat(response.updatedCount()).isEqualTo(3L);
 	}
 
 	// ---------------------------------------------------------------
