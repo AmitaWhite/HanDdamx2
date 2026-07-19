@@ -5,6 +5,7 @@ import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
 import com.white.handdam.feed.dto.response.AttachmentResponse;
+import com.white.handdam.feed.dto.response.DownloadResponse;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedSummaryResponse;
 import com.white.handdam.feed.entity.AttachmentType;
@@ -219,7 +220,8 @@ public class FeedService {
     private AttachmentType resolveAttachmentType(String mimeType) {
         if (mimeType == null) return AttachmentType.FILE;
         if (mimeType.startsWith("image/")) return AttachmentType.IMAGE;
-        return AttachmentType.FILE; // PDF, 기타 파일
+        if (mimeType.startsWith("video/")) return AttachmentType.FILE;
+        return AttachmentType.FILE; // PDF 등
     }
 
     // [LYJ-013] 피드 첨부파일 삭제
@@ -242,5 +244,40 @@ public class FeedService {
         }
         attachment.softDelete();
     }
+
+    // [LYJ-014] 첨부파일 다운로드 URL 조회
+    public DownloadResponse getDownloadUrl(Long feedId, Long attachmentId, Long memberId) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = (!isOwner && memberId != null)
+            ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
+            : null;
+        validateAccess(feed.getVisibility(), level, isOwner);
+
+        FeedAttachment attachment = feedAttachmentRepository.findByIdAndFeedIdAndDeletedFalse(attachmentId, feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.ATTACHMENT_NOT_FOUND));
+
+        if (attachment.getType() == AttachmentType.VIDEO_LINK) {
+            return DownloadResponse.ofLink(attachment);
+        }
+        String presignedUrl = objectStorage.generatePresignedUrl(attachment.getStorageKey(), 10);
+        return DownloadResponse.ofPresigned(attachment, presignedUrl, 10);
+    }
+
+    // 공개범위 접근 불가 시 적절한 에러 코드로 예외 발생
+    // canAccess()는 true/false만 반환하지만, 다운로드는 왜 막혔는지 명확히 알려줘야 함
+    private void validateAccess(Visibility visibility, String level, boolean isOwner) {
+        if (canAccess(visibility, level, isOwner)) return;
+        throw new CustomException(
+            visibility == Visibility.FREE_SUBSCRIBER
+                ? FeedErrorCode.FREE_SUBSCRIPTION_REQUIRED
+                : FeedErrorCode.PAID_SUBSCRIPTION_REQUIRED
+        );
+    }
+
 
 }

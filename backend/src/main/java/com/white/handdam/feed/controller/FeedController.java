@@ -4,10 +4,7 @@ import com.white.handdam.feed.dto.request.AddAttachmentRequest;
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
-import com.white.handdam.feed.dto.response.AttachmentResponse;
-import com.white.handdam.feed.dto.response.FeedDetailResponse;
-import com.white.handdam.feed.dto.response.FeedIdResponse;
-import com.white.handdam.feed.dto.response.FeedSummaryResponse;
+import com.white.handdam.feed.dto.response.*;
 import com.white.handdam.feed.service.FeedService;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.response.SliceResponse;
@@ -150,5 +147,17 @@ public class FeedController {
         feedService.deleteAttachment(feedId, attachmentId, member.id());
         return ApiResponse.noContent();
     }
+
+    // [LYJ-014] GET /api/feeds/{feedId}/attachments/{attachmentId}/download
+    @GetMapping("/{feedId}/attachments/{attachmentId}/download")
+    public ApiResponse<DownloadResponse> getDownloadUrl(
+        @PathVariable Long feedId,
+        @PathVariable Long attachmentId,
+        @AuthenticationPrincipal AuthMember member
+    ) {
+        Long memberId = member != null ? member.id() : null;
+        return ApiResponse.success(feedService.getDownloadUrl(feedId, attachmentId, memberId));
+    }
+
 
 }
