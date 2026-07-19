@@ -22,4 +22,14 @@ public class AsyncConfig {
         return executor;
     }
 
+    @Bean(name = "notificationExecutor")
+    public Executor notificationExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("notification-");
+        executor.initialize();
+        return executor;
+    }
 }
