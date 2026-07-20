@@ -10,6 +10,7 @@ import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,7 +26,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -67,14 +67,16 @@ public class PremiumBoardPostController {
 		@RequestParam @NotBlank @Size(max = 255) String title,
 		@RequestParam @NotNull BoardPostType type,
 		@RequestParam @NotBlank String content,
-		@RequestPart(value = "images", required = false) List<MultipartFile> images
+		// 브라우저 FormData 다중 파일은 MultipartFile[] 바인딩이 List 보다 안정적
+		@RequestParam(value = "images", required = false) MultipartFile[] images
 	) {
+		List<MultipartFile> imageList = images == null ? List.of() : Arrays.asList(images);
 		return ApiResponse.success(
 			boardPostService.createPost(
 				creatorId,
 				member.id(),
 				new CreateBoardPostRequest(title, type, content),
-				images
+				imageList
 			)
 		);
 	}

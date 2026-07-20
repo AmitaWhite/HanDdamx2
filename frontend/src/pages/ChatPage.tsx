@@ -1,18 +1,31 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
 import { mockChatThread, type MockChatMessage } from "@/mocks/chat";
+import { findCreator } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
 
 export function ChatPage() {
-	const [messages, setMessages] = useState<MockChatMessage[]>(mockChatThread.messages);
+	const [searchParams] = useSearchParams();
+	const creatorId = searchParams.get("creatorId") ?? mockChatThread.creator.id;
+	const creator = findCreator(creatorId);
+
+	const [messages, setMessages] = useState<MockChatMessage[]>([]);
 	const [draft, setDraft] = useState("");
 
 	function send() {
 		if (!draft.trim()) return;
-		setMessages((prev) => [...prev, { id: `local-${Date.now()}`, sender: "me", text: draft.trim(), sentAtLabel: "방금" }]);
+		setMessages((prev) => [
+			...prev,
+			{
+				id: `local-${Date.now()}`,
+				sender: "me",
+				text: draft.trim(),
+				sentAtLabel: "방금",
+			},
+		]);
 		setDraft("");
 	}
 
@@ -22,23 +35,34 @@ export function ChatPage() {
 				<Link to={paths.home} aria-label="뒤로가기" className="text-on-surface">
 					<Icon name="arrow_back" />
 				</Link>
-				<Link to={paths.creator(mockChatThread.creator.id)} className="flex items-center gap-3">
-					<Avatar src={mockImg(mockChatThread.creator.avatarSeed, 80, 80)} size={36} />
-					<span className="text-label-md font-label-md text-on-surface">{mockChatThread.creator.name}</span>
+				<Link to={paths.creator(creator.id)} className="flex items-center gap-3">
+					<Avatar src={mockImg(creator.avatarSeed, 80, 80)} size={36} />
+					<span className="text-label-md font-label-md text-on-surface">
+						{creator.name}
+					</span>
 				</Link>
 			</div>
 
 			<div className="container-page flex-1 space-y-3 overflow-y-auto py-6">
 				{messages.map((m) => (
-					<div key={m.id} className={`flex ${m.sender === "me" ? "justify-end" : "justify-start"}`}>
+					<div
+						key={m.id}
+						className={`flex ${m.sender === "me" ? "justify-end" : "justify-start"}`}
+					>
 						<div
 							className={
 								"max-w-[70%] rounded-2xl px-4 py-2.5 text-body-md " +
-								(m.sender === "me" ? "bg-primary text-on-primary" : "bg-surface-container-lowest text-on-surface")
+								(m.sender === "me"
+									? "bg-primary text-on-primary"
+									: "bg-surface-container-lowest text-on-surface")
 							}
 						>
 							{m.imageSeed && (
-								<img src={mockImg(m.imageSeed, 300, 300)} alt="첨부 이미지" className="mb-2 rounded-lg" />
+								<img
+									src={mockImg(m.imageSeed, 300, 300)}
+									alt="첨부 이미지"
+									className="mb-2 rounded-lg"
+								/>
 							)}
 							{m.text}
 						</div>

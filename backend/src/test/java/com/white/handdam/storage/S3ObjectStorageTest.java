@@ -58,8 +58,7 @@ class S3ObjectStorageTest {
 
         StoredObject result = storage.upload("feeds/1/attachments", file);
 
-        assertThat(result.storageKey()).contains("feeds/1/attachments/");
-        assertThat(result.storageKey()).contains("photo.jpg");
+        assertThat(result.storageKey()).matches("feeds/1/attachments/[0-9a-f\\-]{36}\\.jpg");
         assertThat(result.originalName()).isEqualTo("photo.jpg");
         assertThat(result.url()).contains("handdam-test");
         verify(s3Client).putObject(any(PutObjectRequest.class), any(RequestBody.class));
@@ -78,7 +77,7 @@ class S3ObjectStorageTest {
 
         StoredObject result = storage.upload("feeds/1/attachments", file);
 
-        assertThat(result.storageKey()).contains("manual.pdf");
+        assertThat(result.storageKey()).matches("feeds/1/attachments/[0-9a-f\\-]{36}\\.pdf");
         assertThat(result.originalName()).isEqualTo("manual.pdf");
     }
 
@@ -95,7 +94,7 @@ class S3ObjectStorageTest {
 
         StoredObject result = storage.upload("feeds/1/attachments", file);
 
-        assertThat(result.storageKey()).contains("tutorial.mp4");
+        assertThat(result.storageKey()).matches("feeds/1/attachments/[0-9a-f\\-]{36}\\.mp4");
     }
 
     // ─── 허용되지 않는 타입 ───────────────────────────────────────────

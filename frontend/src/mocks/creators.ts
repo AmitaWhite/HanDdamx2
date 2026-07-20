@@ -11,6 +11,18 @@ export interface MockCreator {
 }
 
 export const mockCreators: MockCreator[] = [
+	/** 로컬 DB member id=9 (leelovery99 / 이동준) — /creators/9 메인 페이지용 */
+	{
+		id: "9",
+		name: "이동준",
+		category: "자수",
+		avatarSeed: "artisan-dongjun",
+		coverSeed: "cover-dongjun",
+		subscriberCount: 1,
+		postCount: 3,
+		bio: "한땀한땀 — 손끝으로 이어가는 일상 공예. 구독자와 Q&A로 소통합니다.",
+		hasQnaTab: true,
+	},
 	{
 		id: "suyeon",
 		name: "이수연",

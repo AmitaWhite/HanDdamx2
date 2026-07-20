@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,7 +34,7 @@ public class BoardPostImageController {
 	public ApiResponse<List<BoardPostImageResponse>> addImages(
 		@PathVariable Long postId,
 		@AuthenticationPrincipal AuthMember member,
-		@RequestPart("images") List<MultipartFile> images
+		@RequestParam("images") List<MultipartFile> images
 	) {
 		return ApiResponse.success(boardPostService.addImages(postId, member.id(), images));
 	}
