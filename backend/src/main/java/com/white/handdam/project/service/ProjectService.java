@@ -29,6 +29,7 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
+import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
@@ -51,7 +52,7 @@ public class ProjectService {
     private final MemberRepository memberRepository;
     private final FeedRepository feedRepository;
     private final ObjectStorage objectStorage;
-    private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionLevelChecker subscriptionLevelChecker;
 
 
     /**
@@ -234,17 +235,18 @@ public class ProjectService {
         return feeds.map(f -> FeedSummaryResponse.from(f, creator, category));
     }
 
+    // CANCEL_SCHEDULED 구독 만료 여부 체크 후 활성여부 판단
     private List<Visibility> resolveVisibilities(Long memberId, Long creatorId) {
         if (memberId == null) return List.of(Visibility.PUBLIC);
 
-        return subscriptionRepository
-                .findBySubscriberIdAndCreatorId(memberId, creatorId)
-                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE
-                        || s.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED)
-                .map(s -> s.getSubscriptionLevel() == SubscriptionLevel.PAID
-                        ? List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER, Visibility.PAID_SUBSCRIBER)
-                        : List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER))
-                .orElse(List.of(Visibility.PUBLIC));
+        String level = subscriptionLevelChecker.getLevel(memberId, creatorId);
+        if ("PAID".equals(level)) {
+            return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER, Visibility.PAID_SUBSCRIBER);
+        }
+        if ("FREE".equals(level)) {
+            return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER);
+        }
+        return List.of(Visibility.PUBLIC);
     }
 
     /**

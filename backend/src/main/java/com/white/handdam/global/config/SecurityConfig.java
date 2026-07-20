@@ -54,7 +54,6 @@ public class SecurityConfig {
                         "/api/feeds/explore",
                         "/api/feeds/creators/**",
                         "/api/feeds/public",
-                        "/api/feeds/*",
                         "/api/feeds/*/comments",
                         "/api/categories",
                         "/api/creators/*/projects",
@@ -72,6 +71,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/members/{memberId:[0-9]+}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/projects/*").permitAll()         // 상세 조회만 공개
                 .requestMatchers(HttpMethod.GET, "/api/projects/*/feeds").permitAll()   // 피드 목록만 공개
+                .requestMatchers(HttpMethod.GET, "/api/feeds/{feedId:[0-9]+}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/feeds/me").hasRole("CREATOR")    // 크리에이터만 접근가능
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
