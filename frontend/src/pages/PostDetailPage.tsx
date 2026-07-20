@@ -62,9 +62,9 @@ export function PostDetailPage() {
 						<p className="text-caption font-caption text-secondary">{post.createdAtLabel}</p>
 					</div>
 					{post.isPaid && (
-						<span className="ml-auto shrink-0 rounded bg-primary px-2 py-1 text-[10px] font-bold text-on-primary">
+						<Chip active size="sm" className="ml-auto shrink-0">
 							유료 구독자 공개
-						</span>
+						</Chip>
 					)}
 				</div>
 

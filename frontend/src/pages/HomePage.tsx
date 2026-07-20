@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { PostCard } from "@/components/social/PostCard";
 import { Avatar } from "@/components/ui/Avatar";
-import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { findCreator } from "@/mocks/creators";
@@ -54,33 +53,31 @@ export function HomePage() {
 				{items.map((post) => {
 					const author = findCreator(post.creatorId);
 					return (
-						<Link key={post.id} to={paths.postDetail(post.id)}>
-							<Card interactive className="group overflow-hidden">
-								<div className="relative aspect-square overflow-hidden">
-									<span className="absolute left-3 top-3 z-10">
-										<Chip className="bg-surface-container-lowest/90">{post.category}</Chip>
-									</span>
-									<img
-										src={mockImg(post.imageSeed)}
-										alt={post.title}
-										className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-									/>
-								</div>
-								<div className="p-5">
-									<h3 className="mb-1 text-headline-md font-display text-on-surface">{post.title}</h3>
-									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<Avatar src={mockImg(author.avatarSeed, 80, 80)} size={24} />
-											<span className="text-caption font-caption text-secondary">{author.name}</span>
-										</div>
-										<span className="flex items-center gap-1 text-caption font-caption text-primary">
-											<Icon name="favorite" className="text-[18px]" />
-											{post.likeCount}
-										</span>
+						<PostCard
+							key={post.id}
+							href={paths.postDetail(post.id)}
+							imageSeed={post.imageSeed}
+							imageAlt={post.title}
+							overlay={
+								<span className="absolute left-3 top-3 z-10">
+									<Chip className="bg-surface-container-lowest/90">{post.category}</Chip>
+								</span>
+							}
+						>
+							<div className="p-5">
+								<h3 className="mb-1 text-headline-md font-display text-on-surface">{post.title}</h3>
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-2">
+										<Avatar src={mockImg(author.avatarSeed, 80, 80)} size={24} />
+										<span className="text-caption font-caption text-secondary">{author.name}</span>
 									</div>
+									<span className="flex items-center gap-1 text-caption font-caption text-primary">
+										<Icon name="favorite" className="text-[18px]" />
+										{post.likeCount}
+									</span>
 								</div>
-							</Card>
-						</Link>
+							</div>
+						</PostCard>
 					);
 				})}
 			</div>

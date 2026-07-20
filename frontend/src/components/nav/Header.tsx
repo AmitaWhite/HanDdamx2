@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
 import { cn } from "@/lib/cn";
+import { NotificationDropdown } from "./NotificationDropdown";
 import { ProfileMenu } from "./ProfileMenu";
 
 /**
@@ -77,11 +78,7 @@ function AuthedHeader() {
 				{/* 우: 아이콘 액션 */}
 				<div className="flex items-center gap-1 sm:gap-2">
 					<IconButton to={paths.chat} icon="chat_bubble" label="메시지" />
-					<IconButton
-						to={paths.notifications}
-						icon="notifications"
-						label="알림"
-					/>
+					<NotificationDropdown />
 					<ProfileMenu />
 				</div>
 			</nav>

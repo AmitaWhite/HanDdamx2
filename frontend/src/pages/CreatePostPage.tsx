@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -8,9 +8,14 @@ import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
 import { mockProjects, PROJECT_STAGES } from "@/mocks/projects";
 
-const CURRENT_CREATOR_ID = "suyeon";
+/** 로그인 계정과 mock 크리에이터를 잇는 백엔드 매핑이 아직 없어 임시로 고정한 값. */
+const MOCK_CREATOR_ID = "suyeon";
 
 type Visibility = "public" | "free" | "paid";
+
+interface CreatePostLocationState {
+	projectId?: string;
+}
 
 const VISIBILITY_OPTIONS: { id: Visibility; label: string; description: string }[] = [
 	{ id: "public", label: "전체공개", description: "누구나 볼 수 있어요" },
@@ -22,9 +27,11 @@ const TOOLBAR_ICONS = ["format_bold", "format_italic", "format_list_bulleted", "
 
 export function CreatePostPage() {
 	const navigate = useNavigate();
-	const myProjects = mockProjects.filter((p) => p.creatorId === CURRENT_CREATOR_ID);
+	const location = useLocation();
+	const locationState = (location.state ?? {}) as CreatePostLocationState;
+	const myProjects = mockProjects.filter((p) => p.creatorId === MOCK_CREATOR_ID);
 
-	const [projectId, setProjectId] = useState("");
+	const [projectId, setProjectId] = useState(locationState.projectId ?? "");
 	const [title, setTitle] = useState("");
 	const [body, setBody] = useState("");
 	const [attachments, setAttachments] = useState<{ id: string; url: string }[]>([]);

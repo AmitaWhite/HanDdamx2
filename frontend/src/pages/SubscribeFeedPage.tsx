@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { findCreator, mockCreators } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
@@ -27,9 +28,9 @@ export function SubscribeFeedPage() {
 											<p className="truncate text-caption font-caption text-secondary">{creator.category}</p>
 										</div>
 										{post.isPaid && (
-											<span className="ml-auto shrink-0 rounded bg-primary px-2 py-1 text-[10px] font-bold text-on-primary">
+											<Chip active size="sm" className="ml-auto shrink-0">
 												유료
-											</span>
+											</Chip>
 										)}
 									</div>
 									<div className="aspect-[16/9] overflow-hidden">
