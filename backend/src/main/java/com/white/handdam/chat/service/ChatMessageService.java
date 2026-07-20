@@ -96,7 +96,7 @@ public class ChatMessageService {
 		ChatMessageResponse response = ChatMessageConverter.toResponse(saved);
 		chatMessagePublisher.publish(room.getId(), response);
 
-		// TODO(NOTIFICATION): ChatMessageSentEvent 구독 리스너에서 알림 저장·전송 처리 (현재는 발행만)
+		// NotificationEventListener#handleChatMessageSent 가 구독해 알림 저장·전송을 처리한다
 		eventPublisher.publishEvent(new ChatMessageSentEvent(
 			room.getId(),
 			saved.getId(),
