@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
+import { AuthOnlyRoute } from "@/features/auth/AuthOnlyRoute";
 import { GuestOnlyRoute } from "@/features/auth/GuestOnlyRoute";
 import { ConsumerLayout } from "@/layouts/ConsumerLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -61,22 +62,78 @@ export const router = createBrowserRouter([
 	{
 		element: <ConsumerLayout />,
 		children: [
+			// 게스트도 둘러볼 수 있는 화면 — 가드 없음
 			{ path: paths.home, element: <HomePage /> },
-			{ path: paths.feed, element: <SubscribeFeedPage /> },
-			{ path: paths.notifications, element: <NotificationsPage /> },
-			{ path: paths.chat, element: <ChatPage /> },
-			{ path: paths.mypage, element: <MyPage /> },
-			{ path: paths.mypageSettings, element: <MyPageSettingsPage /> },
 			{ path: paths.creator(), element: <CreatorPage /> },
 			{ path: paths.creatorQna(), element: <QnaBoardPage /> },
 			{ path: paths.qnaPost(), element: <QnaPostPage /> },
 			{ path: paths.postDetail(), element: <PostDetailPage /> },
-			{ path: paths.subscribeSelect(), element: <SubscribeSelectPage /> },
-			{ path: paths.subscribeComplete, element: <SubscribeCompletePage /> },
+			// 로그인 필요 — 비로그인 시 /login 리다이렉트
+			{
+				path: paths.feed,
+				element: (
+					<AuthOnlyRoute>
+						<SubscribeFeedPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.notifications,
+				element: (
+					<AuthOnlyRoute>
+						<NotificationsPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.chat,
+				element: (
+					<AuthOnlyRoute>
+						<ChatPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.mypage,
+				element: (
+					<AuthOnlyRoute>
+						<MyPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.mypageSettings,
+				element: (
+					<AuthOnlyRoute>
+						<MyPageSettingsPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.subscribeSelect(),
+				element: (
+					<AuthOnlyRoute>
+						<SubscribeSelectPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.subscribeComplete,
+				element: (
+					<AuthOnlyRoute>
+						<SubscribeCompletePage />
+					</AuthOnlyRoute>
+				),
+			},
 		],
 	},
 	{
-		element: <DashboardLayout />,
+		// 크리에이터 대시보드 전체가 로그인 필요
+		element: (
+			<AuthOnlyRoute>
+				<DashboardLayout />
+			</AuthOnlyRoute>
+		),
 		children: [
 			{ path: paths.dashboardProjects, element: <DashboardProjectsPage /> },
 			{ path: paths.dashboardProject(), element: <DashboardProjectPage /> },
