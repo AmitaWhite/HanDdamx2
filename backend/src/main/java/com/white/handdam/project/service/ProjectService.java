@@ -4,6 +4,7 @@ import com.white.handdam.category.entity.Category;
 import com.white.handdam.category.exception.CategoryErrorCode;
 import com.white.handdam.category.repository.CategoryRepository;
 import com.white.handdam.creator.exception.CreatorErrorCode;
+import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
@@ -218,19 +219,19 @@ public class ProjectService {
     /**
      * 프로젝트 피드 목록 조회
      */
+    // getProjectFeeds 메서드 교체
     public Slice<FeedSummaryResponse> getProjectFeeds(Long projectId, Long requesterId, Pageable pageable) {
         Project project = findProjectById(projectId);
-
+        Member creator = memberRepository.findById(project.getCreatorId())
+            .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+        Category category = categoryRepository.findById(project.getCategoryId())
+            .orElseThrow(() -> new CustomException(CategoryErrorCode.CATEGORY_NOT_FOUND));
         boolean isOwner = requesterId != null && requesterId.equals(project.getCreatorId());
-        if (isOwner) {
-            return feedRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(projectId, pageable)
-                    .map(FeedSummaryResponse::from);
-        }
-
-        List<Visibility> visibilities = resolveVisibilities(requesterId, project.getCreatorId());
-        return feedRepository.findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
-                        projectId, visibilities, pageable)
-                .map(FeedSummaryResponse::from);
+        Slice<Feed> feeds = isOwner
+            ? feedRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(projectId, pageable)
+            : feedRepository.findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
+            projectId, resolveVisibilities(requesterId, project.getCreatorId()), pageable);
+        return feeds.map(f -> FeedSummaryResponse.from(f, creator, category));
     }
 
     private List<Visibility> resolveVisibilities(Long memberId, Long creatorId) {

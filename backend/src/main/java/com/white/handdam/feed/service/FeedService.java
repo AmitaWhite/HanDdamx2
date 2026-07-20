@@ -1,5 +1,9 @@
 package com.white.handdam.feed.service;
 
+import com.white.handdam.category.entity.Category;
+import com.white.handdam.category.exception.CategoryErrorCode;
+import com.white.handdam.category.repository.CategoryRepository;
+import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.feed.dto.request.AddAttachmentRequest;
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
@@ -16,6 +20,8 @@ import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.member.entity.Member;
+import com.white.handdam.member.repository.MemberRepository;
 import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
@@ -31,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +48,8 @@ public class FeedService {
     private final ProjectRepository projectRepository;
     private final FeedAttachmentRepository feedAttachmentRepository;
     private final ObjectStorage objectStorage;
+    private final MemberRepository memberRepository;
+    private final CategoryRepository categoryRepository;
 
     // [LYJ-001] 피드 작성
     @Transactional
@@ -60,13 +69,19 @@ public class FeedService {
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
         Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
                 .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        // Member, Category 추가
+        Member creator = memberRepository.findById(project.getCreatorId())
+            .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+        Category category = categoryRepository.findById(project.getCategoryId())
+            .orElseThrow(() -> new CustomException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+
         boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
         String level = (memberId != null && !isOwner)
                 ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
                 : null;
         return canAccess(feed.getVisibility(), level, isOwner)
-                ? FeedDetailResponse.visible(feed)
-                : FeedDetailResponse.locked(feed);
+            ? FeedDetailResponse.visible(feed, creator, category)
+            : FeedDetailResponse.locked(feed, creator, category);
     }
 
     // [LYJ-030] 피드 공개범위
@@ -131,8 +146,9 @@ public class FeedService {
 
     // [LYJ-006] 최근 PUBLIC 피드 목록
     public Slice<FeedSummaryResponse> getPublicFeeds(Pageable pageable) {
-        return feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
-                .map(FeedSummaryResponse::from);
+        return toSummarySlice(
+            feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
+        );
     }
 
     // [LYJ-007] 회원 홈 피드 (구독 피드 + 카테고리 필터)
@@ -153,17 +169,20 @@ public class FeedService {
         List<Long> safePaid = paidCreatorIds.isEmpty() ? List.of(-1L) : paidCreatorIds;
         List<Long> safeFree = freeCreatorIds.isEmpty() ? List.of(-1L) : freeCreatorIds;
 
-        return feedRepository.findHomeFeeds(
+        return toSummarySlice(
+            feedRepository.findHomeFeeds(
                 memberId, safePaid, safeFree, categoryId,
                 List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER),
                 pageable
-        ).map(FeedSummaryResponse::from);
+            )
+        );
     }
 
     // [LYJ-008] 전체 공개 탐색 피드 (비회원도 접근 가능)
     public Slice<FeedSummaryResponse> getExploreFeeds(Long categoryId, Pageable pageable) {
-        return feedRepository.findExploreFeeds(categoryId, pageable)
-                .map(FeedSummaryResponse::from);
+        return toSummarySlice(
+            feedRepository.findExploreFeeds(categoryId, pageable)
+        );
     }
 
     // [LYJ-009] 특정 크리에이터의 피드 목록 조회
@@ -171,8 +190,40 @@ public class FeedService {
         String level = (memberId != null) ? subscriptionLevelChecker.getLevel(memberId, creatorId) : null;
         List<Visibility> visibilities = resolveVisibilites(level);
 
-        return feedRepository.findByCreatorIdAndVisibilityIn(creatorId, visibilities, pageable)
-                .map(FeedSummaryResponse::from);
+        return toSummarySlice(
+            feedRepository.findByCreatorIdAndVisibilityIn(creatorId, visibilities, pageable)
+        );
+    }
+
+    // [LYJ-010] 내 작성 피드 목록 (크리에이터 본인 전용 — 공개범위 무관 전체 조회)
+    public Slice<FeedSummaryResponse> getMyFeeds(Long creatorId, Pageable pageable) {
+        return toSummarySlice(
+            feedRepository.findByCreatorId(creatorId, pageable)
+        );
+    }
+
+    // 리스트 공통 변환 헬퍼 — N+1 방지 배치 조회
+    private Slice<FeedSummaryResponse> toSummarySlice(Slice<Feed> feeds) {
+        List<Long> projectIds = feeds.getContent().stream()
+            .map(Feed::getProjectId).distinct().toList();
+        Map<Long, Project> projectMap = projectRepository.findAllById(projectIds).stream()
+            .collect(Collectors.toMap(Project::getId, p -> p));
+        List<Long> creatorIds = projectMap.values().stream()
+            .map(Project::getCreatorId).distinct().toList();
+        List<Long> categoryIds = projectMap.values().stream()
+            .map(Project::getCategoryId).distinct().toList();
+        Map<Long, Member> memberMap = memberRepository.findAllById(creatorIds).stream()
+            .collect(Collectors.toMap(Member::getId, m -> m));
+        Map<Long, Category> categoryMap = categoryRepository.findAllById(categoryIds).stream()
+            .collect(Collectors.toMap(Category::getId, c -> c));
+        return feeds.map(f -> {
+            Project p = projectMap.get(f.getProjectId());
+            return FeedSummaryResponse.from(
+                f,
+                memberMap.get(p.getCreatorId()),
+                categoryMap.get(p.getCategoryId())
+            );
+        });
     }
 
     // 구독 레벨을 접근 가능한 공개범위 목록으로 변환
@@ -183,12 +234,6 @@ public class FeedService {
             return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER);
         }
         return List.of(Visibility.PUBLIC);
-    }
-
-    // [LYJ-010] 내 작성 피드 목록 (크리에이터 본인 전용 — 공개범위 무관 전체 조회)
-    public Slice<FeedSummaryResponse> getMyFeeds(Long creatorId, Pageable pageable) {
-        return feedRepository.findByCreatorId(creatorId, pageable)
-                .map(FeedSummaryResponse::from);
     }
 
     // [LYJ-012] 피드 첨부파일 추가
