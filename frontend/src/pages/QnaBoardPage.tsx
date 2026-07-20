@@ -206,7 +206,6 @@ export function QnaBoardPage() {
 					<p className="p-8 text-center text-body-md text-secondary">해당 카테고리의 글이 아직 없어요.</p>
 				)}
 			</div>
-
 			<div className="mt-6 text-center">
 				<Button variant="secondary">더보기</Button>
 			</div>

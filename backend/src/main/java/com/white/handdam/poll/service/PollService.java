@@ -180,7 +180,11 @@ public class PollService {
         String snapshot    = "PAID".equals(level) ? "PAID" : "FREE";
 
         PollVote vote = PollVote.create(pollId, option.getId(), memberId, weight, snapshot);
-        return pollVoteRepository.save(vote).getId();
+        try {
+            return pollVoteRepository.save(vote).getId();
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(PollErrorCode.POLL_ALREADY_VOTED);
+        }
     }
 
     // [LYJ-027] 내 투표 선택지 변경

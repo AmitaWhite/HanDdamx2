@@ -18,6 +18,16 @@ export interface MockNotification {
 	href: string;
 }
 
+/** 알림 타입 → 아이콘. 헤더 드롭다운과 전체 알림 페이지가 공유. */
+export const NOTIFICATION_TYPE_ICON: Record<NotificationType, string> = {
+	reply: "reply",
+	payment: "payments",
+	new_post: "photo_library",
+	poll_vote: "how_to_vote",
+	subscription_expiring: "schedule",
+	creator_approved: "workspace_premium",
+};
+
 export const mockNotifications: MockNotification[] = [
 	{
 		id: "n1",

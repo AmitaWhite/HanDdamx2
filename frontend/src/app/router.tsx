@@ -1,8 +1,8 @@
 import { createBrowserRouter } from "react-router-dom";
 import { AuthOnlyRoute } from "@/features/auth/AuthOnlyRoute";
+import { CreatorOnlyRoute } from "@/features/auth/CreatorOnlyRoute";
 import { GuestOnlyRoute } from "@/features/auth/GuestOnlyRoute";
 import { ConsumerLayout } from "@/layouts/ConsumerLayout";
-import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { PublicLayout } from "@/layouts/PublicLayout";
 import { ChatPage } from "@/pages/ChatPage";
 import { CreatePostPage } from "@/pages/CreatePostPage";
@@ -31,7 +31,11 @@ import { SubscribeSelectPage } from "@/pages/SubscribeSelectPage";
 import { paths } from "./paths";
 
 /**
- * 라우트 = stitch 19개 화면을 3개 존으로 정리한 결과.
+ * 라우트 = public / consumer 2개 존으로 정리한 결과.
+ * 크리에이터 관리 화면(프로젝트·게시물 관리, 새 글 작성)도 별도 대시보드 레이아웃 없이
+ * consumer 존(ConsumerLayout) 아래에서 CreatorOnlyRoute로 가드된다.
+ * 단, MyPageSideNav는 목록형 관리 화면(DashboardProjectsPage/DashboardPostsPage)에만 표시되고,
+ * 상세/작성 화면(DashboardProjectPage/CreatePostPage)은 참고 시안대로 사이드바 없이 전체 너비로 렌더한다.
  * 전 화면 목데이터(src/mocks/)로 채워져 있음 — 실제 API 연동은 화면별로 점진 적용 예정.
  */
 export const router = createBrowserRouter([
@@ -134,20 +138,45 @@ export const router = createBrowserRouter([
 					</AuthOnlyRoute>
 				),
 			},
-		],
-	},
-	{
-		// 크리에이터 대시보드 전체가 로그인 필요
-		element: (
-			<AuthOnlyRoute>
-				<DashboardLayout />
-			</AuthOnlyRoute>
-		),
-		children: [
-			{ path: paths.dashboardProjects, element: <DashboardProjectsPage /> },
-			{ path: paths.dashboardProject(), element: <DashboardProjectPage /> },
-			{ path: paths.dashboardPosts, element: <DashboardPostsPage /> },
-			{ path: paths.dashboardPostNew, element: <CreatePostPage /> },
+			// 크리에이터 관리 화면 — 마이페이지 체계(ConsumerLayout) 아래로 통합
+			{
+				path: paths.dashboardProjects,
+				element: (
+					<AuthOnlyRoute>
+						<CreatorOnlyRoute>
+							<DashboardProjectsPage />
+						</CreatorOnlyRoute>
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.dashboardProject(),
+				element: (
+					<AuthOnlyRoute>
+						<CreatorOnlyRoute>
+							<DashboardProjectPage />
+						</CreatorOnlyRoute>
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.dashboardPosts,
+				element: (
+					<AuthOnlyRoute>
+						<DashboardPostsPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.dashboardPostNew,
+				element: (
+					<AuthOnlyRoute>
+						<CreatorOnlyRoute>
+							<CreatePostPage />
+						</CreatorOnlyRoute>
+					</AuthOnlyRoute>
+				),
+			},
 		],
 	},
 	{ path: "*", element: <PagePlaceholder title="404" /> },

@@ -5,6 +5,7 @@ import { paths } from "@/app/paths";
 import { Avatar } from "@/components/ui/Avatar";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { EngagementBar } from "@/components/social/EngagementBar";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
@@ -366,19 +367,10 @@ function MockQnaPostPage({ postId }: { postId: string }) {
 
 			<article>
 				<div className="mb-3 flex items-center gap-2">
-					<span
-						className={
-							"rounded px-2 py-1 text-[10px] font-bold " +
-							(post.status === "answered"
-								? "bg-primary text-on-primary"
-								: "bg-surface-container text-secondary")
-						}
-					>
+					<Chip active={post.status === "answered"} size="sm">
 						{post.status === "answered" ? "답변 완료" : "답변 대기"}
-					</span>
-					<span className="text-caption font-caption text-secondary">
-						{post.category}
-					</span>
+					</Chip>
+					<span className="text-caption font-caption text-secondary">{post.category}</span>
 				</div>
 				<h1 className="mb-3 text-headline-lg font-display text-on-surface">
 					{post.title}

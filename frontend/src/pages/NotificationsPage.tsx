@@ -1,25 +1,12 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { useNotifications } from "@/features/notifications/NotificationsContext";
 import { cn } from "@/lib/cn";
-import { mockNotifications, type MockNotification } from "@/mocks/notifications";
-
-const TYPE_ICON: Record<MockNotification["type"], string> = {
-	reply: "reply",
-	payment: "payments",
-	new_post: "photo_library",
-	poll_vote: "how_to_vote",
-	subscription_expiring: "schedule",
-	creator_approved: "workspace_premium",
-};
+import { NOTIFICATION_TYPE_ICON } from "@/mocks/notifications";
 
 export function NotificationsPage() {
-	const [items, setItems] = useState(mockNotifications);
-
-	function markAllRead() {
-		setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
-	}
+	const { notifications: items, markAllRead } = useNotifications();
 
 	return (
 		<div className="container-page py-6">
@@ -41,7 +28,7 @@ export function NotificationsPage() {
 							)}
 						>
 							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container text-secondary">
-								<Icon name={TYPE_ICON[n.type]} className="text-[20px]" />
+								<Icon name={NOTIFICATION_TYPE_ICON[n.type]} className="text-[20px]" />
 							</span>
 							<div className="min-w-0 flex-1">
 								<p className={cn("text-body-md text-on-surface", !n.isRead && "font-bold")}>

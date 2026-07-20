@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Footer } from "@/components/nav/Footer";
+import { PostCard } from "@/components/social/PostCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -118,36 +119,34 @@ export function LandingPage() {
 					{recentRecords.map((post) => {
 						const author = findCreator(post.creatorId);
 						return (
-							<Link key={post.id} to={paths.postDetail(post.id)}>
-								<Card interactive className="group overflow-hidden">
-									<div className="relative aspect-square overflow-hidden">
-										<img
-											src={mockImg(post.imageSeed)}
-											alt={post.title}
-											className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-										/>
-										{post.isPaid && (
-											<span className="absolute right-4 top-4 rounded bg-primary px-2 py-1 text-[10px] font-bold text-on-primary">
-												유료
-											</span>
-										)}
-									</div>
-									<div className="p-6">
-										<div className="mb-4 flex items-center gap-3">
-											<Avatar src={mockImg(author.avatarSeed, 80, 80)} size={32} />
-											<span className="text-label-md font-label-md text-on-surface">
-												{author.name}
-											</span>
-										</div>
-										<h4 className="mb-2 text-headline-md font-display text-on-surface">
-											{post.title}
-										</h4>
-										<span className="text-caption font-caption text-secondary">
-											#{post.category}
+							<PostCard
+								key={post.id}
+								href={paths.postDetail(post.id)}
+								imageSeed={post.imageSeed}
+								imageAlt={post.title}
+								overlay={
+									post.isPaid && (
+										<Chip active size="sm" className="absolute right-4 top-4">
+											유료
+										</Chip>
+									)
+								}
+							>
+								<div className="p-6">
+									<div className="mb-4 flex items-center gap-3">
+										<Avatar src={mockImg(author.avatarSeed, 80, 80)} size={32} />
+										<span className="text-label-md font-label-md text-on-surface">
+											{author.name}
 										</span>
 									</div>
-								</Card>
-							</Link>
+									<h4 className="mb-2 text-headline-md font-display text-on-surface">
+										{post.title}
+									</h4>
+									<span className="text-caption font-caption text-secondary">
+										#{post.category}
+									</span>
+								</div>
+							</PostCard>
 						);
 					})}
 				</div>
