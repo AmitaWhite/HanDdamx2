@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { CreatorQnaList } from "@/components/creator/CreatorQnaList";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
@@ -44,33 +45,7 @@ export function QnaBoardPage() {
 				</div>
 			</div>
 
-			<div className="divide-y divide-outline-variant/30 rounded-xl border border-outline-variant/50 bg-surface-container-lowest">
-				{posts.map((post) => (
-					<Link
-						key={post.id}
-						to={paths.qnaPost(post.id)}
-						className="flex items-center gap-4 p-5 transition-colors hover:bg-surface-container-low"
-					>
-						<span
-							className={
-								"shrink-0 rounded px-2 py-1 text-[10px] font-bold " +
-								(post.status === "answered" ? "bg-primary text-on-primary" : "bg-surface-container text-secondary")
-							}
-						>
-							{post.status === "answered" ? "답변 완료" : "답변 대기"}
-						</span>
-						<div className="min-w-0 flex-1">
-							<p className="truncate text-body-md text-on-surface">{post.title}</p>
-							<p className="mt-1 text-caption font-caption text-secondary">
-								{post.category} · {post.authorName} · 댓글 {post.commentCount} · {post.createdAtLabel}
-							</p>
-						</div>
-					</Link>
-				))}
-				{posts.length === 0 && (
-					<p className="p-8 text-center text-body-md text-secondary">해당 카테고리의 글이 아직 없어요.</p>
-				)}
-			</div>
+			<CreatorQnaList qnaPosts={posts} emptyMessage="해당 카테고리의 글이 아직 없어요." />
 
 			<div className="mt-6 text-center">
 				<Button variant="secondary">더보기</Button>

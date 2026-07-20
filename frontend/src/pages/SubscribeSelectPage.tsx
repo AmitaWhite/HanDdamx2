@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -7,13 +7,21 @@ import { cn } from "@/lib/cn";
 import { findCreator } from "@/mocks/creators";
 import { mockPlans } from "@/mocks/subscriptionPlans";
 
+interface SubscribeSelectLocationState {
+	mode?: "support";
+}
+
 export function SubscribeSelectPage() {
 	const { creatorId = "" } = useParams();
 	const creator = findCreator(creatorId);
 	const navigate = useNavigate();
+	const location = useLocation();
+	// 이미 무료 구독 중인 사람이 "후원하기"로 들어온 경우 — 무료 플랜은 숨기고 유료 플랜만 보여준다.
+	const isSupportMode = (location.state as SubscribeSelectLocationState | null)?.mode === "support";
 	const [selected, setSelected] = useState<"free" | "paid">("paid");
 
-	const selectedPlan = mockPlans.find((p) => p.id === selected) ?? mockPlans[0];
+	const plans = isSupportMode ? mockPlans.filter((p) => p.id === "paid") : mockPlans;
+	const selectedPlan = plans.find((p) => p.id === selected) ?? plans[0];
 
 	function handleSubscribe() {
 		navigate(paths.subscribeComplete, { state: { creatorId: creator.id, planId: selectedPlan.id } });
@@ -29,11 +37,15 @@ export function SubscribeSelectPage() {
 				{creator.name} 프로필로
 			</Link>
 
-			<h1 className="mb-2 text-headline-lg font-display text-on-surface">{creator.name} 작가 구독하기</h1>
-			<p className="mb-8 text-body-md text-secondary">원하는 구독 플랜을 선택해주세요.</p>
+			<h1 className="mb-2 text-headline-lg font-display text-on-surface">
+				{creator.name} 작가 {isSupportMode ? "후원하기" : "구독하기"}
+			</h1>
+			<p className="mb-8 text-body-md text-secondary">
+				{isSupportMode ? "작가님의 창작 활동을 더 응원해주세요." : "원하는 구독 플랜을 선택해주세요."}
+			</p>
 
 			<div className="mb-8 flex flex-col gap-4">
-				{mockPlans.map((plan) => (
+				{plans.map((plan) => (
 					<button
 						key={plan.id}
 						type="button"
@@ -76,7 +88,7 @@ export function SubscribeSelectPage() {
 			</div>
 
 			<Button size="lg" fullWidth onClick={handleSubscribe}>
-				결제하고 구독하기
+				{isSupportMode ? "결제하고 후원하기" : "결제하고 구독하기"}
 			</Button>
 			<p className="mt-4 text-center text-caption font-caption text-secondary">구독은 언제든지 취소할 수 있습니다.</p>
 		</div>
