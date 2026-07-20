@@ -2,7 +2,7 @@ import { ensureFreshAccessToken, http, unwrap, unwrapVoid } from "@/lib/api";
 import type { MemberProfileResponse, MemberSummaryResponse } from "./types";
 
 
-// KSY-014: 내 프로필 조회 */
+// KSY-014: 내 프로필 조회
 export function getMyProfile() {
 	return unwrap<MemberProfileResponse>(http.get("/members/me"));
 }
