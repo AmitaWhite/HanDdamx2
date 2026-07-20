@@ -210,6 +210,9 @@ public class FeedService {
             StoredObject stored = objectStorage.upload("feeds/" + feedId + "/attachments", file);
             attachment = FeedAttachment.ofUpload(feedId, type, stored, file.getSize(), file.getContentType());
         } else {
+            if (request.videoUrl() == null || request.videoUrl().isBlank()) {
+                throw new CustomException(FeedErrorCode.ATTACHMENT_INVALID_REQUEST);
+            }
             attachment = FeedAttachment.ofVideoLink(feedId, request.videoUrl());
         }
 

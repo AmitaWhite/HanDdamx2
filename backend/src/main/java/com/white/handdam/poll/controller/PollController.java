@@ -67,7 +67,7 @@ public class PollController {
     public ApiResponse<Long> vote(
         @PathVariable Long pollId,
         @AuthenticationPrincipal AuthMember member,
-        @RequestBody PollVoteRequest request
+        @Valid @RequestBody PollVoteRequest request
     ) {
         return ApiResponse.success(pollService.vote(pollId, member.id(), request));
     }
@@ -77,7 +77,7 @@ public class PollController {
     public ApiResponse<Long> changeVote(
         @PathVariable Long pollId,
         @AuthenticationPrincipal AuthMember member,
-        @RequestBody PollVoteRequest request
+        @Valid @RequestBody PollVoteRequest request
     ) {
         return ApiResponse.success(pollService.changeVote(pollId, member.id(), request));
     }
