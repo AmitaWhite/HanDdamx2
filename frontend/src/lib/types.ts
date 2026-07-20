@@ -15,10 +15,10 @@ export interface ApiResponse<T> {
 	error: ErrorResponse | null;
 }
 
-/** 페이지네이션(Slice) 응답 — SliceResponse 대응 */
+/** 페이지네이션(Slice) 응답 — com.white.handdam.global.response.SliceResponse 대응 */
 export interface SliceResponse<T> {
 	content: T[];
 	hasNext: boolean;
-	// 실제 필드가 확정되면 조정
-	[key: string]: unknown;
+	page: number;
+	size: number;
 }
