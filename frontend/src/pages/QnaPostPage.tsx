@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Avatar } from "@/components/ui/Avatar";
@@ -14,7 +14,9 @@ import { useSubmitState } from "@/features/auth/useSubmitState";
 import {
 	type BoardPostResponse,
 	type BoardPostType,
+	addPremiumBoardPostImages,
 	deletePremiumBoardPost,
+	deletePremiumBoardPostImage,
 	getPremiumBoardPost,
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
@@ -58,7 +60,7 @@ function toRelativeLabel(iso: string): string {
 	return `${Math.floor(days / 7)}주 전`;
 }
 
-/** 숫자 postId → 실API(LDJ-003~005), 그 외 → 기존 mock UI */
+/** 숫자 postId → 실API(LDJ-003~005, 007~008), 그 외 → 기존 mock UI */
 export function QnaPostPage() {
 	const { postId = "" } = useParams();
 	const numericPostId = toNumericPostId(postId);
@@ -92,6 +94,11 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		error: deleteError,
 		run: runDelete,
 	} = useSubmitState("삭제에 실패했습니다. 다시 시도해 주세요.");
+	const {
+		loading: imageBusy,
+		error: imageError,
+		run: runImage,
+	} = useSubmitState("이미지 처리에 실패했습니다. 다시 시도해 주세요.");
 
 	useEffect(() => {
 		let cancelled = false;
@@ -166,6 +173,44 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		}
 	}
 
+	/** LDJ-007: 수정 중 이미지 추가 — 선택 즉시 업로드 */
+	async function onAddImages(e: ChangeEvent<HTMLInputElement>) {
+		const selected = e.target.files;
+		if (!selected || selected.length === 0) return;
+		const files = Array.from(selected);
+		e.target.value = "";
+
+		const added = await runImage(() =>
+			addPremiumBoardPostImages(postId, files),
+		);
+		if (added) {
+			setPost((prev) =>
+				prev
+					? { ...prev, images: [...prev.images, ...added] }
+					: prev,
+			);
+		}
+	}
+
+	/** LDJ-008: 수정 중 이미지 삭제 */
+	async function onRemoveImage(imageId: number) {
+		if (!window.confirm("이 이미지를 삭제할까요?")) return;
+		const ok = await runImage(async () => {
+			await deletePremiumBoardPostImage(postId, imageId);
+			return true;
+		});
+		if (ok) {
+			setPost((prev) =>
+				prev
+					? {
+							...prev,
+							images: prev.images.filter((img) => img.id !== imageId),
+						}
+					: prev,
+			);
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="container-page max-w-2xl py-10 text-center text-body-md text-secondary">
@@ -198,9 +243,9 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 				Q&A 게시판
 			</Link>
 
-			{(saveError || deleteError) && (
+			{(saveError || deleteError || imageError) && (
 				<div className="mb-4">
-					<Alert>{saveError ?? deleteError}</Alert>
+					<Alert>{saveError ?? deleteError ?? imageError}</Alert>
 				</div>
 			)}
 
@@ -249,17 +294,62 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 							className="w-full resize-y rounded border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-md focus:border-on-surface focus:outline-none focus:ring-1 focus:ring-on-surface"
 						/>
 					</div>
+
+					<div>
+						<label className="mb-2 block text-label-md font-label-md text-on-surface">
+							이미지
+						</label>
+						{post.images.length > 0 && (
+							<ul className="mb-3 flex flex-wrap gap-3">
+								{[...post.images]
+									.sort((a, b) => a.orderIndex - b.orderIndex)
+									.map((image) => (
+										<li key={image.id} className="relative">
+											<img
+												src={image.url}
+												alt={image.originalName ?? "첨부 이미지"}
+												className="h-24 w-24 rounded-lg object-cover"
+											/>
+											<button
+												type="button"
+												onClick={() => onRemoveImage(image.id)}
+												disabled={imageBusy}
+												className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-on-surface text-surface-container-lowest disabled:opacity-50"
+												aria-label="이미지 삭제"
+											>
+												<Icon name="close" className="text-[14px]" />
+											</button>
+										</li>
+									))}
+							</ul>
+						)}
+						<label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low py-6 text-center hover:border-primary">
+							<Icon name="upload" className="text-[24px] text-secondary" />
+							<span className="text-body-md text-secondary">
+								{imageBusy ? "업로드 중…" : "이미지 추가"}
+							</span>
+							<input
+								type="file"
+								multiple
+								accept="image/*"
+								className="hidden"
+								disabled={imageBusy || saving}
+								onChange={onAddImages}
+							/>
+						</label>
+					</div>
+
 					<div className="flex gap-3">
 						<Button
 							type="button"
 							variant="secondary"
 							fullWidth
 							onClick={() => setEditing(false)}
-							disabled={saving}
+							disabled={saving || imageBusy}
 						>
 							취소
 						</Button>
-						<Button type="submit" fullWidth disabled={saving}>
+						<Button type="submit" fullWidth disabled={saving || imageBusy}>
 							{saving ? "저장 중…" : "저장"}
 						</Button>
 					</div>

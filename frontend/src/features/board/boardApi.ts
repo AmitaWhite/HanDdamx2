@@ -165,3 +165,36 @@ export function updatePremiumBoardPost({
 export async function deletePremiumBoardPost(postId: number) {
 	await unwrapVoid(http.delete(`/premium-board/posts/${postId}`));
 }
+
+/**
+ * 기존 유료 게시글에 이미지 추가 (LDJ-007).
+ * 백엔드: POST /api/premium-board/posts/{postId}/images (multipart)
+ * 권한: 작성자, 공식 답변 전(WAITING)만.
+ * @returns 이번에 추가된 이미지 목록
+ */
+export function addPremiumBoardPostImages(postId: number, images: File[]) {
+	const formData = new FormData();
+	for (const file of images) {
+		formData.append("images", file);
+	}
+
+	return unwrap<BoardPostImageResponse[]>(
+		http.post(`/premium-board/posts/${postId}/images`, formData, {
+			headers: { "Content-Type": "multipart/form-data" },
+		}),
+	);
+}
+
+/**
+ * 유료 게시글 이미지 삭제 (LDJ-008).
+ * 백엔드: DELETE /api/premium-board/posts/{postId}/images/{imageId}
+ * 권한: 작성자, 공식 답변 전(WAITING)만.
+ */
+export async function deletePremiumBoardPostImage(
+	postId: number,
+	imageId: number,
+) {
+	await unwrapVoid(
+		http.delete(`/premium-board/posts/${postId}/images/${imageId}`),
+	);
+}

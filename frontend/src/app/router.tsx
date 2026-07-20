@@ -70,10 +70,24 @@ export const router = createBrowserRouter([
 			// 게스트도 둘러볼 수 있는 화면 — 가드 없음
 			{ path: paths.home, element: <HomePage /> },
 			{ path: paths.creator(), element: <CreatorPage /> },
-			{ path: paths.creatorQna(), element: <QnaBoardPage /> },
-			{ path: paths.qnaPost(), element: <QnaPostPage /> },
 			{ path: paths.postDetail(), element: <PostDetailPage /> },
-			// 로그인 필요 — 비로그인 시 /login 리다이렉트
+			// 유료 Q&A — 로그인 필요 (백엔드도 JWT + 유료 구독/크리에이터만 목록·상세 허용)
+			{
+				path: paths.creatorQna(),
+				element: (
+					<AuthOnlyRoute>
+						<QnaBoardPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.qnaPost(),
+				element: (
+					<AuthOnlyRoute>
+						<QnaPostPage />
+					</AuthOnlyRoute>
+				),
+			},
 			{
 				path: paths.creatorQnaNew(),
 				element: (
@@ -82,6 +96,7 @@ export const router = createBrowserRouter([
 					</AuthOnlyRoute>
 				),
 			},
+			// 로그인 필요 — 비로그인 시 /login 리다이렉트
 			{
 				path: paths.feed,
 				element: (

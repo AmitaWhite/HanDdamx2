@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { CreatorQnaList } from "@/components/creator/CreatorQnaList";
@@ -9,22 +9,56 @@ import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
+import {
+	type BoardPostType,
+	getPremiumBoardPosts,
+} from "@/features/board/boardApi";
 import { useSubscription } from "@/features/subscription/SubscriptionContext";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { findCreator } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
 import { mockPosts } from "@/mocks/posts";
 import { mockProjects } from "@/mocks/projects";
-import { mockQnaPosts } from "@/mocks/qna";
+import { mockQnaPosts, type MockQnaPost, type QnaCategory } from "@/mocks/qna";
 
 const PROJECT_SCROLL_STEP = 220;
+const QNA_PREVIEW_SIZE = 5;
+
+const TYPE_TO_CATEGORY: Record<BoardPostType, QnaCategory> = {
+	QUESTION: "제작 질문",
+	FEEDBACK: "작품 피드백",
+	CONTENT_SUGGESTION: "콘텐츠 제안",
+	MATERIAL: "재료 추천",
+	GENERAL: "일반 소통",
+};
+
+function toNumericCreatorId(value: string): number | null {
+	if (!value) return null;
+	const n = Number(value);
+	return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function toRelativeLabel(iso: string): string {
+	const diffMs = Date.now() - new Date(iso).getTime();
+	if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
+	const minutes = Math.floor(diffMs / 60_000);
+	if (minutes < 1) return "방금";
+	if (minutes < 60) return `${minutes}분 전`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}시간 전`;
+	const days = Math.floor(hours / 24);
+	if (days < 7) return `${days}일 전`;
+	return `${Math.floor(days / 7)}주 전`;
+}
 
 export function CreatorPage() {
 	const { creatorId = "" } = useParams();
 	const creator = findCreator(creatorId);
+	const numericCreatorId = toNumericCreatorId(creatorId);
 	const projects = mockProjects.filter((p) => p.creatorId === creator.id);
 	const posts = mockPosts.filter((p) => p.creatorId === creator.id);
-	const qnaPosts = mockQnaPosts.filter((q) => q.creatorId === creator.id);
+	const mockQna = mockQnaPosts.filter((q) => q.creatorId === creator.id);
 
 	const { isAuthenticated } = useAuth();
 	const navigate = useNavigate();
@@ -34,6 +68,60 @@ export function CreatorPage() {
 	const [activeTab, setActiveTab] = useState<"posts" | "qna">("posts");
 	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 	const projectsRef = useRef<HTMLDivElement>(null);
+
+	const [remoteQna, setRemoteQna] = useState<MockQnaPost[]>([]);
+	const [qnaLoading, setQnaLoading] = useState(false);
+	const [qnaError, setQnaError] = useState<string | null>(null);
+
+	// 숫자 creatorId → 실API 미리보기. mock creator(suyeon 등)는 mockQna 유지.
+	useEffect(() => {
+		if (numericCreatorId === null) return;
+
+		let cancelled = false;
+		setQnaLoading(true);
+		setQnaError(null);
+
+		getPremiumBoardPosts({
+			creatorId: numericCreatorId,
+			page: 0,
+			size: QNA_PREVIEW_SIZE,
+		})
+			.then((page) => {
+				if (cancelled) return;
+				setRemoteQna(
+					page.content.map((post) => ({
+						id: String(post.id),
+						creatorId: String(post.creatorId),
+						title: post.title,
+						status: post.status === "ANSWERED" ? "answered" : "pending",
+						category: TYPE_TO_CATEGORY[post.type],
+						authorName: `회원 #${post.memberId}`,
+						commentCount: 0,
+						createdAtLabel: toRelativeLabel(post.createdAt),
+						body: [post.content],
+					})),
+				);
+			})
+			.catch((err: unknown) => {
+				if (cancelled) return;
+				setRemoteQna([]);
+				setQnaError(
+					err instanceof ApiError
+						? err.message
+						: "Q&A를 불러오지 못했습니다.",
+				);
+			})
+			.finally(() => {
+				if (!cancelled) setQnaLoading(false);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [numericCreatorId]);
+
+	const qnaPosts =
+		numericCreatorId !== null ? remoteQna : mockQna.slice(0, QNA_PREVIEW_SIZE);
 
 	function handleToggleSubscribe() {
 		if (!isAuthenticated) {
@@ -76,7 +164,18 @@ export function CreatorPage() {
 
 	const qnaPanel = (
 		<div>
-			<CreatorQnaList qnaPosts={qnaPosts.slice(0, 5)} />
+			{qnaError && (
+				<div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-body-md text-primary">
+					{qnaError}
+				</div>
+			)}
+			{qnaLoading ? (
+				<p className="rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-8 text-center text-body-md text-secondary">
+					불러오는 중…
+				</p>
+			) : (
+				<CreatorQnaList qnaPosts={qnaPosts} />
+			)}
 			<div className="mt-4 text-center">
 				<Link
 					to={paths.creatorQna(creator.id)}
