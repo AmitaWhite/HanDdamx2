@@ -21,6 +21,8 @@ export const paths = {
 
 	creator: (id: string | number = ":creatorId") => `/creators/${id}`,
 	creatorQna: (id: string | number = ":creatorId") => `/creators/${id}/qna`,
+	creatorQnaNew: (id: string | number = ":creatorId") =>
+		`/creators/${id}/qna/new`,
 	qnaPost: (postId: string | number = ":postId") => `/qna/${postId}`,
 	postDetail: (id: string | number = ":postId") => `/posts/${id}`,
 	subscribeSelect: (id: string | number = ":creatorId") =>
