@@ -30,4 +30,7 @@ public interface BoardCommentRepository extends JpaRepository<BoardComment, Long
             order by bc.createdAt desc
             """)
     Slice<MyBoardCommentResponse> findMyComments(@Param("memberId") Long memberId, Pageable pageable);
+
+    // KSY-015
+    long countByMemberIdAndDeletedFalse(Long memberId);
 }

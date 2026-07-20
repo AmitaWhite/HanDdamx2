@@ -3,10 +3,7 @@ package com.white.handdam.member.controller;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.member.dto.request.MemberUpdateRequest;
-import com.white.handdam.member.dto.response.MemberProfileResponse;
-import com.white.handdam.member.dto.response.MemberPublicProfileResponse;
-import com.white.handdam.member.dto.response.MyBoardCommentResponse;
-import com.white.handdam.member.dto.response.MyFeedCommentResponse;
+import com.white.handdam.member.dto.response.*;
 import com.white.handdam.member.service.MemberService;
 import com.white.handdam.member.service.MyActivityService;
 import jakarta.validation.Valid;
@@ -64,6 +61,11 @@ public class MemberController {
     public ApiResponse<Slice<MyBoardCommentResponse>> getMyBoardComments(@AuthenticationPrincipal AuthMember authMember,
                                                                          @PageableDefault(size=3) Pageable pageable) {
         return ApiResponse.success(myActivityService.getMyBoardComments(authMember.id(), pageable));
+    }
+
+    @GetMapping("/me/summary")
+    public ApiResponse<MemberSummaryResponse> getMySummary(@AuthenticationPrincipal AuthMember authMember) {
+        return ApiResponse.success(myActivityService.getMySummary(authMember.id()));
     }
 
 }

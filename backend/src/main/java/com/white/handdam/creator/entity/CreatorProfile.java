@@ -127,4 +127,5 @@ public class CreatorProfile extends BaseTimeEntity {
     public void updateSubscriptionPrice(int price) {
         this.subscriptionPrice = price;
     }
+
 }
