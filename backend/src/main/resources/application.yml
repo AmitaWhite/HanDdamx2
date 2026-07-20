@@ -101,7 +101,7 @@ toss:
   api-base-url: ${TOSS_API_BASE_URL:https://api.tosspayments.com}
 
 app:
-  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
 
 subscription:
   expiration:
