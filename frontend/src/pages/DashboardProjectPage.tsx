@@ -40,7 +40,7 @@ export function DashboardProjectPage() {
 						게시물 {project.postCount}개 · {project.periodLabel}
 					</p>
 				</div>
-				<LinkButton to={paths.dashboardPostNew}>
+				<LinkButton to={paths.dashboardPostNew} state={{ projectId: project.id }}>
 					<Icon name="add" className="text-[18px]" />
 					새 포스트 작성
 				</LinkButton>
