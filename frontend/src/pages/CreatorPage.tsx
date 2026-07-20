@@ -227,8 +227,20 @@ export function CreatorPage() {
 								className="flex w-[200%] transition-transform duration-300 ease-out"
 								style={{ transform: activeTab === "posts" ? "translateX(0%)" : "translateX(-50%)" }}
 							>
-								<div className="w-1/2 pr-0 sm:pr-3">{postsGrid}</div>
-								<div className="w-1/2 pl-0 sm:pl-3">{qnaPanel}</div>
+								<div
+									className="w-1/2 pr-0 sm:pr-3"
+									aria-hidden={activeTab !== "posts"}
+									{...({ inert: activeTab !== "posts" ? "" : undefined } as Record<string, string | undefined>)}
+								>
+									{postsGrid}
+								</div>
+								<div
+									className="w-1/2 pl-0 sm:pl-3"
+									aria-hidden={activeTab !== "qna"}
+									{...({ inert: activeTab !== "qna" ? "" : undefined } as Record<string, string | undefined>)}
+								>
+									{qnaPanel}
+								</div>
 							</div>
 						</div>
 					</>
