@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { Avatar } from "@/components/ui/Avatar";
@@ -6,20 +6,72 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { LinkButton } from "@/components/ui/LinkButton";
-import { mockImg } from "@/mocks/helpers";
-import { mockMember } from "@/mocks/member";
+import { getMyProfile } from "@/features/member/memberApi";
+import type { MemberProfileResponse } from "@/features/member/types";
 
 export function MyPageSettingsPage() {
-	const [nickname, setNickname] = useState(mockMember.nickname);
+	const [profile, setProfile] = useState<MemberProfileResponse | null>(null);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(false);
+
+	const [nickname, setNickname] = useState("");
 	const [currentPassword, setCurrentPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
+
 	const [showCurrent, setShowCurrent] = useState(false);
 	const [showNew, setShowNew] = useState(false);
-	const [saved, setSaved] = useState(false);
+
+	useEffect(() => {
+		let ignore = false;
+
+		const fetchProfile = async () => {
+			try {
+				const data = await getMyProfile();
+
+				if (!ignore) {
+					setProfile(data);
+					setNickname(data.nickname);
+				}
+			} catch {
+				if (!ignore) {
+					setError(true);
+				}
+			} finally {
+				if (!ignore) {
+					setLoading(false);
+				}
+			}
+		};
+
+		fetchProfile();
+
+		return () => {
+			ignore = true;
+		};
+	}, []);
 
 	function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		setSaved(true);
+	}
+
+	if (loading) {
+		return (
+			<MyPageShell>
+				<p className="py-12 text-center text-body-md text-secondary">
+					불러오는 중...
+				</p>
+			</MyPageShell>
+		);
+	}
+
+	if (error || !profile) {
+		return (
+			<MyPageShell>
+				<p className="py-12 text-center text-body-md text-secondary">
+					프로필 정보를 불러오지 못했습니다.
+				</p>
+			</MyPageShell>
+		);
 	}
 
 	return (
@@ -28,15 +80,9 @@ export function MyPageSettingsPage() {
 				프로필 설정
 			</h1>
 
-			{saved && (
-				<p role="status" className="mb-6 rounded bg-primary/10 px-4 py-3 text-label-md font-label-md text-primary">
-					변경사항이 저장되었습니다. (목데이터 — 실제 저장되지 않음)
-				</p>
-			)}
-
 			<div className="mb-8 flex items-center gap-4">
 				<div className="relative">
-					<Avatar src={mockImg(mockMember.avatarSeed, 160, 160)} size={80} />
+					<Avatar src={profile.profileImageUrl ?? undefined} size={80} />
 					<span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-on-primary">
 						<Icon name="photo_camera" className="text-[16px]" />
 					</span>
