@@ -62,7 +62,7 @@ public class S3ObjectStorage implements ObjectStorage {
 	 *
 	 * <pre>
 	 * 1) 파일/형식 검증
-	 * 2) storageKey 생성 (folder/uuid_원본파일명)
+	 * 2) storageKey 생성 (folder/uuid.확장자)
 	 * 3) S3 putObject
 	 * 4) url 포함한 StoredObject 반환
 	 * </pre>
