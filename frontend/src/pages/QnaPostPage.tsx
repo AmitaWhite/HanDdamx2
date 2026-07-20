@@ -12,12 +12,17 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSubmitState } from "@/features/auth/useSubmitState";
 import {
+	type BoardAnswerResponse,
 	type BoardPostResponse,
 	type BoardPostType,
 	addPremiumBoardPostImages,
+	createBoardAnswer,
+	deleteBoardAnswer,
 	deletePremiumBoardPost,
 	deletePremiumBoardPostImage,
+	getBoardAnswer,
 	getPremiumBoardPost,
+	updateBoardAnswer,
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
 import { ApiError } from "@/lib/api";
@@ -60,7 +65,7 @@ function toRelativeLabel(iso: string): string {
 	return `${Math.floor(days / 7)}주 전`;
 }
 
-/** 숫자 postId → 실API(LDJ-003~005, 007~008), 그 외 → 기존 mock UI */
+/** 숫자 postId → 실API(LDJ-003~005, 007~011), 그 외 → 기존 mock UI */
 export function QnaPostPage() {
 	const { postId = "" } = useParams();
 	const numericPostId = toNumericPostId(postId);
@@ -77,6 +82,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 	const { user } = useAuth();
 
 	const [post, setPost] = useState<BoardPostResponse | null>(null);
+	const [answer, setAnswer] = useState<BoardAnswerResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const imageUploadFailed =
@@ -87,6 +93,9 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 	const [editTitle, setEditTitle] = useState("");
 	const [editType, setEditType] = useState<BoardPostType>("QUESTION");
 	const [editContent, setEditContent] = useState("");
+
+	const [answerDraft, setAnswerDraft] = useState("");
+	const [answerEditing, setAnswerEditing] = useState(false);
 
 	const {
 		loading: saving,
@@ -103,19 +112,29 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		error: imageError,
 		run: runImage,
 	} = useSubmitState("이미지 처리에 실패했습니다. 다시 시도해 주세요.");
+	const {
+		loading: answerBusy,
+		error: answerError,
+		run: runAnswer,
+	} = useSubmitState("공식 답변 처리에 실패했습니다. 다시 시도해 주세요.");
 
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setLoadError(null);
 
-		getPremiumBoardPost(postId)
-			.then((data) => {
+		Promise.all([
+			getPremiumBoardPost(postId),
+			getBoardAnswer(postId).catch(() => null),
+		])
+			.then(([data, answerData]) => {
 				if (cancelled) return;
 				setPost(data);
+				setAnswer(answerData);
 				setEditTitle(data.title);
 				setEditType(data.type);
 				setEditContent(data.content);
+				setAnswerDraft(answerData?.content ?? "");
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return;
@@ -125,6 +144,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						: "게시글을 불러오지 못했습니다.",
 				);
 				setPost(null);
+				setAnswer(null);
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
@@ -136,7 +156,11 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 	}, [postId]);
 
 	const isAuthor = !!user && !!post && user.memberId === post.memberId;
+	const isBoardOwner = !!user && !!post && user.memberId === post.creatorId;
 	const canEdit = isAuthor && post?.status === "WAITING";
+	const canWriteAnswer = isBoardOwner && post?.status === "WAITING" && !answer;
+	const canManageAnswer =
+		!!user && !!answer && user.memberId === answer.creatorId;
 
 	function startEdit() {
 		if (!post) return;
@@ -215,6 +239,55 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		}
 	}
 
+	/** LDJ-009: 공식 답변 작성 */
+	async function onCreateAnswer(e: FormEvent) {
+		e.preventDefault();
+		const content = answerDraft.trim();
+		if (!content) return;
+
+		const created = await runAnswer(() => createBoardAnswer(postId, content));
+		if (created) {
+			setAnswer(created);
+			setAnswerDraft(created.content);
+			setPost((prev) => (prev ? { ...prev, status: "ANSWERED" } : prev));
+		}
+	}
+
+	/** LDJ-010: 공식 답변 수정 */
+	async function onUpdateAnswer(e: FormEvent) {
+		e.preventDefault();
+		if (!answer) return;
+		const content = answerDraft.trim();
+		if (!content) return;
+
+		const updated = await runAnswer(() =>
+			updateBoardAnswer(answer.id, content),
+		);
+		if (updated) {
+			setAnswer(updated);
+			setAnswerDraft(updated.content);
+			setAnswerEditing(false);
+		}
+	}
+
+	/** LDJ-011: 공식 답변 삭제 */
+	async function onDeleteAnswer() {
+		if (!answer) return;
+		if (!window.confirm("공식 답변을 삭제할까요? 게시글이 답변 대기로 돌아갑니다.")) {
+			return;
+		}
+		const ok = await runAnswer(async () => {
+			await deleteBoardAnswer(answer.id);
+			return true;
+		});
+		if (ok) {
+			setAnswer(null);
+			setAnswerDraft("");
+			setAnswerEditing(false);
+			setPost((prev) => (prev ? { ...prev, status: "WAITING" } : prev));
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="container-page max-w-2xl py-10 text-center text-body-md text-secondary">
@@ -247,12 +320,13 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 				Q&A 게시판
 			</Link>
 
-			{(saveError || deleteError || imageError || imageUploadFailed) && (
+			{(saveError || deleteError || imageError || answerError || imageUploadFailed) && (
 				<div className="mb-4">
 					<Alert>
 						{saveError ??
 							deleteError ??
 							imageError ??
+							answerError ??
 							"글은 등록됐지만 이미지가 저장되지 않았습니다. 아래에서 다시 추가해 주세요."}
 					</Alert>
 				</div>
@@ -425,6 +499,107 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						</div>
 					)}
 				</article>
+			)}
+
+			{/* LDJ-009~011 + GET: 공식 답변 */}
+			{!editing && answer && (
+				<div className="mt-8 rounded-xl border border-primary/30 bg-primary/5 p-5">
+					<div className="mb-3 flex items-center justify-between gap-3">
+						<div className="flex items-center gap-2">
+							<Icon name="workspace_premium" className="text-primary" />
+							<span className="text-label-md font-label-md text-on-surface">
+								크리에이터의 공식 답변
+							</span>
+						</div>
+						{canManageAnswer && !answerEditing && (
+							<div className="flex gap-2">
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => {
+										setAnswerDraft(answer.content);
+										setAnswerEditing(true);
+									}}
+								>
+									수정
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={onDeleteAnswer}
+									disabled={answerBusy}
+								>
+									{answerBusy ? "삭제 중…" : "삭제"}
+								</Button>
+							</div>
+						)}
+					</div>
+					{answerEditing ? (
+						<form className="flex flex-col gap-3" onSubmit={onUpdateAnswer} noValidate>
+							<textarea
+								value={answerDraft}
+								onChange={(e) => setAnswerDraft(e.target.value)}
+								rows={5}
+								required
+								className="w-full resize-y rounded border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-md focus:border-on-surface focus:outline-none focus:ring-1 focus:ring-on-surface"
+							/>
+							<div className="flex gap-3">
+								<Button
+									type="button"
+									variant="secondary"
+									fullWidth
+									onClick={() => {
+										setAnswerDraft(answer.content);
+										setAnswerEditing(false);
+									}}
+									disabled={answerBusy}
+								>
+									취소
+								</Button>
+								<Button type="submit" fullWidth disabled={answerBusy}>
+									{answerBusy ? "저장 중…" : "저장"}
+								</Button>
+							</div>
+						</form>
+					) : (
+						<>
+							<div className="whitespace-pre-wrap text-body-md text-on-surface">
+								{answer.content}
+							</div>
+							<p className="mt-3 text-caption font-caption text-secondary">
+								{toRelativeLabel(answer.createdAt)}
+							</p>
+						</>
+					)}
+				</div>
+			)}
+
+			{!editing && canWriteAnswer && (
+				<form
+					className="mt-8 rounded-xl border border-outline-variant bg-surface-container-low p-5"
+					onSubmit={onCreateAnswer}
+					noValidate
+				>
+					<div className="mb-3 flex items-center gap-2">
+						<Icon name="workspace_premium" className="text-primary" />
+						<span className="text-label-md font-label-md text-on-surface">
+							공식 답변 작성
+						</span>
+					</div>
+					<textarea
+						value={answerDraft}
+						onChange={(e) => setAnswerDraft(e.target.value)}
+						rows={5}
+						required
+						placeholder="구독자에게 공식 답변을 남겨 주세요"
+						className="mb-3 w-full resize-y rounded border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-md focus:border-on-surface focus:outline-none focus:ring-1 focus:ring-on-surface"
+					/>
+					<Button type="submit" fullWidth disabled={answerBusy}>
+						{answerBusy ? "등록 중…" : "답변 등록"}
+					</Button>
+				</form>
 			)}
 		</div>
 	);

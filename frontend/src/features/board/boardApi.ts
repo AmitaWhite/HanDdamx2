@@ -1,4 +1,13 @@
-import { http, ensureFreshAccessToken, unwrap, unwrapVoid, ApiError } from "@/lib/api";
+import axios from "axios";
+import {
+	http,
+	ensureFreshAccessToken,
+	unwrap,
+	unwrapVoid,
+	ApiError,
+	asApiError,
+} from "@/lib/api";
+import type { ApiResponse } from "@/lib/types";
 
 /**
  * 백엔드 BoardPostType (com.white.handdam.board.entity.BoardPostType)
@@ -207,4 +216,84 @@ export async function deletePremiumBoardPostImage(
 	await unwrapVoid(
 		http.delete(`/premium-board/posts/${postId}/images/${imageId}`),
 	);
+}
+
+/** 백엔드 BoardAnswerResponse */
+export interface BoardAnswerResponse {
+	id: number;
+	boardPostId: number;
+	creatorId: number;
+	content: string;
+	createdAt: string;
+	updatedAt: string;
+	deletedAt: string | null;
+}
+
+/**
+ * 게시글 공식 답변 조회.
+ * 백엔드: GET /api/premium-board/posts/{postId}/answer
+ * 답변 없으면 null (data:null 또는 BOARD_ANSWER_NOT_FOUND).
+ */
+export async function getBoardAnswer(
+	postId: number,
+): Promise<BoardAnswerResponse | null> {
+	try {
+		const { data: body } = await http.get<ApiResponse<BoardAnswerResponse>>(
+			`/premium-board/posts/${postId}/answer`,
+		);
+		if (body.success) {
+			return body.data;
+		}
+		if (body.error?.code === "BOARD_ANSWER_NOT_FOUND") {
+			return null;
+		}
+		throw new ApiError(
+			body.error?.code ?? "UNKNOWN",
+			body.error?.message ?? "공식 답변을 불러오지 못했습니다.",
+		);
+	} catch (err) {
+		if (err instanceof ApiError) {
+			if (err.code === "BOARD_ANSWER_NOT_FOUND") return null;
+			throw err;
+		}
+		const apiErr = asApiError(err);
+		if (
+			apiErr.code === "BOARD_ANSWER_NOT_FOUND" ||
+			(axios.isAxiosError(err) && err.response?.status === 404)
+		) {
+			return null;
+		}
+		throw apiErr;
+	}
+}
+
+/**
+ * 크리에이터 공식 답변 작성 (LDJ-009).
+ * 백엔드: POST /api/premium-board/posts/{postId}/answer
+ * 권한: 게시판 소유 크리에이터
+ */
+export function createBoardAnswer(postId: number, content: string) {
+	return unwrap<BoardAnswerResponse>(
+		http.post(`/premium-board/posts/${postId}/answer`, { content }),
+	);
+}
+
+/**
+ * 공식 답변 수정 (LDJ-010).
+ * 백엔드: PATCH /api/board-answers/{answerId}
+ * 권한: 답변 작성 크리에이터
+ */
+export function updateBoardAnswer(answerId: number, content: string) {
+	return unwrap<BoardAnswerResponse>(
+		http.patch(`/board-answers/${answerId}`, { content }),
+	);
+}
+
+/**
+ * 공식 답변 소프트 삭제 (LDJ-011).
+ * 백엔드: DELETE /api/board-answers/{answerId}
+ * 권한: 답변 작성 크리에이터
+ */
+export async function deleteBoardAnswer(answerId: number) {
+	await unwrapVoid(http.delete(`/board-answers/${answerId}`));
 }

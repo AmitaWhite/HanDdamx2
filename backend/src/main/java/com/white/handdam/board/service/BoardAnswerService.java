@@ -27,15 +27,16 @@ public class BoardAnswerService {
 	/**
 	 * 게시글의 활성 공식 답변 조회.
 	 * 권한: 게시글 접근 가능자(크리에이터/작성자/유료 구독자)와 동일.
+	 * 답변이 없으면 null (WAITING 게시글은 정상).
 	 */
 	public BoardAnswerResponse getAnswer(Long postId, Long requesterId) {
 		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
 			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
 		boardPostService.assertCanAccessPost(post, requesterId);
 
-		BoardAnswer answer = boardAnswerRepository.findByBoardPostIdAndDeletedFalse(postId)
-			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_ANSWER_NOT_FOUND));
-		return BoardAnswerConverter.toResponse(answer);
+		return boardAnswerRepository.findByBoardPostIdAndDeletedFalse(postId)
+			.map(BoardAnswerConverter::toResponse)
+			.orElse(null);
 	}
 
 	/**
