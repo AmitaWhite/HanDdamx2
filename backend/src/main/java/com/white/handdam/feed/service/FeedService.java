@@ -1,24 +1,33 @@
 package com.white.handdam.feed.service;
 
+import com.white.handdam.feed.dto.request.AddAttachmentRequest;
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
 import com.white.handdam.feed.dto.request.FeedUpdateRequest;
+import com.white.handdam.feed.dto.response.AttachmentResponse;
+import com.white.handdam.feed.dto.response.DownloadResponse;
 import com.white.handdam.feed.dto.response.FeedDetailResponse;
 import com.white.handdam.feed.dto.response.FeedSummaryResponse;
+import com.white.handdam.feed.entity.AttachmentType;
 import com.white.handdam.feed.entity.Feed;
+import com.white.handdam.feed.entity.FeedAttachment;
 import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
+import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
+import com.white.handdam.storage.ObjectStorage;
+import com.white.handdam.storage.StoredObject;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -30,6 +39,8 @@ public class FeedService {
     private final FeedRepository feedRepository;
     private final SubscriptionLevelChecker subscriptionLevelChecker;
     private final ProjectRepository projectRepository;
+    private final FeedAttachmentRepository feedAttachmentRepository;
+    private final ObjectStorage objectStorage;
 
     // [LYJ-001] 피드 작성
     @Transactional
@@ -179,4 +190,94 @@ public class FeedService {
         return feedRepository.findByCreatorId(creatorId, pageable)
                 .map(FeedSummaryResponse::from);
     }
+
+    // [LYJ-012] 피드 첨부파일 추가
+    // type=IMAGE/FILE: S3 업로드 후 저장 / type=VIDEO_LINK: 외부 URL만 저장
+    @Transactional
+    public AttachmentResponse addAttachment(Long feedId, Long memberId,
+                                            MultipartFile file, AddAttachmentRequest request) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        if (!project.getCreatorId().equals(memberId)) {
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        FeedAttachment attachment;
+        if (file != null && !file.isEmpty()) {
+            AttachmentType type = resolveAttachmentType(file.getContentType());
+            StoredObject stored = objectStorage.upload("feeds/" + feedId + "/attachments", file);
+            attachment = FeedAttachment.ofUpload(feedId, type, stored, file.getSize(), file.getContentType());
+        } else {
+            attachment = FeedAttachment.ofVideoLink(feedId, request.videoUrl());
+        }
+
+        return AttachmentResponse.from(feedAttachmentRepository.save(attachment));
+    }
+
+    // MIME 타입으로 AttachmentType 결정
+    private AttachmentType resolveAttachmentType(String mimeType) {
+        if (mimeType == null) return AttachmentType.FILE;
+        if (mimeType.startsWith("image/")) return AttachmentType.IMAGE;
+        if (mimeType.startsWith("video/")) return AttachmentType.FILE;
+        return AttachmentType.FILE; // PDF 등
+    }
+
+    // [LYJ-013] 피드 첨부파일 삭제
+    @Transactional
+    public void deleteAttachment(Long feedId, Long attachmentId, Long memberId) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+        if (!project.getCreatorId().equals(memberId)) {
+            throw new CustomException(FeedErrorCode.FEED_FORBIDDEN);
+        }
+
+        FeedAttachment attachment = feedAttachmentRepository.findByIdAndFeedIdAndDeletedFalse(attachmentId, feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.ATTACHMENT_NOT_FOUND));
+
+        // S3 파일이 있는 경우만 삭제
+        if (attachment.getStorageKey() != null) {
+            objectStorage.delete(attachment.getStorageKey());
+        }
+        attachment.softDelete();
+    }
+
+    // [LYJ-014] 첨부파일 다운로드 URL 조회
+    public DownloadResponse getDownloadUrl(Long feedId, Long attachmentId, Long memberId) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = (!isOwner && memberId != null)
+            ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
+            : null;
+        validateAccess(feed.getVisibility(), level, isOwner);
+
+        FeedAttachment attachment = feedAttachmentRepository.findByIdAndFeedIdAndDeletedFalse(attachmentId, feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.ATTACHMENT_NOT_FOUND));
+
+        if (attachment.getType() == AttachmentType.VIDEO_LINK) {
+            return DownloadResponse.ofLink(attachment);
+        }
+        String presignedUrl = objectStorage.generatePresignedUrl(attachment.getStorageKey(), 10);
+        return DownloadResponse.ofPresigned(attachment, presignedUrl, 10);
+    }
+
+    // 공개범위 접근 불가 시 적절한 에러 코드로 예외 발생
+    // canAccess()는 true/false만 반환하지만, 다운로드는 왜 막혔는지 명확히 알려줘야 함
+    private void validateAccess(Visibility visibility, String level, boolean isOwner) {
+        if (canAccess(visibility, level, isOwner)) return;
+        throw new CustomException(
+            visibility == Visibility.FREE_SUBSCRIBER
+                ? FeedErrorCode.FREE_SUBSCRIPTION_REQUIRED
+                : FeedErrorCode.PAID_SUBSCRIPTION_REQUIRED
+        );
+    }
+
+
 }

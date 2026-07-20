@@ -910,6 +910,11 @@ class BoardPostServiceTest {
 			store.remove(storageKey);
 		}
 
+		@Override
+		public String generatePresignedUrl(String storageKey, int expireMinutes) {
+			return "http://memory/" + storageKey + "?presigned=true";
+		}
+
 		byte[] getBytes(String storageKey) {
 			return store.get(storageKey);
 		}
