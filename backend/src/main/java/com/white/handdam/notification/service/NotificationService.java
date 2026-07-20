@@ -16,6 +16,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -33,6 +35,10 @@ public class NotificationService {
 	 *
 	 * <p>저장이 본체고 전송은 부가 기능이다. 미접속 사용자는 전송이 스킵될 뿐 알림은 남아야 하므로,
 	 * 전송 실패가 저장을 롤백시키지 않도록 전송을 try/catch 로 감싼다.
+	 *
+	 * <p><b>전송은 커밋 이후로 미룬다.</b> 저장 직후 보내면 이어지는 커밋이 실패했을 때
+	 * 클라이언트는 DB 에 없는 알림을 이미 받아 화면에 그린 상태가 된다(새로고침하면 사라진다).
+	 * 비동기 스레드라 지켜보는 사람이 없어 조용히 남으므로 {@code afterCommit} 으로 미룬다.
 	 *
 	 * <p>{@code REQUIRES_NEW} 인 이유: 호출자인 리스너가
 	 * {@code @TransactionalEventListener(AFTER_COMMIT)} 이라 원본 트랜잭션이 이미 끝난 뒤 실행된다.
@@ -64,12 +70,39 @@ public class NotificationService {
 				.build()
 		);
 
-		// 전송 실패가 저장을 되돌리면 안 된다
+		// 트랜잭션 안에서 미리 DTO 로 옮긴다 (id/createdAt 은 persist 시점에 채워져 있다)
+		NotificationResponse response = NotificationConverter.toResponse(saved);
+		publishAfterCommit(memberId, response);
+	}
+
+	/**
+	 * 커밋이 성공한 뒤에 전송한다. 트랜잭션 동기화가 없으면(예: 단위 테스트) 즉시 전송한다.
+	 */
+	private void publishAfterCommit(Long memberId, NotificationResponse response) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			publishQuietly(memberId, response);
+			return;
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				publishQuietly(memberId, response);
+			}
+		});
+	}
+
+	/**
+	 * 전송 실패를 로그로만 남긴다.
+	 *
+	 * <p>{@code afterCommit} 콜백에서 나간 예외는 커밋을 호출한 쪽까지 전파되므로
+	 * (Spring 이 afterCommit 예외를 잡지 않는다) 이 가드는 반드시 있어야 한다.
+	 */
+	private void publishQuietly(Long memberId, NotificationResponse response) {
 		try {
-			notificationPublisher.publish(memberId, NotificationConverter.toResponse(saved));
+			notificationPublisher.publish(memberId, response);
 		} catch (Exception e) {
 			log.warn("알림 실시간 전송 실패(저장은 완료): notificationId={}, memberId={}",
-				saved.getId(), memberId, e);
+				response.id(), memberId, e);
 		}
 	}
 

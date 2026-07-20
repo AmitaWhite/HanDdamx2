@@ -20,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -120,6 +122,29 @@ class NotificationServiceTest {
 		verify(notificationRepository).save(captor.capture());
 		assertThat(captor.getValue().getMessage())
 			.hasSize(NotificationService.MAX_MESSAGE_LENGTH);
+	}
+
+	@Test
+	@DisplayName("알림 생성 - 트랜잭션 동기화가 있으면 커밋 이후에 전송한다")
+	void create_publishDeferredUntilAfterCommit() {
+		given(notificationRepository.save(any(NotificationEntity.class)))
+			.willReturn(sampleNotification(RECIPIENT_ID, false));
+
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			notificationService.create(RECIPIENT_ID, SENDER_ID, NotificationType.CHAT_MESSAGE,
+				"안녕하세요", CHAT_ROOM_ID, REFERENCE_TYPE_CHAT_ROOM);
+
+			// 저장은 됐지만 아직 커밋 전이므로 전송되지 않아야 한다
+			verify(notificationRepository).save(any(NotificationEntity.class));
+			verify(notificationPublisher, never()).publish(anyLong(), any(NotificationResponse.class));
+
+			TransactionSynchronizationUtils.triggerAfterCommit();
+
+			verify(notificationPublisher).publish(eq(RECIPIENT_ID), any(NotificationResponse.class));
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
 	}
 
 	// ---------------------------------------------------------------
