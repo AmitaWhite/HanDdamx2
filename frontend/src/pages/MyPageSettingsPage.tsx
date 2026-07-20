@@ -81,8 +81,8 @@ export function MyPageSettingsPage() {
 				</Button>
 			</div>
 
-			<NicknameForm initialNickname={profile.nickname} />
-			<PasswordForm />
+			<NicknameForm initialNickname={profile.nickname} onProfileUpdated={setProfile} />
+			{profile.oauthProvider === "NONE" && <PasswordForm />}
 
 			<div className="mt-6">
 				<LinkButton to={paths.mypage} variant="ghost">

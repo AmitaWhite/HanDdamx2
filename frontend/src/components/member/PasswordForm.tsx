@@ -3,17 +3,39 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
+import { changePassword } from "@/features/member/memberApi";
+import { asApiError } from "@/lib/api";
 
 export function PasswordForm() {
 	const [currentPassword, setCurrentPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
 	const [showCurrent, setShowCurrent] = useState(false);
 	const [showNew, setShowNew] = useState(false);
+	const [saving, setSaving] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [saved, setSaved] = useState(false);
 
-	function onSubmit(e: React.FormEvent) {
+	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
-
-		// 커밋 4에서 API 연동
+		setError(null);
+		setSaved(false);
+		setSaving(true);
+		try {
+			await changePassword(currentPassword, newPassword);
+			setCurrentPassword("");
+			setNewPassword("");
+			setError(null);
+			setSaved(true);
+		} catch (err) {
+			const apiErr = asApiError(err);
+			setError(
+				apiErr.code === "OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD"
+					? "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."
+					: "현재 비밀번호를 확인해주세요.",
+			);
+		} finally {
+			setSaving(false);
+		}
 	}
 
 	return (
@@ -24,7 +46,13 @@ export function PasswordForm() {
 					type={showCurrent ? "text" : "password"}
 					placeholder="••••••••"
 					value={currentPassword}
-					onChange={(e) => setCurrentPassword(e.target.value)}
+					disabled={saving}
+					onChange={(e) => {
+						setCurrentPassword(e.target.value);
+						setSaved(false);
+						setError(null);
+					}}
+					error={error ?? undefined}
 				/>
 				<button
 					type="button"
@@ -42,7 +70,12 @@ export function PasswordForm() {
 					type={showNew ? "text" : "password"}
 					placeholder="8자 이상 입력"
 					value={newPassword}
-					onChange={(e) => setNewPassword(e.target.value)}
+					disabled={saving}
+					onChange={(e) => {
+						setNewPassword(e.target.value);
+						setSaved(false);
+						setError(null);
+					}}
 				/>
 				<button
 					type="button"
@@ -54,8 +87,16 @@ export function PasswordForm() {
 				</button>
 			</div>
 
+			{saved && (
+				<p role="status" className="rounded bg-primary/10 px-4 py-3 text-label-md font-label-md text-primary">
+					비밀번호가 변경되었습니다.
+				</p>
+			)}
+
 			<div className="mt-2">
-				<Button type="submit">변경사항 저장</Button>
+				<Button type="submit" disabled={saving}>
+					{saving ? "변경 중…" : "비밀번호 변경"}
+				</Button>
 			</div>
 		</form>
 	);
