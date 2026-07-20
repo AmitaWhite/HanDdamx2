@@ -19,6 +19,7 @@ import com.white.handdam.storage.StoredObject;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -65,10 +67,10 @@ public class BoardPostService {
 	) {
 		// 1) 게시판 접근 권한: 크리에이터 또는 활성 유료 구독자
 		assertCanAccessBoard(creatorId, requesterId);
-		// 2) 조건에 맞는 글 페이지 조회 후 DTO로 변환
+		// 2) 조건에 맞는 글 페이지 조회 후 DTO로 변환 (이미지 포함)
 		return boardPostRepository
 			.findByCreator(creatorId, type, status, pageable)
-			.map(BoardPostConverter::toResponse);
+			.map(this::toResponseWithImages);
 	}
 
 	// -------------------------------------------------------------------------
@@ -95,7 +97,7 @@ public class BoardPostService {
 		}
 		return boardPostRepository
 			.findByMember(memberId, type, status, pageable)
-			.map(BoardPostConverter::toResponse);
+			.map(this::toResponseWithImages);
 	}
 
 	/**
@@ -142,8 +144,24 @@ public class BoardPostService {
 			saved.getMemberId(),
 			saved.getTitle()
 		));
+		int incoming = imageFiles == null ? 0 : imageFiles.size();
+		long nonEmpty = imageFiles == null
+			? 0
+			: imageFiles.stream().filter(f -> f != null && !f.isEmpty()).count();
+		log.info(
+			"createPost images received. postId={}, parts={}, nonEmpty={}",
+			saved.getId(),
+			incoming,
+			nonEmpty
+		);
 		List<BoardPostImage> images = uploadAndSaveImages(saved, creatorId, imageFiles, 0);
 		return BoardPostConverter.toResponse(saved, images);
+	}
+
+	private BoardPostResponse toResponseWithImages(BoardPost post) {
+		List<BoardPostImage> images =
+			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(post.getId());
+		return BoardPostConverter.toResponse(post, images);
 	}
 
 	// -------------------------------------------------------------------------

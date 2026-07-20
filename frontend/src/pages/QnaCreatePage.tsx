@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
@@ -22,10 +22,39 @@ const CATEGORY_OPTIONS: { label: QnaCategory; type: BoardPostType }[] = [
 	{ label: "일반 소통", type: "GENERAL" },
 ];
 
+const ALLOWED_IMAGE_TYPES = new Set([
+	"image/jpeg",
+	"image/png",
+	"image/gif",
+	"image/webp",
+	"image/jpg",
+]);
+
+type ImageItem = {
+	id: string;
+	file: File;
+	previewUrl: string;
+};
+
 function toNumericCreatorId(value: string): number | null {
 	if (!value) return null;
 	const n = Number(value);
 	return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function isAllowedImage(file: File): boolean {
+	if (file.type && ALLOWED_IMAGE_TYPES.has(file.type.toLowerCase())) {
+		return true;
+	}
+	// Windows 등에서 type 이 비어 있는 경우 확장자로 허용
+	const name = file.name.toLowerCase();
+	return (
+		name.endsWith(".jpg") ||
+		name.endsWith(".jpeg") ||
+		name.endsWith(".png") ||
+		name.endsWith(".gif") ||
+		name.endsWith(".webp")
+	);
 }
 
 /**
@@ -36,14 +65,14 @@ export function QnaCreatePage() {
 	const navigate = useNavigate();
 	const creator = findCreator(creatorId);
 	const numericCreatorId = toNumericCreatorId(creatorId);
+	const fileInputId = useId();
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const imagesRef = useRef<ImageItem[]>([]);
 
 	const [title, setTitle] = useState("");
 	const [type, setType] = useState<BoardPostType>("QUESTION");
 	const [content, setContent] = useState("");
-	const [files, setFiles] = useState<File[]>([]);
-	const [previews, setPreviews] = useState<{ name: string; url: string }[]>(
-		[],
-	);
+	const [images, setImages] = useState<ImageItem[]>([]);
 	const [fieldError, setFieldError] = useState<string | undefined>();
 
 	const {
@@ -52,19 +81,16 @@ export function QnaCreatePage() {
 		run,
 	} = useSubmitState("글 작성에 실패했습니다. 다시 시도해 주세요.");
 
-	// blob URL 은 시간이 지나면 깨질 수 있어 files 변경 시에만 만들고, 교체/언마운트 시 revoke
+	imagesRef.current = images;
+
+	// 언마운트 시에만 preview URL 정리 (StrictMode useEffect revoke 레이스 방지)
 	useEffect(() => {
-		const next = files.map((file) => ({
-			name: file.name,
-			url: URL.createObjectURL(file),
-		}));
-		setPreviews(next);
 		return () => {
-			for (const preview of next) {
-				URL.revokeObjectURL(preview.url);
+			for (const item of imagesRef.current) {
+				URL.revokeObjectURL(item.previewUrl);
 			}
 		};
-	}, [files]);
+	}, []);
 
 	if (numericCreatorId === null) {
 		return <Navigate to={paths.creatorQna(creatorId || "suyeon")} replace />;
@@ -75,12 +101,41 @@ export function QnaCreatePage() {
 	function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files;
 		if (!selected || selected.length === 0) return;
-		setFiles((prev) => [...prev, ...Array.from(selected)]);
+
+		const accepted: ImageItem[] = [];
+		const rejected: string[] = [];
+
+		for (const file of Array.from(selected)) {
+			if (!isAllowedImage(file)) {
+				rejected.push(file.name);
+				continue;
+			}
+			accepted.push({
+				id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+				file,
+				previewUrl: URL.createObjectURL(file),
+			});
+		}
+
+		if (accepted.length > 0) {
+			setImages((prev) => [...prev, ...accepted]);
+			setFieldError(undefined);
+		}
+		if (rejected.length > 0) {
+			setFieldError(
+				`지원하지 않는 파일입니다: ${rejected.join(", ")} (jpg/png/gif/webp만)`,
+			);
+		}
+
 		e.target.value = "";
 	}
 
-	function removeFile(index: number) {
-		setFiles((prev) => prev.filter((_, i) => i !== index));
+	function removeImage(id: string) {
+		setImages((prev) => {
+			const target = prev.find((item) => item.id === id);
+			if (target) URL.revokeObjectURL(target.previewUrl);
+			return prev.filter((item) => item.id !== id);
+		});
 	}
 
 	async function onSubmit(e: FormEvent) {
@@ -93,6 +148,7 @@ export function QnaCreatePage() {
 		}
 		setFieldError(undefined);
 
+		const files = images.map((item) => item.file);
 		const created = await run(() =>
 			createPremiumBoardPost({
 				creatorId: creatorMemberId,
@@ -183,36 +239,46 @@ export function QnaCreatePage() {
 				</div>
 
 				<div>
-					<label className="mb-2 block text-label-md font-label-md text-on-surface">
-						이미지 (선택){files.length > 0 ? ` · ${files.length}장` : ""}
-					</label>
-					<label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low py-8 text-center hover:border-primary">
+					<p className="mb-2 text-label-md font-label-md text-on-surface">
+						이미지 (선택)
+						{images.length > 0 ? ` · ${images.length}장` : ""}
+					</p>
+					<input
+						ref={fileInputRef}
+						id={fileInputId}
+						type="file"
+						multiple
+						accept="image/*"
+						className="absolute h-px w-px overflow-hidden opacity-0"
+						onChange={onFilesSelected}
+					/>
+					<button
+						type="button"
+						onClick={() => fileInputRef.current?.click()}
+						className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low py-8 text-center hover:border-primary"
+					>
 						<Icon name="upload" className="text-[28px] text-secondary" />
 						<span className="text-body-md text-secondary">
 							이미지 파일을 선택하세요
 						</span>
-						<input
-							type="file"
-							multiple
-							accept="image/jpeg,image/png,image/gif,image/webp"
-							className="hidden"
-							onChange={onFilesSelected}
-						/>
-					</label>
-					{previews.length > 0 && (
+						<span className="text-caption font-caption text-outline">
+							jpg, png, gif, webp
+						</span>
+					</button>
+					{images.length > 0 && (
 						<ul className="mt-3 flex flex-wrap gap-3">
-							{previews.map((preview, index) => (
-								<li key={`${preview.url}-${index}`} className="relative">
+							{images.map((item) => (
+								<li key={item.id} className="relative">
 									<img
-										src={preview.url}
-										alt={preview.name}
+										src={item.previewUrl}
+										alt={item.file.name}
 										className="h-24 w-24 rounded-lg object-cover"
 									/>
 									<button
 										type="button"
-										onClick={() => removeFile(index)}
+										onClick={() => removeImage(item.id)}
 										className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-on-surface text-surface-container-lowest"
-										aria-label={`${preview.name} 제거`}
+										aria-label={`${item.file.name} 제거`}
 									>
 										<Icon name="close" className="text-[14px]" />
 									</button>

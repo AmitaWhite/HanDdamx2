@@ -1,4 +1,4 @@
-import { http, ensureFreshAccessToken, unwrap, unwrapVoid } from "@/lib/api";
+import { http, ensureFreshAccessToken, unwrap, unwrapVoid, ApiError } from "@/lib/api";
 
 /**
  * 백엔드 BoardPostType (com.white.handdam.board.entity.BoardPostType)
@@ -121,9 +121,19 @@ export async function createPremiumBoardPost({
 		formData.append("images", file, file.name);
 	}
 
-	return unwrap<BoardPostResponse>(
+	const created = await unwrap<BoardPostResponse>(
 		http.post(`/creators/${creatorId}/premium-board/posts`, formData),
 	);
+
+	// 파일을 보냈는데 서버가 이미지를 안 저장하면 성공으로 넘어가지 않게 한다
+	if (images.length > 0 && created.images.length === 0) {
+		throw new ApiError(
+			"IMAGE_UPLOAD_EMPTY",
+			`이미지가 저장되지 않았습니다. (선택한 파일 ${images.length}장). 다시 시도해 주세요.`,
+		);
+	}
+
+	return created;
 }
 
 /**
