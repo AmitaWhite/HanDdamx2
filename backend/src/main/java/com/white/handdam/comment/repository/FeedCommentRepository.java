@@ -31,7 +31,7 @@ public interface FeedCommentRepository extends JpaRepository<FeedComment, Long> 
                 where fc.memberId = :memberId
                 and fc.deleted = false
                 and f.deleted = false
-                order by fc.createdAt desc
+                order by fc.createdAt desc, fc.id desc
             """)
     Slice<MyFeedCommentResponse> findMyComments(@Param("memberId") Long memberId, Pageable pageable);
 

@@ -27,7 +27,7 @@ public interface BoardCommentRepository extends JpaRepository<BoardComment, Long
             where bc.memberId = :memberId
             and bc.deleted = false
             and bp.deleted = false
-            order by bc.createdAt desc
+            order by bc.createdAt desc, bc.id desc
             """)
     Slice<MyBoardCommentResponse> findMyComments(@Param("memberId") Long memberId, Pageable pageable);
 
