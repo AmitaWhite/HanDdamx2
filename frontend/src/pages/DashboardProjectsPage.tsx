@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { findCreator } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
@@ -37,16 +38,9 @@ export function DashboardProjectsPage() {
 								<div className="p-5">
 									<div className="mb-2 flex items-center justify-between gap-2">
 										<h3 className="text-headline-md font-display text-on-surface">{project.title}</h3>
-										<span
-											className={
-												"shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold " +
-												(project.status === "ongoing"
-													? "bg-primary text-on-primary"
-													: "bg-surface-container text-secondary")
-											}
-										>
+										<Chip active={project.status === "ongoing"} size="sm" className="shrink-0">
 											{project.status === "ongoing" ? "진행중" : "완료"}
-										</span>
+										</Chip>
 									</div>
 									<p className="text-caption font-caption text-secondary">
 										게시물 {project.postCount}개 · {project.metaLabel}

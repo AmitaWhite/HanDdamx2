@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { cn } from "@/lib/cn";
@@ -95,9 +96,9 @@ export function DashboardProjectPage() {
 											</span>
 										)}
 										{post.isPaid && (
-											<span className="rounded bg-primary px-2 py-0.5 text-[10px] font-bold text-on-primary">
+											<Chip active size="sm">
 												유료
-											</span>
+											</Chip>
 										)}
 									</div>
 									<h3 className="truncate text-label-md font-label-md text-on-surface">{post.title}</h3>

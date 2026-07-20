@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { Chip } from "@/components/ui/Chip";
 import type { MockQnaPost } from "@/mocks/qna";
 
 interface CreatorQnaListProps {
@@ -17,14 +18,9 @@ export function CreatorQnaList({ qnaPosts, emptyMessage = "아직 Q&A가 없어�
 					to={paths.qnaPost(post.id)}
 					className="flex items-center gap-4 p-5 transition-colors hover:bg-surface-container-low"
 				>
-					<span
-						className={
-							"shrink-0 rounded px-2 py-1 text-[10px] font-bold " +
-							(post.status === "answered" ? "bg-primary text-on-primary" : "bg-surface-container text-secondary")
-						}
-					>
+					<Chip active={post.status === "answered"} size="sm" className="shrink-0">
 						{post.status === "answered" ? "답변 완료" : "답변 대기"}
-					</span>
+					</Chip>
 					<div className="min-w-0 flex-1">
 						<p className="truncate text-body-md text-on-surface">{post.title}</p>
 						<p className="mt-1 text-caption font-caption text-secondary">
