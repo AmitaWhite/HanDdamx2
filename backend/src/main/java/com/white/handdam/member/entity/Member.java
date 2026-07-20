@@ -97,4 +97,18 @@ public class Member extends BaseTimeEntity {
     }
 
     public void changeRoleToCreator() { this.role = Role.CREATOR; }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void updateProfileImage(String profileImageUrl, String profileImageStorageKey) {
+        this.profileImageUrl = profileImageUrl;
+        this.profileImageStorageKey = profileImageStorageKey;
+    }
+
+    public void clearProfileImage() {
+        this.profileImageUrl = null;
+        this.profileImageStorageKey = null;
+    }
 }
