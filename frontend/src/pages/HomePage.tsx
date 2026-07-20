@@ -59,7 +59,7 @@ export function HomePage() {
 							imageSeed={post.imageSeed}
 							imageAlt={post.title}
 							overlay={
-								<span className="absolute left-3 top-3 z-10">
+								<span className="absolute left-3 top-3">
 									<Chip className="bg-surface-container-lowest/90">{post.category}</Chip>
 								</span>
 							}

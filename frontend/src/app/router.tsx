@@ -32,7 +32,9 @@ import { paths } from "./paths";
 /**
  * 라우트 = public / consumer 2개 존으로 정리한 결과.
  * 크리에이터 관리 화면(프로젝트·게시물 관리, 새 글 작성)도 별도 대시보드 레이아웃 없이
- * consumer 존(ConsumerLayout+MyPageSideNav) 아래에서 CreatorOnlyRoute로 가드된다.
+ * consumer 존(ConsumerLayout) 아래에서 CreatorOnlyRoute로 가드된다.
+ * 단, MyPageSideNav는 목록형 관리 화면(DashboardProjectsPage/DashboardPostsPage)에만 표시되고,
+ * 상세/작성 화면(DashboardProjectPage/CreatePostPage)은 참고 시안대로 사이드바 없이 전체 너비로 렌더한다.
  * 전 화면 목데이터(src/mocks/)로 채워져 있음 — 실제 API 연동은 화면별로 점진 적용 예정.
  */
 export const router = createBrowserRouter([

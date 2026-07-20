@@ -23,7 +23,7 @@ export function PostCard({ href, imageSeed, imageAlt, overlay, children, classNa
 		<Link to={href}>
 			<Card interactive className={cn("group overflow-hidden", className)}>
 				<div className="relative aspect-square overflow-hidden">
-					{overlay}
+					{overlay && <div className="relative z-10">{overlay}</div>}
 					<img
 						src={mockImg(imageSeed)}
 						alt={imageAlt}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { paths } from "@/app/paths";
@@ -42,6 +42,14 @@ export function CreatePostPage() {
 	const [pollOptions, setPollOptions] = useState(["", ""]);
 	const [pollEndAt, setPollEndAt] = useState("");
 
+	// 언마운트 시 남아 있는 첨부 미리보기 Blob URL을 전부 해제한다.
+	useEffect(() => {
+		return () => {
+			attachments.forEach((a) => URL.revokeObjectURL(a.url));
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
 		const files = e.target.files;
 		if (!files) return;
@@ -50,7 +58,11 @@ export function CreatePostPage() {
 	}
 
 	function removeAttachment(id: string) {
-		setAttachments((prev) => prev.filter((a) => a.id !== id));
+		setAttachments((prev) => {
+			const target = prev.find((a) => a.id === id);
+			if (target) URL.revokeObjectURL(target.url);
+			return prev.filter((a) => a.id !== id);
+		});
 	}
 
 	function addPollOption() {
@@ -101,7 +113,13 @@ export function CreatePostPage() {
 					<label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low py-10 text-center hover:border-primary">
 						<Icon name="upload" className="text-[28px] text-secondary" />
 						<span className="text-body-md text-secondary">이미지·영상 링크·첨부파일(PDF 도안 등)</span>
-						<input type="file" multiple className="hidden" onChange={onFilesSelected} accept="image/*" />
+						<input
+							type="file"
+							multiple
+							className="hidden"
+							onChange={onFilesSelected}
+							accept="image/*,application/pdf"
+						/>
 					</label>
 					{attachments.length > 0 && (
 						<div className="mt-3 flex flex-wrap gap-3">
