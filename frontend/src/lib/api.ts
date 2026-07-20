@@ -46,6 +46,31 @@ http.interceptors.response.use(
 	},
 );
 
+export class ApiError extends Error {
+	constructor(
+		public code: string,
+		message: string,
+	) {
+		super(message);
+		this.name = "ApiError";
+	}
+}
+
+/** Axios/알 수 없는 에러를 ApiError 로 정규화 (폼·목록 공통 catch 용). */
+export function asApiError(
+	err: unknown,
+	fallback = "요청에 실패했습니다.",
+): ApiError {
+	if (err instanceof ApiError) return err;
+	if (axios.isAxiosError<ApiResponse<unknown>>(err)) {
+		return new ApiError(
+			err.response?.data?.error?.code ?? "UNKNOWN",
+			err.response?.data?.error?.message ?? fallback,
+		);
+	}
+	return new ApiError("UNKNOWN", fallback);
+}
+
 /**
  * ApiResponse<T> 를 벗겨 data 만 반환하는 헬퍼.
  * 실패 시 ApiError 를 throw 하여 호출부에서 try/catch 로 처리.
@@ -53,14 +78,18 @@ http.interceptors.response.use(
 export async function unwrap<T>(
 	promise: Promise<{ data: ApiResponse<T> }>,
 ): Promise<T> {
-	const { data: body } = await promise;
-	if (!body.success || body.data === null) {
-		throw new ApiError(
-			body.error?.code ?? "UNKNOWN",
-			body.error?.message ?? "요청에 실패했습니다.",
-		);
+	try {
+		const { data: body } = await promise;
+		if (!body.success || body.data === null) {
+			throw new ApiError(
+				body.error?.code ?? "UNKNOWN",
+				body.error?.message ?? "요청에 실패했습니다.",
+			);
+		}
+		return body.data;
+	} catch (err) {
+		throw asApiError(err);
 	}
-	return body.data;
 }
 
 /**
@@ -70,21 +99,15 @@ export async function unwrap<T>(
 export async function unwrapVoid(
 	promise: Promise<{ data: ApiResponse<unknown> }>,
 ): Promise<void> {
-	const { data: body } = await promise;
-	if (!body.success) {
-		throw new ApiError(
-			body.error?.code ?? "UNKNOWN",
-			body.error?.message ?? "요청에 실패했습니다.",
-		);
-	}
-}
-
-export class ApiError extends Error {
-	constructor(
-		public code: string,
-		message: string,
-	) {
-		super(message);
-		this.name = "ApiError";
+	try {
+		const { data: body } = await promise;
+		if (!body.success) {
+			throw new ApiError(
+				body.error?.code ?? "UNKNOWN",
+				body.error?.message ?? "요청에 실패했습니다.",
+			);
+		}
+	} catch (err) {
+		throw asApiError(err);
 	}
 }

@@ -22,6 +22,7 @@ import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
 import { PostDetailPage } from "@/pages/PostDetailPage";
 import { QnaBoardPage } from "@/pages/QnaBoardPage";
+import { QnaCreatePage } from "@/pages/QnaCreatePage";
 import { QnaPostPage } from "@/pages/QnaPostPage";
 import { SignupPage } from "@/pages/SignupPage";
 import { SubscribeCompletePage } from "@/pages/SubscribeCompletePage";
@@ -69,6 +70,14 @@ export const router = createBrowserRouter([
 			{ path: paths.qnaPost(), element: <QnaPostPage /> },
 			{ path: paths.postDetail(), element: <PostDetailPage /> },
 			// 로그인 필요 — 비로그인 시 /login 리다이렉트
+			{
+				path: paths.creatorQnaNew(),
+				element: (
+					<AuthOnlyRoute>
+						<QnaCreatePage />
+					</AuthOnlyRoute>
+				),
+			},
 			{
 				path: paths.feed,
 				element: (

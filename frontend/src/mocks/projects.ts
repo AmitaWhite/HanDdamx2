@@ -22,6 +22,28 @@ export interface MockProject {
 
 export const mockProjects: MockProject[] = [
 	{
+		id: "proj-dongjun-stitch",
+		creatorId: "9",
+		title: "일상기록 자수 연작",
+		status: "ongoing",
+		postCount: 3,
+		metaLabel: "업데이트 오늘",
+		thumbnailSeed: "dongjun-proj1",
+		periodLabel: "2026.07 ~ 진행중",
+		currentStage: "production",
+	},
+	{
+		id: "proj-dongjun-pouch",
+		creatorId: "9",
+		title: "미니 파우치 만들기",
+		status: "ongoing",
+		postCount: 1,
+		metaLabel: "업데이트 3일 전",
+		thumbnailSeed: "dongjun-proj2",
+		periodLabel: "2026.06 ~ 진행중",
+		currentStage: "prep",
+	},
+	{
 		id: "proj-flower-wreath",
 		creatorId: "suyeon",
 		title: "들꽃 리스 연작",

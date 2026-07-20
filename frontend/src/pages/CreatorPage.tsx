@@ -36,7 +36,7 @@ export function CreatorPage() {
 						<p className="mt-3 text-body-md text-on-surface">{creator.bio}</p>
 					</div>
 					<div className="flex shrink-0 gap-2">
-						<LinkButton to={paths.chat} variant="secondary">
+						<LinkButton to={`${paths.chat}?creatorId=${creator.id}`} variant="secondary">
 							메시지
 						</LinkButton>
 						<LinkButton to={paths.subscribeSelect(creator.id)}>구독하기</LinkButton>
