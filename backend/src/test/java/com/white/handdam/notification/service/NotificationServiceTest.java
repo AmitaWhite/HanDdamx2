@@ -5,6 +5,7 @@ import com.white.handdam.notification.dto.response.NotificationReadAllResponse;
 import com.white.handdam.notification.dto.response.NotificationResponse;
 import com.white.handdam.notification.entity.NotificationEntity;
 import com.white.handdam.notification.entity.NotificationEntity.NotificationType;
+import com.white.handdam.notification.entity.NotificationReferenceType;
 import com.white.handdam.notification.exception.NotificationErrorCode;
 import com.white.handdam.notification.repository.NotificationRepository;
 import com.white.handdam.notification.websocket.publisher.NotificationPublisher;
@@ -45,7 +46,8 @@ class NotificationServiceTest {
 	private static final Long SENDER_ID = 2L;
 	private static final Long CHAT_ROOM_ID = 42L;
 	private static final Long NOTIFICATION_ID = 100L;
-	private static final String REFERENCE_TYPE_CHAT_ROOM = "CHAT_ROOM";
+	private static final NotificationReferenceType REFERENCE_TYPE_CHAT_ROOM =
+		NotificationReferenceType.CHAT_ROOM;
 	private static final Instant CREATED_AT = Instant.parse("2026-07-20T00:00:00Z");
 
 	@Mock
@@ -77,7 +79,7 @@ class NotificationServiceTest {
 		assertThat(saved.getSenderId()).isEqualTo(SENDER_ID);
 		assertThat(saved.getType()).isEqualTo(NotificationType.CHAT_MESSAGE);
 		assertThat(saved.getReferenceId()).isEqualTo(CHAT_ROOM_ID);
-		assertThat(saved.getReferenceType()).isEqualTo(REFERENCE_TYPE_CHAT_ROOM);
+		assertThat(saved.getReferenceType()).isEqualTo(REFERENCE_TYPE_CHAT_ROOM.name());
 		assertThat(saved.getIsRead()).isFalse();
 
 		verify(notificationPublisher).publish(eq(RECIPIENT_ID), any(NotificationResponse.class));
@@ -245,7 +247,7 @@ class NotificationServiceTest {
 			.type(NotificationType.CHAT_MESSAGE)
 			.message("안녕하세요")
 			.referenceId(CHAT_ROOM_ID)
-			.referenceType(REFERENCE_TYPE_CHAT_ROOM)
+			.referenceType(REFERENCE_TYPE_CHAT_ROOM.name())
 			.build();
 		ReflectionTestUtils.setField(notification, "id", NOTIFICATION_ID);
 		ReflectionTestUtils.setField(notification, "createdAt", CREATED_AT);
