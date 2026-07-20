@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
-import { Avatar } from "@/components/ui/Avatar";
-import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { getMyProfile } from "@/features/member/memberApi";
 import type { MemberProfileResponse } from "@/features/member/types";
 import { NicknameForm } from "@/components/member/NicknameForm";
 import { PasswordForm } from "@/components/member/PasswordForm";
+import { ProfileImageForm } from "@/components/member/ProfileImageForm";
 
 export function MyPageSettingsPage() {
 	const [profile, setProfile] = useState<MemberProfileResponse | null>(null);
@@ -69,17 +67,7 @@ export function MyPageSettingsPage() {
 				프로필 설정
 			</h1>
 
-			<div className="mb-8 flex items-center gap-4">
-				<div className="relative">
-					<Avatar src={profile.profileImageUrl ?? undefined} size={80} />
-					<span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-on-primary">
-						<Icon name="photo_camera" className="text-[16px]" />
-					</span>
-				</div>
-				<Button type="button" variant="secondary" size="sm">
-					사진 변경
-				</Button>
-			</div>
+			<ProfileImageForm profile={profile} onProfileUpdated={setProfile} />
 
 			<NicknameForm initialNickname={profile.nickname} onProfileUpdated={setProfile} />
 			{profile.oauthProvider === "NONE" && <PasswordForm />}
