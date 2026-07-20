@@ -18,6 +18,7 @@ export const paths = {
 	chat: "/chat",
 	mypage: "/mypage",
 	mypageSettings: "/mypage/settings",
+	myQna: "/mypage/qna",
 
 	creator: (id: string | number = ":creatorId") => `/creators/${id}`,
 	creatorQna: (id: string | number = ":creatorId") => `/creators/${id}/qna`,
