@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { CreatorQnaList } from "@/components/creator/CreatorQnaList";
+import { PostCard } from "@/components/social/PostCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -53,30 +54,21 @@ export function CreatorPage() {
 	const postsGrid = (
 		<div className="grid grid-cols-2 gap-gutter sm:grid-cols-3">
 			{posts.map((post) => (
-				<Link key={post.id} to={paths.postDetail(post.id)}>
-					<Card interactive className="overflow-hidden">
-						<div className="aspect-square overflow-hidden">
-							<img
-								src={mockImg(post.imageSeed, 400, 400)}
-								alt={post.title}
-								className="h-full w-full object-cover"
-							/>
+				<PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={post.imageSeed} imageAlt={post.title}>
+					<div className="p-4">
+						<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
+						<div className="flex items-center gap-3 text-caption font-caption text-secondary">
+							<span className="flex items-center gap-1">
+								<Icon name="favorite" className="text-[14px]" />
+								{post.likeCount}
+							</span>
+							<span className="flex items-center gap-1">
+								<Icon name="chat_bubble_outline" className="text-[14px]" />
+								{post.commentCount}
+							</span>
 						</div>
-						<div className="p-4">
-							<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
-							<div className="flex items-center gap-3 text-caption font-caption text-secondary">
-								<span className="flex items-center gap-1">
-									<Icon name="favorite" className="text-[14px]" />
-									{post.likeCount}
-								</span>
-								<span className="flex items-center gap-1">
-									<Icon name="chat_bubble_outline" className="text-[14px]" />
-									{post.commentCount}
-								</span>
-							</div>
-						</div>
-					</Card>
-				</Link>
+					</div>
+				</PostCard>
 			))}
 			{posts.length === 0 && <p className="col-span-full py-8 text-center text-body-md text-secondary">아직 게시물이 없어요.</p>}
 		</div>

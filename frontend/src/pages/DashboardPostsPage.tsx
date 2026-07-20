@@ -2,13 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
+import { PostCard } from "@/components/social/PostCard";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
 import { mockComments } from "@/mocks/comments";
 import { findCreator } from "@/mocks/creators";
-import { mockImg } from "@/mocks/helpers";
 import { mockPosts } from "@/mocks/posts";
 
 /** 로그인 계정과 mock 크리에이터를 잇는 백엔드 매핑이 아직 없어 임시로 고정한 값. */
@@ -62,25 +62,12 @@ export function DashboardPostsPage() {
 							</div>
 							<div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-3">
 								{sorted.map((post) => (
-									<Card key={post.id} className="overflow-hidden">
-										<Link to={paths.postDetail(post.id)}>
-											<div className="aspect-square overflow-hidden">
-												<img
-													src={mockImg(post.imageSeed, 400, 400)}
-													alt={post.title}
-													className="h-full w-full object-cover"
-												/>
-											</div>
-										</Link>
+									<PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={post.imageSeed} imageAlt={post.title}>
 										<div className="p-4">
 											<span className="mb-2 inline-block rounded bg-surface-container px-2 py-0.5 text-caption font-caption text-secondary">
 												{post.category}
 											</span>
-											<Link to={paths.postDetail(post.id)}>
-												<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface hover:text-primary">
-													{post.title}
-												</h3>
-											</Link>
+											<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
 											<p className="mb-2 truncate text-caption font-caption text-secondary">{post.excerpt}</p>
 											<div className="flex items-center justify-between text-caption font-caption text-secondary">
 												<span className="flex items-center gap-3">
@@ -96,7 +83,7 @@ export function DashboardPostsPage() {
 												<span>{post.createdAtLabel}</span>
 											</div>
 										</div>
-									</Card>
+									</PostCard>
 								))}
 							</div>
 							{sorted.length === 0 && (
