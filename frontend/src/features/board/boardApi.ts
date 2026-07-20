@@ -1,4 +1,4 @@
-import { http, unwrap, unwrapVoid } from "@/lib/api";
+import { http, ensureFreshAccessToken, unwrap, unwrapVoid } from "@/lib/api";
 
 /**
  * 백엔드 BoardPostType (com.white.handdam.board.entity.BoardPostType)
@@ -103,26 +103,26 @@ export interface CreatePremiumBoardPostParams {
  * 백엔드: POST /api/creators/{creatorId}/premium-board/posts (multipart/form-data)
  * 권한: 게시판 크리에이터 본인 또는 활성 유료 구독자.
  */
-export function createPremiumBoardPost({
+export async function createPremiumBoardPost({
 	creatorId,
 	title,
 	type,
 	content,
 	images = [],
 }: CreatePremiumBoardPostParams) {
+	// multipart 는 401 재시도가 불안정할 수 있어 만료 임박 시 미리 갱신
+	await ensureFreshAccessToken();
+
 	const formData = new FormData();
 	formData.append("title", title);
 	formData.append("type", type);
 	formData.append("content", content);
 	for (const file of images) {
-		formData.append("images", file);
+		formData.append("images", file, file.name);
 	}
 
 	return unwrap<BoardPostResponse>(
-		http.post(`/creators/${creatorId}/premium-board/posts`, formData, {
-			// 기본 JSON Content-Type 을 덮어쓰고, boundary 는 axios/브라우저가 붙인다.
-			headers: { "Content-Type": "multipart/form-data" },
-		}),
+		http.post(`/creators/${creatorId}/premium-board/posts`, formData),
 	);
 }
 
@@ -172,16 +172,16 @@ export async function deletePremiumBoardPost(postId: number) {
  * 권한: 작성자, 공식 답변 전(WAITING)만.
  * @returns 이번에 추가된 이미지 목록
  */
-export function addPremiumBoardPostImages(postId: number, images: File[]) {
+export async function addPremiumBoardPostImages(postId: number, images: File[]) {
+	await ensureFreshAccessToken();
+
 	const formData = new FormData();
 	for (const file of images) {
-		formData.append("images", file);
+		formData.append("images", file, file.name);
 	}
 
 	return unwrap<BoardPostImageResponse[]>(
-		http.post(`/premium-board/posts/${postId}/images`, formData, {
-			headers: { "Content-Type": "multipart/form-data" },
-		}),
+		http.post(`/premium-board/posts/${postId}/images`, formData),
 	);
 }
 

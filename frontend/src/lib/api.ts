@@ -1,4 +1,4 @@
-import axios, { type AxiosError } from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type { ApiResponse } from "./types";
 
 /**
@@ -12,11 +12,9 @@ export const backendOrigin = apiBaseUrl.replace(/\/api\/?$/, "");
 
 export const http = axios.create({
 	baseURL: apiBaseUrl,
-	headers: { "Content-Type": "application/json" },
 	withCredentials: true,
 });
 
-// --- 토큰 관리 (임시: localStorage. 추후 auth 스토어로 이동) ---
 const ACCESS_TOKEN_KEY = "handdam.accessToken";
 
 export const tokenStore = {
@@ -25,24 +23,118 @@ export const tokenStore = {
 	clear: () => localStorage.removeItem(ACCESS_TOKEN_KEY),
 };
 
-// 요청 인터셉터: JWT 자동 첨부
+type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+let refreshPromise: Promise<string> | null = null;
+
+function decodeJwtExpMs(token: string): number | null {
+	try {
+		const payload = token.split(".")[1];
+		if (!payload) return null;
+		const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+		const padded = normalized.padEnd(
+			normalized.length + ((4 - (normalized.length % 4)) % 4),
+			"=",
+		);
+		const json = JSON.parse(atob(padded)) as { exp?: number };
+		return typeof json.exp === "number" ? json.exp * 1000 : null;
+	} catch {
+		return null;
+	}
+}
+
+/** access token 이 없거나 skewMs 이내 만료면 true */
+export function isAccessTokenExpiringSoon(skewMs = 60_000): boolean {
+	const token = tokenStore.get();
+	if (!token) return true;
+	const expMs = decodeJwtExpMs(token);
+	if (expMs === null) return false;
+	return expMs <= Date.now() + skewMs;
+}
+
+/**
+ * httpOnly refresh 쿠키로 access token 재발급.
+ * authApi 를 거치지 않아 interceptor↔unwrap 순환을 피한다.
+ */
+export async function refreshAccessToken(): Promise<string> {
+	const { data: body } = await axios.post<
+		ApiResponse<{ accessToken: string }>
+	>(`${apiBaseUrl}/auth/token/refresh`, {}, { withCredentials: true });
+	const accessToken = body.data?.accessToken;
+	if (!body.success || !accessToken) {
+		throw new ApiError(
+			body.error?.code ?? "UNAUTHORIZED",
+			body.error?.message ?? "로그인이 만료되었습니다. 다시 로그인해 주세요.",
+		);
+	}
+	tokenStore.set(accessToken);
+	return accessToken;
+}
+
+/**
+ * multipart 업로드 직전에 호출.
+ * 401 재시도 시 FormData 가 비는 환경을 피하기 위해, 만료 임박이면 미리 갱신한다.
+ */
+export async function ensureFreshAccessToken(): Promise<void> {
+	if (!isAccessTokenExpiringSoon()) return;
+	if (!refreshPromise) {
+		refreshPromise = refreshAccessToken().finally(() => {
+			refreshPromise = null;
+		});
+	}
+	await refreshPromise;
+}
+
+function isAuthEndpoint(url?: string): boolean {
+	if (!url) return false;
+	return (
+		url.includes("/auth/login") ||
+		url.includes("/auth/token/refresh") ||
+		url.includes("/auth/logout")
+	);
+}
+
 http.interceptors.request.use((config) => {
 	const token = tokenStore.get();
 	if (token) {
-		config.headers.Authorization = `Bearer ${token}`;
+		config.headers.set("Authorization", `Bearer ${token}`);
+	}
+	if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+		config.headers.delete("Content-Type");
 	}
 	return config;
 });
 
-// 응답 인터셉터: 401 처리 훅 자리 (silent refresh 는 후속 과제)
 http.interceptors.response.use(
 	(res) => res,
-	(error: AxiosError<ApiResponse<unknown>>) => {
-		if (error.response?.status === 401) {
-			// TODO: refresh token 재발급 흐름 연결
-			tokenStore.clear();
+	async (error: AxiosError<ApiResponse<unknown>>) => {
+		const original = error.config as RetriableConfig | undefined;
+		if (
+			error.response?.status !== 401 ||
+			!original ||
+			original._retry ||
+			isAuthEndpoint(original.url)
+		) {
+			if (error.response?.status === 401 && !isAuthEndpoint(original?.url)) {
+				tokenStore.clear();
+			}
+			return Promise.reject(error);
 		}
-		return Promise.reject(error);
+
+		original._retry = true;
+		try {
+			if (!refreshPromise) {
+				refreshPromise = refreshAccessToken().finally(() => {
+					refreshPromise = null;
+				});
+			}
+			const newToken = await refreshPromise;
+			original.headers.set("Authorization", `Bearer ${newToken}`);
+			return http.request(original);
+		} catch {
+			tokenStore.clear();
+			return Promise.reject(error);
+		}
 	},
 );
 
@@ -56,13 +148,19 @@ export class ApiError extends Error {
 	}
 }
 
-/** Axios/알 수 없는 에러를 ApiError 로 정규화 (폼·목록 공통 catch 용). */
 export function asApiError(
 	err: unknown,
 	fallback = "요청에 실패했습니다.",
 ): ApiError {
 	if (err instanceof ApiError) return err;
 	if (axios.isAxiosError<ApiResponse<unknown>>(err)) {
+		if (err.response?.status === 401) {
+			return new ApiError(
+				err.response.data?.error?.code ?? "UNAUTHORIZED",
+				err.response.data?.error?.message ??
+					"로그인이 만료되었습니다. 다시 로그인해 주세요.",
+			);
+		}
 		return new ApiError(
 			err.response?.data?.error?.code ?? "UNKNOWN",
 			err.response?.data?.error?.message ?? fallback,
@@ -71,10 +169,6 @@ export function asApiError(
 	return new ApiError("UNKNOWN", fallback);
 }
 
-/**
- * ApiResponse<T> 를 벗겨 data 만 반환하는 헬퍼.
- * 실패 시 ApiError 를 throw 하여 호출부에서 try/catch 로 처리.
- */
 export async function unwrap<T>(
 	promise: Promise<{ data: ApiResponse<T> }>,
 ): Promise<T> {
@@ -92,10 +186,6 @@ export async function unwrap<T>(
 	}
 }
 
-/**
- * noContent(data=null) 응답용. unwrap()과 달리 data===null 은 정상 허용하되,
- * success:false 는 여전히 ApiError 로 변환한다(HTTP 200 이면서 success:false 인 경우 대비).
- */
 export async function unwrapVoid(
 	promise: Promise<{ data: ApiResponse<unknown> }>,
 ): Promise<void> {

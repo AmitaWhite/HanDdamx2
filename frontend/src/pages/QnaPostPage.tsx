@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Avatar } from "@/components/ui/Avatar";
 import { Alert } from "@/components/ui/Alert";
@@ -73,11 +73,15 @@ export function QnaPostPage() {
 
 function RemoteQnaPostPage({ postId }: { postId: number }) {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { user } = useAuth();
 
 	const [post, setPost] = useState<BoardPostResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	const imageUploadFailed =
+		(location.state as { imageUploadFailed?: boolean } | null)?.imageUploadFailed ===
+		true;
 
 	const [editing, setEditing] = useState(false);
 	const [editTitle, setEditTitle] = useState("");
@@ -243,9 +247,14 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 				Q&A 게시판
 			</Link>
 
-			{(saveError || deleteError || imageError) && (
+			{(saveError || deleteError || imageError || imageUploadFailed) && (
 				<div className="mb-4">
-					<Alert>{saveError ?? deleteError ?? imageError}</Alert>
+					<Alert>
+						{saveError ??
+							deleteError ??
+							imageError ??
+							"글은 등록됐지만 이미지가 저장되지 않았습니다. 아래에서 다시 추가해 주세요."}
+					</Alert>
 				</div>
 			)}
 

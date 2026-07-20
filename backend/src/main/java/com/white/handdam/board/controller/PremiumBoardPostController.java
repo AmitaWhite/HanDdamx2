@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -67,7 +66,8 @@ public class PremiumBoardPostController {
 		@RequestParam @NotBlank @Size(max = 255) String title,
 		@RequestParam @NotNull BoardPostType type,
 		@RequestParam @NotBlank String content,
-		@RequestPart(value = "images", required = false) List<MultipartFile> images
+		// FormData 동일 키 다중 파일은 @RequestParam 이 안정적. @RequestPart 는 1장만/간헐 실패 가능.
+		@RequestParam(value = "images", required = false) List<MultipartFile> images
 	) {
 		return ApiResponse.success(
 			boardPostService.createPost(

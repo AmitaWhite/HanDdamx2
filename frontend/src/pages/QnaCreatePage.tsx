@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
@@ -41,6 +41,9 @@ export function QnaCreatePage() {
 	const [type, setType] = useState<BoardPostType>("QUESTION");
 	const [content, setContent] = useState("");
 	const [files, setFiles] = useState<File[]>([]);
+	const [previews, setPreviews] = useState<{ name: string; url: string }[]>(
+		[],
+	);
 	const [fieldError, setFieldError] = useState<string | undefined>();
 
 	const {
@@ -49,25 +52,29 @@ export function QnaCreatePage() {
 		run,
 	} = useSubmitState("글 작성에 실패했습니다. 다시 시도해 주세요.");
 
-	const previews = useMemo(
-		() =>
-			files.map((file) => ({
-				name: file.name,
-				url: URL.createObjectURL(file),
-			})),
-		[files],
-	);
+	// blob URL 은 시간이 지나면 깨질 수 있어 files 변경 시에만 만들고, 교체/언마운트 시 revoke
+	useEffect(() => {
+		const next = files.map((file) => ({
+			name: file.name,
+			url: URL.createObjectURL(file),
+		}));
+		setPreviews(next);
+		return () => {
+			for (const preview of next) {
+				URL.revokeObjectURL(preview.url);
+			}
+		};
+	}, [files]);
 
 	if (numericCreatorId === null) {
 		return <Navigate to={paths.creatorQna(creatorId || "suyeon")} replace />;
 	}
 
-	// early return 이후에도 중첩 함수 안에서는 null 이 남을 수 있어 number 로 고정
 	const creatorMemberId: number = numericCreatorId;
 
 	function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files;
-		if (!selected) return;
+		if (!selected || selected.length === 0) return;
 		setFiles((prev) => [...prev, ...Array.from(selected)]);
 		e.target.value = "";
 	}
@@ -96,7 +103,13 @@ export function QnaCreatePage() {
 			}),
 		);
 		if (created) {
-			navigate(paths.creatorQna(creatorMemberId), { replace: true });
+			navigate(paths.qnaPost(created.id), {
+				replace: true,
+				state:
+					files.length > 0 && created.images.length === 0
+						? { imageUploadFailed: true }
+						: undefined,
+			});
 		}
 	}
 
@@ -171,7 +184,7 @@ export function QnaCreatePage() {
 
 				<div>
 					<label className="mb-2 block text-label-md font-label-md text-on-surface">
-						이미지 (선택)
+						이미지 (선택){files.length > 0 ? ` · ${files.length}장` : ""}
 					</label>
 					<label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low py-8 text-center hover:border-primary">
 						<Icon name="upload" className="text-[28px] text-secondary" />
@@ -181,7 +194,7 @@ export function QnaCreatePage() {
 						<input
 							type="file"
 							multiple
-							accept="image/*"
+							accept="image/jpeg,image/png,image/gif,image/webp"
 							className="hidden"
 							onChange={onFilesSelected}
 						/>
@@ -189,7 +202,7 @@ export function QnaCreatePage() {
 					{previews.length > 0 && (
 						<ul className="mt-3 flex flex-wrap gap-3">
 							{previews.map((preview, index) => (
-								<li key={`${preview.name}-${index}`} className="relative">
+								<li key={`${preview.url}-${index}`} className="relative">
 									<img
 										src={preview.url}
 										alt={preview.name}
