@@ -44,7 +44,7 @@ public class MyActivityService {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new CustomException(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        long boardCommentCount = boardCommentRepository.countByMemberIdAndDeletedFalse(memberId);
+        long boardCommentCount = boardCommentRepository.countMyComments(memberId);
         long subscribingCount = subscriptionRepository.countBySubscriberId(memberId);
 
         String introduction = member.getRole() == Role.CREATOR

@@ -32,5 +32,13 @@ public interface BoardCommentRepository extends JpaRepository<BoardComment, Long
     Slice<MyBoardCommentResponse> findMyComments(@Param("memberId") Long memberId, Pageable pageable);
 
     // KSY-015
-    long countByMemberIdAndDeletedFalse(Long memberId);
+    @Query("""
+           select count(bc)
+           from BoardComment bc
+           join bc.boardPost bp
+           where bc.memberId = :memberId
+           and bc.deleted = false
+           and bp.deleted = false
+           """)
+    long countMyComments(Long memberId);
 }
