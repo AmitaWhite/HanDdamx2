@@ -6,6 +6,7 @@ import com.white.handdam.notification.dto.response.NotificationReadAllResponse;
 import com.white.handdam.notification.dto.response.NotificationResponse;
 import com.white.handdam.notification.entity.NotificationEntity;
 import com.white.handdam.notification.entity.NotificationEntity.NotificationType;
+import com.white.handdam.notification.entity.NotificationReferenceType;
 import com.white.handdam.notification.exception.NotificationErrorCode;
 import com.white.handdam.notification.repository.NotificationRepository;
 import com.white.handdam.notification.websocket.publisher.NotificationPublisher;
@@ -52,7 +53,7 @@ public class NotificationService {
 		NotificationType type,
 		String message,
 		Long referenceId,
-		String referenceType
+		NotificationReferenceType referenceType
 	) {
 		// 내 행동으로 나에게 알림이 가지 않도록 (주 정책은 리스너, 여기는 방어선)
 		if (memberId == null || memberId.equals(senderId)) {
@@ -66,7 +67,8 @@ public class NotificationService {
 				.type(type)
 				.message(truncate(message))
 				.referenceId(referenceId)
-				.referenceType(referenceType)
+				// 컬럼은 VARCHAR 이므로 enum 이름으로 저장한다 (엔티티는 String 유지)
+				.referenceType(referenceType.name())
 				.build()
 		);
 
