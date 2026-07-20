@@ -1,11 +1,47 @@
 import { Link, NavLink } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Icon } from "@/components/ui/Icon";
+import { LinkButton } from "@/components/ui/LinkButton";
+import { useAuth } from "@/features/auth/AuthContext";
 import { cn } from "@/lib/cn";
 import { ProfileMenu } from "./ProfileMenu";
 
-/** 소비자 앱 상단 헤더 (72px, backdrop-blur). 모바일에선 중앙 네비/검색을 숨기고 하단 탭바로 대체. */
+/**
+ * 상단 헤더 (72px, backdrop-blur). 로그인 여부에 따라 내용이 갈린다.
+ * - 로그인: 좌측 네비+검색 + 채팅/알림 아이콘 + 프로필 메뉴
+ * - 비로그인: 로고 + 로그인/회원가입 버튼만
+ * PublicLayout/ConsumerLayout 양쪽에서 공용으로 사용.
+ */
 export function Header() {
+	const { isAuthenticated } = useAuth();
+	if (!isAuthenticated) return <GuestHeader />;
+	return <AuthedHeader />;
+}
+
+function GuestHeader() {
+	return (
+		<header className="fixed top-0 z-50 w-full border-b border-outline-variant bg-surface/95 backdrop-blur-[10px]">
+			<nav className="container-page flex h-[72px] items-center justify-between">
+				<Link
+					to={paths.landing}
+					className="text-headline-md font-display font-bold text-primary"
+				>
+					한땀한땀
+				</Link>
+				<div className="flex items-center gap-3">
+					<LinkButton to={paths.login} variant="ghost" size="sm">
+						로그인
+					</LinkButton>
+					<LinkButton to={paths.signup} variant="primary" size="sm">
+						회원가입
+					</LinkButton>
+				</div>
+			</nav>
+		</header>
+	);
+}
+
+function AuthedHeader() {
 	return (
 		<header className="fixed top-0 z-50 w-full border-b border-outline-variant bg-surface/95 backdrop-blur-[10px]">
 			<nav className="container-page flex h-[72px] items-center justify-between">
