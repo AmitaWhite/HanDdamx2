@@ -4,6 +4,7 @@ import com.white.handdam.category.entity.Category;
 import com.white.handdam.category.exception.CategoryErrorCode;
 import com.white.handdam.category.repository.CategoryRepository;
 import com.white.handdam.creator.exception.CreatorErrorCode;
+import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
@@ -28,6 +29,7 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
+import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
@@ -50,7 +52,7 @@ public class ProjectService {
     private final MemberRepository memberRepository;
     private final FeedRepository feedRepository;
     private final ObjectStorage objectStorage;
-    private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionLevelChecker subscriptionLevelChecker;
 
 
     /**
@@ -218,32 +220,33 @@ public class ProjectService {
     /**
      * 프로젝트 피드 목록 조회
      */
+    // getProjectFeeds 메서드 교체
     public Slice<FeedSummaryResponse> getProjectFeeds(Long projectId, Long requesterId, Pageable pageable) {
         Project project = findProjectById(projectId);
-
+        Member creator = memberRepository.findById(project.getCreatorId())
+            .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_NOT_FOUND));
+        Category category = categoryRepository.findById(project.getCategoryId())
+            .orElseThrow(() -> new CustomException(CategoryErrorCode.CATEGORY_NOT_FOUND));
         boolean isOwner = requesterId != null && requesterId.equals(project.getCreatorId());
-        if (isOwner) {
-            return feedRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(projectId, pageable)
-                    .map(FeedSummaryResponse::from);
-        }
-
-        List<Visibility> visibilities = resolveVisibilities(requesterId, project.getCreatorId());
-        return feedRepository.findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
-                        projectId, visibilities, pageable)
-                .map(FeedSummaryResponse::from);
+        Slice<Feed> feeds = isOwner
+            ? feedRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(projectId, pageable)
+            : feedRepository.findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
+            projectId, resolveVisibilities(requesterId, project.getCreatorId()), pageable);
+        return feeds.map(f -> FeedSummaryResponse.from(f, creator, category));
     }
 
+    // CANCEL_SCHEDULED 구독 만료 여부 체크 후 활성여부 판단
     private List<Visibility> resolveVisibilities(Long memberId, Long creatorId) {
         if (memberId == null) return List.of(Visibility.PUBLIC);
 
-        return subscriptionRepository
-                .findBySubscriberIdAndCreatorId(memberId, creatorId)
-                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE
-                        || s.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED)
-                .map(s -> s.getSubscriptionLevel() == SubscriptionLevel.PAID
-                        ? List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER, Visibility.PAID_SUBSCRIBER)
-                        : List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER))
-                .orElse(List.of(Visibility.PUBLIC));
+        String level = subscriptionLevelChecker.getLevel(memberId, creatorId);
+        if ("PAID".equals(level)) {
+            return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER, Visibility.PAID_SUBSCRIBER);
+        }
+        if ("FREE".equals(level)) {
+            return List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER);
+        }
+        return List.of(Visibility.PUBLIC);
     }
 
     /**

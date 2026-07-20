@@ -7,11 +7,11 @@ import com.white.handdam.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// TODO ACTIVE / CANCEL_SCHEDULED 둘 다 유효한 구독으로 처리 — 추후 만료일 체크 로직 확인
 @Component
 @RequiredArgsConstructor
 public class SubscriptionLevelChecker {
@@ -20,25 +20,35 @@ public class SubscriptionLevelChecker {
     // 반환값: "FREE" | "PAID" | null(비구독)
     public String getLevel(Long memberId, Long creatorId) {
         return subscriptionRepository
-                .findBySubscriberIdAndCreatorId(memberId, creatorId)
-                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE
-                        || s.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED)
-                .map(s -> s.getSubscriptionLevel().name())
-                .orElse(null);
+            .findBySubscriberIdAndCreatorId(memberId, creatorId)
+            .filter(s -> isActiveSubscription(s))  // ← 기존 인라인 조건을 헬퍼로 위임
+            .map(s -> s.getSubscriptionLevel().name())
+            .orElse(null);
     }
 
     // [LYJ-007] 회원의 활성 구독 전체 조회 -> creatorId:level 맵 반환
     public Map<Long, SubscriptionLevel> getActiveSubscriptionLevels(Long memberId) {
         List<Subscription> subscriptions =
-                subscriptionRepository.findBySubscriberIdOrderByStartedAtDesc(memberId);
+            subscriptionRepository.findBySubscriberIdOrderByStartedAtDesc(memberId);
         Map<Long, SubscriptionLevel> result = new HashMap<>();
         for (Subscription s : subscriptions) {
-            if (s.getStatus() == SubscriptionStatus.ACTIVE
-                    || s.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED) {
+            if (isActiveSubscription(s)) {  // ← 기존 인라인 조건을 헬퍼로 위임
                 result.put(s.getCreatorId(), s.getSubscriptionLevel());
             }
         }
         return result;
     }
 
+    // 실제 유효한 구독인지 판단
+    // - ACTIVE: 항상 유효
+    // - CANCEL_SCHEDULED: currentPeriodEndAt이 아직 지나지 않은 경우만 유효
+    private boolean isActiveSubscription(Subscription s) {
+        if (s.getStatus() == SubscriptionStatus.ACTIVE) {
+            return true;
+        }
+        if (s.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED) {
+            return !s.isExpiredCancelScheduledPaid(Instant.now());
+        }
+        return false;
+    }
 }

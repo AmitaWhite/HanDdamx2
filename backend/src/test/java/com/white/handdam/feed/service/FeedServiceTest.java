@@ -1,5 +1,7 @@
 package com.white.handdam.feed.service;
 
+import com.white.handdam.category.entity.Category;
+import com.white.handdam.category.repository.CategoryRepository;
 import com.white.handdam.feed.dto.request.AddAttachmentRequest;
 import com.white.handdam.feed.dto.request.FeedCreateRequest;
 import com.white.handdam.feed.dto.request.FeedMoveProjectRequest;
@@ -16,6 +18,8 @@ import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.global.exception.CustomException;
+import com.white.handdam.member.entity.Member;
+import com.white.handdam.member.repository.MemberRepository;
 import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
@@ -54,6 +58,8 @@ class FeedServiceTest {
     @Mock private FeedRepository feedRepository;
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
     @Mock private ProjectRepository projectRepository;
+    @Mock private MemberRepository memberRepository;
+    @Mock private CategoryRepository categoryRepository;
     @InjectMocks private FeedService feedService;
     @Mock private FeedAttachmentRepository feedAttachmentRepository;
     @Mock private ObjectStorage objectStorage;
@@ -110,6 +116,8 @@ class FeedServiceTest {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
         given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
+        given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, null);
 
@@ -123,6 +131,8 @@ class FeedServiceTest {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
         given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
+        given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, null);
 
@@ -136,6 +146,8 @@ class FeedServiceTest {
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
         given(projectRepository.findByIdAndDeletedFalse(1L))
                 .willReturn(Optional.of(sampleProject(1L))); // creatorId=memberId=1L
+        given(memberRepository.findById(1L)).willReturn(Optional.of(sampleMember(1L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, 1L);
 
@@ -150,6 +162,8 @@ class FeedServiceTest {
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
         given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(subscriptionLevelChecker.getLevel(6L, 99L)).willReturn(null); // 비구독자
+        given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, 6L);
 
@@ -165,6 +179,8 @@ class FeedServiceTest {
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
         given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(subscriptionLevelChecker.getLevel(6L, 99L)).willReturn(null);
+        given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, 6L);
 
@@ -330,6 +346,9 @@ class FeedServiceTest {
         given(feedRepository.findHomeFeeds(
                 eq(1L), any(List.class), any(List.class), isNull(), any(List.class), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(List.of(feed)));
+        given(projectRepository.findAllById(any())).willReturn(List.of(sampleProject(1L)));
+        given(memberRepository.findAllById(any())).willReturn(List.of(sampleMember(1L)));
+        given(categoryRepository.findAllById(any())).willReturn(List.of(sampleCategory(1L)));
 
         Slice<FeedSummaryResponse> result = feedService.getHomeFeed(1L, null, Pageable.unpaged());
 
@@ -359,6 +378,9 @@ class FeedServiceTest {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findExploreFeeds(isNull(), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(List.of(feed)));
+        given(projectRepository.findAllById(any())).willReturn(List.of(sampleProject(1L)));
+        given(memberRepository.findAllById(any())).willReturn(List.of(sampleMember(1L)));
+        given(categoryRepository.findAllById(any())).willReturn(List.of(sampleCategory(1L)));
 
         Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, Pageable.unpaged());
 
@@ -387,6 +409,9 @@ class FeedServiceTest {
         given(feedRepository.findByCreatorIdAndVisibilityIn(
                 eq(10L), any(List.class), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(List.of(feed)));
+        given(projectRepository.findAllById(any())).willReturn(List.of(sampleProject(1L)));
+        given(memberRepository.findAllById(any())).willReturn(List.of(sampleMember(1L)));
+        given(categoryRepository.findAllById(any())).willReturn(List.of(sampleCategory(1L)));
 
         Slice<FeedSummaryResponse> result = feedService.getCreatorFeeds(10L, null, Pageable.unpaged());
 
@@ -416,6 +441,9 @@ class FeedServiceTest {
         Feed feed = sampleFeed(Visibility.PAID_SUBSCRIBER);
         given(feedRepository.findByCreatorId(eq(1L), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(List.of(feed)));
+        given(projectRepository.findAllById(any())).willReturn(List.of(sampleProject(1L)));
+        given(memberRepository.findAllById(any())).willReturn(List.of(sampleMember(1L)));
+        given(categoryRepository.findAllById(any())).willReturn(List.of(sampleCategory(1L)));
 
         Slice<FeedSummaryResponse> result = feedService.getMyFeeds(1L, Pageable.unpaged());
 
@@ -753,6 +781,18 @@ class FeedServiceTest {
                 .build();
         ReflectionTestUtils.setField(project, "id", 1L);
         return project;
+    }
+
+    private Member sampleMember(Long id) {
+        Member member = Member.createLocalMember("test@test.com", "password", "테스터");
+        ReflectionTestUtils.setField(member, "id", id);
+        return member;
+    }
+
+    private Category sampleCategory(Long id) {
+        Category category = Category.builder().name("테스트카테고리").build();
+        ReflectionTestUtils.setField(category, "id", id);
+        return category;
     }
 
     private FeedAttachment sampleUploadAttachment(AttachmentType type, StoredObject stored, String mimeType) {
