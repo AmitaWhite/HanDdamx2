@@ -1,28 +1,15 @@
 import { http, unwrap } from "@/lib/api";
-
-/** 백엔드 CreatorProfileResponse (com.white.handdam.creator.dto.response.CreatorProfileResponse) */
-export interface CreatorProfileResponse {
-	creatorId: number;
-	memberId: number;
-	nickname: string;
-	profileImageUrl: string | null;
-	coverImageUrl: string | null;
-	representativeImageUrl: string | null;
-	introduction: string | null;
-	benefitsDescription: string | null;
-	subscriptionPrice: number;
-	subscriptionLevel: string | null;
-	subscriptionStatus: string | null;
-	subscriberCount: number;
-	projectCount: number;
-	feedCount: number;
-	isMine: boolean;
-}
+import type { CreatorProfile, ProjectSummary } from "./types";
 
 /**
  * 크리에이터 공개 프로필 조회.
  * 백엔드: GET /api/creators/{creatorId}
  */
 export function getCreatorProfile(creatorId: number) {
-	return unwrap<CreatorProfileResponse>(http.get(`/creators/${creatorId}`));
+  return unwrap<CreatorProfile>(http.get(`/creators/${creatorId}`));
+}
+
+/** GET /api/creators/{creatorId}/projects */
+export function getCreatorProjects(creatorId: number): Promise<ProjectSummary[]> {
+  return unwrap(http.get<{ success: boolean; data: ProjectSummary[]; error: null }>(`/creators/${creatorId}/projects`));
 }
