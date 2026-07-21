@@ -21,3 +21,19 @@ export interface MemberSummaryResponse {
 	myBoardCommentCount: number;
 	subscribingCount: number;
 }
+
+export interface MyFeedCommentResponse {
+	commentId: number;
+	content: string;
+	feedId: number;
+	feedTitle: string;
+	createdAt: string;
+}
+
+export interface MyBoardCommentResponse {
+	commentId: number;
+	content: string;
+	boardPostId: number;
+	boardPostTitle: string;
+	createdAt: string;
+}

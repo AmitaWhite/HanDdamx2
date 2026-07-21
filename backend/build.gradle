@@ -72,6 +72,7 @@ dependencies {
 	// ---------- .env 로컬 환경변수 로딩 ----------
 	// implementation "me.paulschwarz:spring-dotenv:${dotenvVersion}" // backend/.env 자동 로딩
 	implementation(platform("me.paulschwarz:spring-dotenv-bom:$dotenvVersion"))
+	developmentOnly(platform("me.paulschwarz:spring-dotenv-bom:$dotenvVersion"))
 	developmentOnly("me.paulschwarz:springboot4-dotenv")
 	// ---------- Lombok ----------
 	compileOnly 'org.projectlombok:lombok'
@@ -88,4 +89,16 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// 실행 가능한 부트 JAR 파일명을 고정한다 (버전 변경과 무관하게 Dockerfile COPY 경로를 안정화).
+// 컨테이너 이미지 빌드가 build/libs/app.jar 하나만 바라보면 되도록 한다.
+tasks.named('bootJar') {
+	archiveFileName = 'app.jar'
+}
+
+// 스프링부트 애플리케이션에는 라이브러리용 plain jar가 필요없다.
+// (남겨두면 build/libs 에 app.jar 외에 -plain.jar 가 함께 생겨 COPY 대상이 모호해진다.)
+tasks.named('jar') {
+	enabled = false
 }
