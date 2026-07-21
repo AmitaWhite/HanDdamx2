@@ -10,6 +10,10 @@ spring:
 
 server:
   port: 8080
+  # Caddy(리버스 프록시)가 사용자와는 HTTPS로, 백엔드에는 내부적으로 평문 HTTP로 통신한다.
+  # 이 값이 없으면 Spring이 Caddy의 X-Forwarded-Proto 헤더를 무시하고 자신을 http로 착각해서,
+  # OAuth2 redirect_uri 등 절대경로 URL을 만들 때 https 대신 http를 붙여버린다(로컬 직접 접속 시엔 영향 없음).
+  forward-headers-strategy: framework
 
 springdoc:
   swagger-ui:
