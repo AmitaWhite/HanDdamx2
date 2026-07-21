@@ -70,14 +70,25 @@ export function CreatorPage() {
 
   useEffect(() => {
     if (!numericCreatorId) return;
+    let cancelled = false;
     setCreatorLoading(true);
+    setCreatorError(null);
     Promise.all([getCreatorProfile(numericCreatorId), getCreatorProjects(numericCreatorId)])
       .then(([profile, projs]) => {
+        if (cancelled) return;
         setCreator(profile);
         setProjects(projs);
       })
-      .catch((e) => setCreatorError(e instanceof Error ? e.message : "크리에이터 정보를 불러오지 못했습니다."))
-      .finally(() => setCreatorLoading(false));
+      .catch((e) => {
+        if (cancelled) return;
+        setCreatorError(e instanceof Error ? e.message : "크리에이터 정보를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setCreatorLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      };
   }, [numericCreatorId]);
 
   useEffect(() => {

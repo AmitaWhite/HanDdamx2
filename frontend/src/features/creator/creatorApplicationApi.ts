@@ -11,8 +11,7 @@ export function applyCreator(
   if (representativeImage) {
     form.append("representativeImage", representativeImage);
   }
-  return unwrap(http.post("/creator-applications", form, { headers: { "Content-Type": "multipart/form-data" } }));
-}
+  return unwrap(http.post("/creator-applications", form));}
 
 /** GET /api/creator-applications/me */
 export function getMyLatestApplication(): Promise<CreatorApplication> {
