@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -41,6 +42,7 @@ class FeedCommentServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private FeedCommentService feedCommentService;
 
     // ---------------------------------------------------------------
