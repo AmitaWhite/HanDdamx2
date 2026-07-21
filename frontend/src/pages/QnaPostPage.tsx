@@ -32,7 +32,6 @@ import {
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
 import { ApiError } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/relativeTime";
 import { commentsFor } from "@/mocks/comments";
 import { mockImg } from "@/mocks/helpers";
 import { findQnaPost, mockQnaAnswers, type QnaCategory } from "@/mocks/qna";
@@ -208,28 +207,6 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		error: commentError,
 		run: runComment,
 	} = useSubmitState("댓글 처리에 실패했습니다. 다시 시도해 주세요.");
-
-	const [commentsLoading, setCommentsLoading] = useState(true);
-
-	useEffect(() => {
-		let cancelled = false;
-		setCommentsLoading(true);
-
-		getBoardComments(postId)
-			.then((data) => {
-				if (!cancelled) setComments(data);
-			})
-			.catch(() => {
-				if (!cancelled) setComments([]);
-			})
-			.finally(() => {
-				if (!cancelled) setCommentsLoading(false);
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [postId]);
 
 	useEffect(() => {
 		let cancelled = false;
