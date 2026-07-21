@@ -27,7 +27,15 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 let refreshPromise: Promise<string> | null = null;
 
-function decodeJwtExpMs(token: string): number | null {
+export interface JwtClaims {
+	/** subject — memberId 문자열 */
+	sub?: string;
+	role?: string;
+	exp?: number;
+}
+
+/** JWT payload(가운데 세그먼트)를 base64url 디코드해서 클레임 객체로 반환. 서명 검증은 하지 않음(클라이언트 표시용). */
+export function decodeJwtPayload(token: string): JwtClaims | null {
 	try {
 		const payload = token.split(".")[1];
 		if (!payload) return null;
@@ -36,8 +44,7 @@ function decodeJwtExpMs(token: string): number | null {
 			normalized.length + ((4 - (normalized.length % 4)) % 4),
 			"=",
 		);
-		const json = JSON.parse(atob(padded)) as { exp?: number };
-		return typeof json.exp === "number" ? json.exp * 1000 : null;
+		return JSON.parse(atob(padded)) as JwtClaims;
 	} catch {
 		return null;
 	}
@@ -47,9 +54,9 @@ function decodeJwtExpMs(token: string): number | null {
 export function isAccessTokenExpiringSoon(skewMs = 60_000): boolean {
 	const token = tokenStore.get();
 	if (!token) return true;
-	const expMs = decodeJwtExpMs(token);
-	if (expMs === null) return false;
-	return expMs <= Date.now() + skewMs;
+	const claims = decodeJwtPayload(token);
+	if (!claims?.exp) return false;
+	return claims.exp * 1000 <= Date.now() + skewMs;
 }
 
 /**

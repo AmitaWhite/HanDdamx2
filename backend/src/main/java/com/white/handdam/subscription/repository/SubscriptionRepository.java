@@ -69,4 +69,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     // 크리에이터 구독자 수 조회
     long countByCreatorId(Long creatorId);
+
+    // KSY-015
+    long countBySubscriberId(Long subscriberId);
 }

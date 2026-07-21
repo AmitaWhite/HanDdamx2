@@ -74,6 +74,31 @@ export interface GetPremiumBoardPostsParams {
 	size?: number;
 }
 
+export interface GetMyBoardPostsParams {
+	type?: BoardPostType;
+	status?: BoardPostStatus;
+	page?: number;
+	size?: number;
+}
+
+/**
+ * 마이페이지 — 내가 작성한 유료 게시판 글 목록(크리에이터 구분 없이 전체).
+ * 백엔드: GET /api/members/me/board-posts
+ * 권한: 본인(JWT 인증된 회원)만.
+ */
+export function getMyBoardPosts({
+	type,
+	status,
+	page = 0,
+	size = 20,
+}: GetMyBoardPostsParams = {}) {
+	return unwrap<PageResponse<BoardPostResponse>>(
+		http.get("/members/me/board-posts", {
+			params: { type, status, page, size, sort: "createdAt,desc" },
+		}),
+	);
+}
+
 /**
  * 크리에이터별 유료 게시판 게시글 목록 조회 (LDJ-001).
  * 백엔드: GET /api/creators/{creatorId}/premium-board/posts
@@ -192,7 +217,10 @@ export async function deletePremiumBoardPost(postId: number) {
  * 권한: 작성자, 공식 답변 전(WAITING)만.
  * @returns 이번에 추가된 이미지 목록
  */
-export async function addPremiumBoardPostImages(postId: number, images: File[]) {
+export async function addPremiumBoardPostImages(
+	postId: number,
+	images: File[],
+) {
 	await ensureFreshAccessToken();
 
 	const formData = new FormData();

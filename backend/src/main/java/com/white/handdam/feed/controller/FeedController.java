@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -115,7 +116,6 @@ public class FeedController {
     }
 
     // [LYJ-010] GET /api/feeds/me — 내 작성 피드 목록
-    // TODO [LYJ-010] CREATOR 역할만 접근 가능하도록 추후 @PreAuthorize("hasRole('CREATOR')") 추가
     @GetMapping("/me")
     public ApiResponse<SliceResponse<FeedSummaryResponse>> getMyFeeds(
             @AuthenticationPrincipal AuthMember member,

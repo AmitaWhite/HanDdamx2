@@ -24,6 +24,7 @@ export function MyPageSideNav() {
 		...BASE_NAV_ITEMS,
 		...(isCreator ? [{ label: "프로젝트 관리", icon: "explore", to: paths.dashboardProjects }] : []),
 		{ label: "게시물 및 댓글 관리", icon: "article", to: paths.dashboardPosts },
+		{ label: "작가와의 Q&A", icon: "forum", to: paths.myQna },
 	];
 
 	return (

@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
-import { Avatar } from "@/components/ui/Avatar";
+import { EngagementBar } from "@/components/social/EngagementBar";
 import { Alert } from "@/components/ui/Alert";
+import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { EngagementBar } from "@/components/social/EngagementBar";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -32,6 +32,7 @@ import {
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
 import { ApiError } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/relativeTime";
 import { commentsFor } from "@/mocks/comments";
 import { mockImg } from "@/mocks/helpers";
 import { findQnaPost, mockQnaAnswers, type QnaCategory } from "@/mocks/qna";
@@ -165,8 +166,8 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const imageUploadFailed =
-		(location.state as { imageUploadFailed?: boolean } | null)?.imageUploadFailed ===
-		true;
+		(location.state as { imageUploadFailed?: boolean } | null)
+			?.imageUploadFailed === true;
 
 	const [editing, setEditing] = useState(false);
 	const [editTitle, setEditTitle] = useState("");
@@ -207,6 +208,29 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		error: commentError,
 		run: runComment,
 	} = useSubmitState("댓글 처리에 실패했습니다. 다시 시도해 주세요.");
+
+	const [comments, setComments] = useState<BoardCommentResponse[]>([]);
+	const [commentsLoading, setCommentsLoading] = useState(true);
+
+	useEffect(() => {
+		let cancelled = false;
+		setCommentsLoading(true);
+
+		getBoardComments(postId)
+			.then((data) => {
+				if (!cancelled) setComments(data);
+			})
+			.catch(() => {
+				if (!cancelled) setComments([]);
+			})
+			.finally(() => {
+				if (!cancelled) setCommentsLoading(false);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [postId]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -307,9 +331,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		);
 		if (added) {
 			setPost((prev) =>
-				prev
-					? { ...prev, images: [...prev.images, ...added] }
-					: prev,
+				prev ? { ...prev, images: [...prev.images, ...added] } : prev,
 			);
 		}
 	}
@@ -771,7 +793,12 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						{isAuthor && (
 							<div className="flex gap-2">
 								{canEdit && (
-									<Button type="button" variant="secondary" size="sm" onClick={startEdit}>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										onClick={startEdit}
+									>
 										수정
 									</Button>
 								)}
@@ -1007,7 +1034,9 @@ function MockQnaPostPage({ postId }: { postId: string }) {
 					<Chip active={post.status === "answered"} size="sm">
 						{post.status === "answered" ? "답변 완료" : "답변 대기"}
 					</Chip>
-					<span className="text-caption font-caption text-secondary">{post.category}</span>
+					<span className="text-caption font-caption text-secondary">
+						{post.category}
+					</span>
 				</div>
 				<h1 className="mb-3 text-headline-lg font-display text-on-surface">
 					{post.title}

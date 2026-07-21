@@ -225,4 +225,11 @@ public class CreatorProfileService {
         }
         return member;
     }
+
+    // KSY-015
+    public String getIntroductionByMemberId(Long memberId) {
+        return creatorProfileRepository.findByMemberId(memberId)
+            .map(CreatorProfile::getIntroduction)
+            .orElse(null); // 전환 승인 프로세스 감안해서 null 처리
+    }
 }

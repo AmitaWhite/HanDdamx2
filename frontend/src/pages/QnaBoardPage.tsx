@@ -10,7 +10,9 @@ import {
 	type BoardPostType,
 	getPremiumBoardPosts,
 } from "@/features/board/boardApi";
+import { useSubscriptionAccess } from "@/features/subscription/useSubscriptionAccess";
 import { ApiError } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/relativeTime";
 import { findCreator } from "@/mocks/creators";
 import { mockQnaPosts, type QnaCategory } from "@/mocks/qna";
 
@@ -50,26 +52,15 @@ function toNumericCreatorId(value: string): number | null {
 	return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-/** ISO 문자열 → "n분/시간/일 전" 간단 라벨. */
-function toRelativeLabel(iso: string): string {
-	const diffMs = Date.now() - new Date(iso).getTime();
-	if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
-	const minutes = Math.floor(diffMs / 60_000);
-	if (minutes < 1) return "방금";
-	if (minutes < 60) return `${minutes}분 전`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}시간 전`;
-	const days = Math.floor(hours / 24);
-	if (days < 7) return `${days}일 전`;
-	const weeks = Math.floor(days / 7);
-	return `${weeks}주 전`;
-}
-
 export function QnaBoardPage() {
 	const { creatorId = "" } = useParams();
 	const creator = findCreator(creatorId);
 	const numericCreatorId = toNumericCreatorId(creatorId);
 	const useRemote = numericCreatorId !== null;
+	const { isCreator, hasActivePaidSubscription } =
+		useSubscriptionAccess(numericCreatorId);
+	// 질문 작성은 활성 유료 구독자만 — 크리에이터 본인은 "답변" 역할이지 "질문 작성" 역할이 아니다.
+	const canAskQuestion = !isCreator && hasActivePaidSubscription;
 
 	const [active, setActive] = useState<(typeof CATEGORIES)[number]>("전체");
 	const [remotePosts, setRemotePosts] = useState<BoardPostResponse[]>([]);
@@ -120,7 +111,7 @@ export function QnaBoardPage() {
 				category: TYPE_TO_CATEGORY[post.type],
 				authorName: post.memberNickname,
 				commentCount: 0, // 백엔드 확장 예정
-				createdAtLabel: toRelativeLabel(post.createdAt),
+				createdAtLabel: formatRelativeTime(post.createdAt),
 			}))
 		: mockQnaPosts
 				.filter((q) => q.creatorId === creator.id)
@@ -147,15 +138,26 @@ export function QnaBoardPage() {
 
 			<div className="mb-6 flex items-center justify-between">
 				<div>
-					<h1 className="text-headline-md font-display text-on-surface">{creator.name} 작가 · Q&A 게시판</h1>
-					<p className="mt-1 text-caption font-caption text-secondary">유료 구독자 전용 공간입니다</p>
+					<h1 className="text-headline-md font-display text-on-surface">
+						{creator.name} 작가 · Q&A 게시판
+					</h1>
+					<p className="mt-1 text-caption font-caption text-secondary">
+						유료 구독자 전용 공간입니다
+					</p>
 				</div>
-				{numericCreatorId !== null ? (
-					<LinkButton to={paths.creatorQnaNew(numericCreatorId)}>글쓰기</LinkButton>
-				) : (
-					<Button type="button" disabled title="숫자 creatorId 에서만 작성 가능">
+				{numericCreatorId === null && (
+					<Button
+						type="button"
+						disabled
+						title="숫자 creatorId 에서만 작성 가능"
+					>
 						글쓰기
 					</Button>
+				)}
+				{numericCreatorId !== null && canAskQuestion && (
+					<LinkButton to={paths.creatorQnaNew(numericCreatorId)}>
+						글쓰기
+					</LinkButton>
 				)}
 			</div>
 
@@ -177,7 +179,9 @@ export function QnaBoardPage() {
 
 			<div className="divide-y divide-outline-variant/30 rounded-xl border border-outline-variant/50 bg-surface-container-lowest">
 				{loading && (
-					<p className="p-8 text-center text-body-md text-secondary">불러오는 중…</p>
+					<p className="p-8 text-center text-body-md text-secondary">
+						불러오는 중…
+					</p>
 				)}
 				{!loading &&
 					items.map((post) => (
@@ -189,21 +193,28 @@ export function QnaBoardPage() {
 							<span
 								className={
 									"shrink-0 rounded px-2 py-1 text-[10px] font-bold " +
-									(post.status === "answered" ? "bg-primary text-on-primary" : "bg-surface-container text-secondary")
+									(post.status === "answered"
+										? "bg-primary text-on-primary"
+										: "bg-surface-container text-secondary")
 								}
 							>
 								{post.status === "answered" ? "답변 완료" : "답변 대기"}
 							</span>
 							<div className="min-w-0 flex-1">
-								<p className="truncate text-body-md text-on-surface">{post.title}</p>
+								<p className="truncate text-body-md text-on-surface">
+									{post.title}
+								</p>
 								<p className="mt-1 text-caption font-caption text-secondary">
-									{post.category} · {post.authorName} · 댓글 {post.commentCount} · {post.createdAtLabel}
+									{post.category} · {post.authorName} · 댓글 {post.commentCount}{" "}
+									· {post.createdAtLabel}
 								</p>
 							</div>
 						</Link>
 					))}
 				{!loading && items.length === 0 && !errorMessage && (
-					<p className="p-8 text-center text-body-md text-secondary">해당 카테고리의 글이 아직 없어요.</p>
+					<p className="p-8 text-center text-body-md text-secondary">
+						해당 카테고리의 글이 아직 없어요.
+					</p>
 				)}
 			</div>
 			<div className="mt-6 text-center">

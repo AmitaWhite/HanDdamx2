@@ -3,6 +3,7 @@ package com.white.handdam.notification.event;
 import com.white.handdam.chat.entity.ChatMessageType;
 import com.white.handdam.chat.event.ChatMessageSentEvent;
 import com.white.handdam.notification.entity.NotificationEntity.NotificationType;
+import com.white.handdam.notification.entity.NotificationReferenceType;
 import com.white.handdam.notification.service.NotificationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,31 +28,33 @@ import static org.mockito.Mockito.verify;
  * (VerificationEmailEventListener 도 동일한 방식).
  */
 @ExtendWith(MockitoExtension.class)
-class NotificationEventListenerTest {
+class ChatNotificationListenerTest {
 
 	private static final Long CHAT_ROOM_ID = 42L;
 	private static final Long MESSAGE_ID = 7L;
 	private static final Long SENDER_ID = 2L;
 	private static final Long RECIPIENT_ID = 1L;
-	private static final String REFERENCE_TYPE_CHAT_ROOM = "CHAT_ROOM";
+	private static final NotificationReferenceType REFERENCE_TYPE_CHAT_ROOM =
+		NotificationReferenceType.CHAT_ROOM;
 
 	@Mock
 	private NotificationService notificationService;
 
 	@InjectMocks
-	private NotificationEventListener notificationEventListener;
+	private ChatNotificationListener chatNotificationListener;
 
 	@Test
 	@DisplayName("채팅 메시지 이벤트 - 수신자에게 CHAT_MESSAGE 알림을 생성한다")
 	void handleChatMessageSent_success() {
-		notificationEventListener.handleChatMessageSent(sampleEvent(RECIPIENT_ID, "안녕하세요"));
+		chatNotificationListener.handleChatMessageSent(sampleEvent(RECIPIENT_ID, "안녕하세요"));
 
 		ArgumentCaptor<Long> memberIdCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Long> senderIdCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<NotificationType> typeCaptor = ArgumentCaptor.forClass(NotificationType.class);
 		ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
 		ArgumentCaptor<Long> referenceIdCaptor = ArgumentCaptor.forClass(Long.class);
-		ArgumentCaptor<String> referenceTypeCaptor = ArgumentCaptor.forClass(String.class);
+		ArgumentCaptor<NotificationReferenceType> referenceTypeCaptor =
+			ArgumentCaptor.forClass(NotificationReferenceType.class);
 
 		verify(notificationService).create(
 			memberIdCaptor.capture(),
@@ -73,10 +76,11 @@ class NotificationEventListenerTest {
 	@Test
 	@DisplayName("채팅 메시지 이벤트 - 수신자가 없으면 알림을 생성하지 않는다")
 	void handleChatMessageSent_noRecipient_skipped() {
-		notificationEventListener.handleChatMessageSent(sampleEvent(null, "안녕하세요"));
+		chatNotificationListener.handleChatMessageSent(sampleEvent(null, "안녕하세요"));
 
 		verify(notificationService, never()).create(
-			anyLong(), anyLong(), any(NotificationType.class), anyString(), anyLong(), anyString());
+			anyLong(), anyLong(), any(NotificationType.class), anyString(), anyLong(),
+			any(NotificationReferenceType.class));
 	}
 
 	@Test
@@ -84,10 +88,11 @@ class NotificationEventListenerTest {
 	void handleChatMessageSent_serviceThrows_doesNotPropagate() {
 		willThrow(new RuntimeException("DB down"))
 			.given(notificationService).create(
-				anyLong(), anyLong(), any(NotificationType.class), anyString(), anyLong(), anyString());
+				anyLong(), anyLong(), any(NotificationType.class), anyString(), anyLong(),
+			any(NotificationReferenceType.class));
 
 		assertThatCode(() ->
-			notificationEventListener.handleChatMessageSent(sampleEvent(RECIPIENT_ID, "안녕하세요")))
+			chatNotificationListener.handleChatMessageSent(sampleEvent(RECIPIENT_ID, "안녕하세요")))
 			.doesNotThrowAnyException();
 	}
 
