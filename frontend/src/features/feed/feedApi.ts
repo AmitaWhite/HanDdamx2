@@ -1,4 +1,4 @@
-import { http, ensureFreshAccessToken, unwrap } from "@/lib/api";
+import { http, ensureFreshAccessToken, unwrap, unwrapVoid } from "@/lib/api";
 import type { SliceResponse } from "@/lib/types";
 import type {
 	AttachmentResponse,
@@ -58,4 +58,39 @@ export function getMyFeeds(page = 0) {
 	return unwrap<SliceResponse<FeedSummaryResponse>>(
 		http.get("/feeds/me", { params: { page } }),
 	);
+}
+
+export interface UpdateFeedParams {
+	title: string;
+	content: string;
+	visibility: Visibility;
+}
+
+/**
+ * 피드 제목·본문·공개범위 수정 (LYJ-003).
+ * 백엔드: PATCH /api/feeds/{feedId}
+ * 권한: 프로젝트 소유 크리에이터
+ */
+export function updateFeed(feedId: number | string, params: UpdateFeedParams) {
+	return unwrap<FeedIdResponse>(http.patch(`/feeds/${feedId}`, params));
+}
+
+/**
+ * 피드를 다른 프로젝트로 이동 (LYJ-004).
+ * 백엔드: PATCH /api/feeds/{feedId}/project
+ * 권한: 이동 전·후 프로젝트 모두 본인 소유여야 함
+ */
+export function moveFeedProject(feedId: number | string, projectId: number) {
+	return unwrap<FeedIdResponse>(
+		http.patch(`/feeds/${feedId}/project`, { projectId }),
+	);
+}
+
+/**
+ * 피드 소프트 삭제 (LYJ-005).
+ * 백엔드: DELETE /api/feeds/{feedId}
+ * 권한: 프로젝트 소유 크리에이터
+ */
+export async function deleteFeed(feedId: number | string) {
+	await unwrapVoid(http.delete(`/feeds/${feedId}`));
 }

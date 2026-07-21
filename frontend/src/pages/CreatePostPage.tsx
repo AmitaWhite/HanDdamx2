@@ -228,26 +228,38 @@ export function CreatePostPage() {
 					</label>
 					{attachments.length > 0 && (
 						<div className="mt-3 flex flex-wrap gap-3">
-							{attachments.map((a) => (
-								<div key={a.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
-									<img src={a.previewUrl} alt="첨부 미리보기" className="h-full w-full object-cover" />
-									<button
-										type="button"
-										onClick={() => removeAttachment(a.id)}
-										aria-label="첨부 삭제"
-										className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
-									>
-										<Icon name="close" className="text-[14px]" />
-									</button>
-								</div>
-							))}
+							{attachments.map((a) => {
+								const isImage = a.file.type.startsWith("image/");
+								return (
+									<div key={a.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
+										{isImage ? (
+											<img src={a.previewUrl} alt="첨부 미리보기" className="h-full w-full object-cover" />
+										) : (
+											<div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-surface-container-low p-1.5 text-center">
+												<Icon name="description" className="text-[24px] text-secondary" />
+												<span className="line-clamp-2 break-all text-[10px] leading-tight text-secondary">
+													{a.file.name}
+												</span>
+											</div>
+										)}
+										<button
+											type="button"
+											onClick={() => removeAttachment(a.id)}
+											aria-label="첨부 삭제"
+											className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
+										>
+											<Icon name="close" className="text-[14px]" />
+										</button>
+									</div>
+								);
+							})}
 						</div>
 					)}
 				</div>
 
 				<div>
 					<label className="mb-2 block text-label-md font-label-md text-on-surface">본문</label>
-					<div className="mb-2 flex gap-1 rounded-t-lg border border-b-0 border-outline-variant bg-surface-container-low p-2">
+					<div className="flex gap-1 rounded-t-lg border border-b-0 border-outline-variant bg-surface-container-low p-2">
 						{TOOLBAR_ICONS.map((icon) => (
 							<button
 								key={icon}
@@ -319,8 +331,8 @@ export function CreatePostPage() {
 						>
 							<span
 								className={cn(
-									"absolute top-0.5 h-5 w-5 rounded-full bg-surface-container-lowest transition-transform",
-									pollEnabled ? "translate-x-5" : "translate-x-0.5",
+									"absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-surface-container-lowest transition-transform",
+									pollEnabled ? "translate-x-5" : "translate-x-0",
 								)}
 							/>
 						</button>

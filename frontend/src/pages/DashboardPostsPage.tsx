@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
-import { getMyFeeds } from "@/features/feed/feedApi";
+import { deleteFeed, getMyFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
 import { mockComments } from "@/mocks/comments";
@@ -43,6 +43,16 @@ export function DashboardPostsPage() {
 			})
 			.finally(() => setFeedsLoading(false));
 	}, [isCreator]);
+
+	async function handleDeletePost(feedId: number) {
+		if (!window.confirm("이 게시물을 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.")) return;
+		try {
+			await deleteFeed(feedId);
+			setFeeds((prev) => prev.filter((f) => f.id !== feedId));
+		} catch (err) {
+			setFeedsError(err instanceof ApiError ? err.message : "삭제에 실패했습니다.");
+		}
+	}
 
 	const sorted = [...feeds].sort((a, b) =>
 		sort === "popular"
@@ -89,33 +99,47 @@ export function DashboardPostsPage() {
 							</div>
 							<div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-3">
 								{sorted.map((post) => (
-									<PostCard
-										key={post.id}
-										href={paths.postDetail(post.id)}
-										imageSeed={`feed-${post.id}`}
-										imageAlt={post.title}
-									>
-										<div className="p-4">
-											<span className="mb-2 inline-block rounded bg-surface-container px-2 py-0.5 text-caption font-caption text-secondary">
-												{post.category.name}
-											</span>
-											<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
-											<p className="mb-2 truncate text-caption font-caption text-secondary">{post.content}</p>
-											<div className="flex items-center justify-between text-caption font-caption text-secondary">
-												<span className="flex items-center gap-3">
-													<span className="flex items-center gap-1">
-														<Icon name="favorite" className="text-[14px]" />
-														{post.likeCount}
-													</span>
-													<span className="flex items-center gap-1">
-														<Icon name="chat_bubble_outline" className="text-[14px]" />
-														{post.commentCount}
-													</span>
-												</span>
-												<span>{formatDateLabel(post.createdAt)}</span>
-											</div>
+									<div key={post.id} className="relative">
+										<div className="absolute right-2 top-2 z-10 flex gap-1">
+											<Link
+												to={paths.dashboardPostEdit(post.id)}
+												aria-label="게시물 수정"
+												className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface shadow-sm hover:bg-surface-container-low"
+											>
+												<Icon name="edit" className="text-[16px]" />
+											</Link>
+											<button
+												type="button"
+												aria-label="게시물 삭제"
+												onClick={() => handleDeletePost(post.id)}
+												className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-lowest/90 text-error shadow-sm hover:bg-surface-container-low"
+											>
+												<Icon name="delete" className="text-[16px]" />
+											</button>
 										</div>
-									</PostCard>
+										<PostCard href={paths.postDetail(post.id)} imageSeed={`feed-${post.id}`} imageAlt={post.title}>
+											<div className="p-4">
+												<span className="mb-2 inline-block rounded bg-surface-container px-2 py-0.5 text-caption font-caption text-secondary">
+													{post.category.name}
+												</span>
+												<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
+												<p className="mb-2 truncate text-caption font-caption text-secondary">{post.content}</p>
+												<div className="flex items-center justify-between text-caption font-caption text-secondary">
+													<span className="flex items-center gap-3">
+														<span className="flex items-center gap-1">
+															<Icon name="favorite" className="text-[14px]" />
+															{post.likeCount}
+														</span>
+														<span className="flex items-center gap-1">
+															<Icon name="chat_bubble_outline" className="text-[14px]" />
+															{post.commentCount}
+														</span>
+													</span>
+													<span>{formatDateLabel(post.createdAt)}</span>
+												</div>
+											</div>
+										</PostCard>
+									</div>
 								))}
 							</div>
 							{feedsLoading && (

@@ -9,7 +9,7 @@ interface EngagementBarProps {
 	className?: string;
 }
 
-/** 좋아요/댓글/공유 액션 바. post-detail·qna-post에서 공용. */
+/** 좋아요/댓글 액션 바. post-detail·qna-post에서 공용. */
 export function EngagementBar({ likeCount, commentCount, liked, onToggleLike, className }: EngagementBarProps) {
 	return (
 		<div className={cn("flex items-center gap-5", className)}>
@@ -28,13 +28,6 @@ export function EngagementBar({ likeCount, commentCount, liked, onToggleLike, cl
 				<Icon name="chat_bubble_outline" className="text-[20px]" />
 				{commentCount}
 			</span>
-			<button
-				type="button"
-				className="ml-auto flex items-center gap-1.5 text-label-md font-label-md text-secondary hover:text-on-surface"
-			>
-				<Icon name="share" className="text-[20px]" />
-				공유
-			</button>
 		</div>
 	);
 }

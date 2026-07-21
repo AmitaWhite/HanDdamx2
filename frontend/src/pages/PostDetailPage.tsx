@@ -9,9 +9,12 @@ import { Icon } from "@/components/ui/Icon";
 import {
 	createFeedComment,
 	createFeedCommentReply,
+	deleteFeedComment,
 	getFeedComments,
+	updateFeedComment,
 } from "@/features/comment/commentApi";
 import type { FeedCommentResponse } from "@/features/comment/types";
+import { useAuth } from "@/features/auth/AuthContext";
 import { getFeed } from "@/features/feed/feedApi";
 import type { FeedDetailResponse } from "@/features/feed/types";
 import { likeFeed, unlikeFeed } from "@/features/like/likeApi";
@@ -37,6 +40,7 @@ function totalCommentCount(comments: FeedCommentResponse[]): number {
 
 export function PostDetailPage() {
 	const { postId = "" } = useParams();
+	const { user } = useAuth();
 
 	const [feed, setFeed] = useState<FeedDetailResponse | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -51,10 +55,15 @@ export function PostDetailPage() {
 	const [draft, setDraft] = useState("");
 	const [replyTarget, setReplyTarget] = useState<number | null>(null);
 	const [replyDraft, setReplyDraft] = useState("");
+	const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+	const [editDraft, setEditDraft] = useState("");
 
 	const [poll, setPoll] = useState<PollResponse | null>(null);
 	const [pollResults, setPollResults] = useState<PollResultResponse | null>(null);
 	const [pollError, setPollError] = useState<string | null>(null);
+	const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
+	const [pollEditMode, setPollEditMode] = useState(false);
+	const [pollSubmitting, setPollSubmitting] = useState(false);
 
 	useEffect(() => {
 		setLoading(true);
@@ -79,6 +88,8 @@ export function PostDetailPage() {
 			.then(([p, r]) => {
 				setPoll(p);
 				setPollResults(r);
+				setSelectedOptionId(p.myVotedOptionId);
+				setPollEditMode(p.myVotedOptionId == null);
 			})
 			.catch((err) => {
 				setPollError(err instanceof ApiError ? err.message : "투표를 불러오지 못했습니다.");
@@ -128,15 +139,70 @@ export function PostDetailPage() {
 		}
 	}
 
-	async function handleVote(optionId: number) {
-		if (!poll || poll.closed) return;
-		if (poll.myVotedOptionId === optionId) return;
+	function startEditComment(comment: FeedCommentResponse) {
+		setReplyTarget(null);
+		setEditingCommentId(comment.id);
+		setEditDraft(comment.content);
+	}
+
+	function cancelEditComment() {
+		setEditingCommentId(null);
+		setEditDraft("");
+	}
+
+	async function submitEditComment(commentId: number) {
+		if (!feed || !editDraft.trim()) return;
+		try {
+			await updateFeedComment(feed.id, commentId, editDraft.trim());
+			setEditingCommentId(null);
+			setEditDraft("");
+			await refreshComments();
+		} catch (err) {
+			setCommentsError(err instanceof ApiError ? err.message : "댓글 수정에 실패했습니다.");
+		}
+	}
+
+	async function handleDeleteComment(commentId: number) {
+		if (!feed) return;
+		if (!window.confirm("이 댓글을 삭제하시겠어요?")) return;
+		try {
+			await deleteFeedComment(feed.id, commentId);
+			await refreshComments();
+		} catch (err) {
+			setCommentsError(err instanceof ApiError ? err.message : "댓글 삭제에 실패했습니다.");
+		}
+	}
+
+	function selectPollOption(optionId: number) {
+		if (!pollEditMode || poll?.closed) return;
+		setSelectedOptionId(optionId);
+	}
+
+	function startPollEdit() {
 		setPollError(null);
+		setPollEditMode(true);
+	}
+
+	function cancelPollEdit() {
+		if (!poll) return;
+		setSelectedOptionId(poll.myVotedOptionId);
+		setPollEditMode(false);
+		setPollError(null);
+	}
+
+	async function submitPollVote() {
+		if (!poll || selectedOptionId == null) return;
+		if (poll.myVotedOptionId === selectedOptionId) {
+			setPollEditMode(false);
+			return;
+		}
+		setPollError(null);
+		setPollSubmitting(true);
 		try {
 			if (poll.myVotedOptionId == null) {
-				await votePoll(poll.pollId, optionId);
+				await votePoll(poll.pollId, selectedOptionId);
 			} else {
-				await changePollVote(poll.pollId, optionId);
+				await changePollVote(poll.pollId, selectedOptionId);
 			}
 			const [freshPoll, freshResults] = await Promise.all([
 				getPoll(poll.pollId),
@@ -144,8 +210,12 @@ export function PostDetailPage() {
 			]);
 			setPoll(freshPoll);
 			setPollResults(freshResults);
+			setSelectedOptionId(freshPoll.myVotedOptionId);
+			setPollEditMode(false);
 		} catch (err) {
 			setPollError(err instanceof ApiError ? err.message : "투표에 실패했습니다.");
+		} finally {
+			setPollSubmitting(false);
 		}
 	}
 
@@ -248,17 +318,17 @@ export function PostDetailPage() {
 									pollResults && pollResults.totalWeight > 0 && result
 										? Math.round((result.weight / pollResults.totalWeight) * 100)
 										: 0;
-								const isMine = poll.myVotedOptionId === opt.optionId;
+								const isSelected = selectedOptionId === opt.optionId;
 								return (
 									<button
 										key={opt.optionId}
 										type="button"
-										disabled={poll.closed}
-										onClick={() => handleVote(opt.optionId)}
+										disabled={poll.closed || !pollEditMode}
+										onClick={() => selectPollOption(opt.optionId)}
 										className={cn(
 											"relative overflow-hidden rounded border text-left transition-colors",
-											isMine ? "border-primary" : "border-outline-variant",
-											poll.closed && "cursor-default",
+											isSelected ? "border-primary" : "border-outline-variant",
+											(poll.closed || !pollEditMode) && "cursor-default",
 										)}
 									>
 										<div className="h-9 bg-primary/15" style={{ width: `${percentage}%` }} />
@@ -273,6 +343,32 @@ export function PostDetailPage() {
 						<p className="mt-3 text-caption font-caption text-secondary">
 							{pollResults?.totalWeight ?? 0}표 참여{poll.closed ? " · 투표 종료" : ""}
 						</p>
+
+						{!poll.closed && (
+							<div className="mt-3 flex items-center gap-3">
+								{pollEditMode ? (
+									<>
+										<Button size="sm" onClick={submitPollVote} disabled={selectedOptionId == null || pollSubmitting}>
+											{pollSubmitting ? "투표하는 중…" : "투표하기"}
+										</Button>
+										{poll.myVotedOptionId != null && (
+											<button
+												type="button"
+												onClick={cancelPollEdit}
+												className="text-label-md font-label-md text-secondary hover:text-on-surface"
+											>
+												취소
+											</button>
+										)}
+									</>
+								) : (
+									<Button size="sm" variant="secondary" onClick={startPollEdit}>
+										수정하기
+									</Button>
+								)}
+							</div>
+						)}
+
 						{pollError && <p className="mt-2 text-caption font-caption text-error">{pollError}</p>}
 					</div>
 				)}
@@ -294,7 +390,28 @@ export function PostDetailPage() {
 									<Avatar src={mockImg(`member-${c.memberId}`, 80, 80)} size={28} />
 									<div className="min-w-0 flex-1">
 										<span className="text-label-md font-label-md text-on-surface">{c.nickname}</span>
-										<p className="text-body-md text-on-surface">{c.content}</p>
+										{editingCommentId === c.id ? (
+											<div className="mt-1 flex items-center gap-2">
+												<input
+													value={editDraft}
+													onChange={(e) => setEditDraft(e.target.value)}
+													onKeyDown={(e) => e.key === "Enter" && submitEditComment(c.id)}
+													className="h-9 flex-1 rounded-full border border-outline-variant bg-surface-container-low px-3 text-caption font-caption focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+												/>
+												<Button size="sm" onClick={() => submitEditComment(c.id)}>
+													저장
+												</Button>
+												<button
+													type="button"
+													onClick={cancelEditComment}
+													className="text-caption font-caption text-secondary hover:text-on-surface"
+												>
+													취소
+												</button>
+											</div>
+										) : (
+											<p className="text-body-md text-on-surface">{c.content}</p>
+										)}
 										<div className="flex items-center gap-3 text-caption font-caption text-secondary">
 											<span>{formatDateLabel(c.createdAt)}</span>
 											<button
@@ -304,6 +421,20 @@ export function PostDetailPage() {
 											>
 												답글 달기
 											</button>
+											{user?.memberId === c.memberId && editingCommentId !== c.id && (
+												<>
+													<button type="button" onClick={() => startEditComment(c)} className="hover:text-primary">
+														수정
+													</button>
+													<button
+														type="button"
+														onClick={() => handleDeleteComment(c.id)}
+														className="hover:text-error"
+													>
+														삭제
+													</button>
+												</>
+											)}
 										</div>
 
 										{replyTarget === c.id && (
@@ -326,10 +457,51 @@ export function PostDetailPage() {
 												{c.replies.map((r) => (
 													<div key={r.id} className="flex gap-3">
 														<Avatar src={mockImg(`member-${r.memberId}`, 80, 80)} size={24} />
-														<div>
+														<div className="min-w-0 flex-1">
 															<span className="text-label-md font-label-md text-on-surface">{r.nickname}</span>
-															<p className="text-body-md text-on-surface">{r.content}</p>
-															<p className="text-caption font-caption text-secondary">{formatDateLabel(r.createdAt)}</p>
+															{editingCommentId === r.id ? (
+																<div className="mt-1 flex items-center gap-2">
+																	<input
+																		value={editDraft}
+																		onChange={(e) => setEditDraft(e.target.value)}
+																		onKeyDown={(e) => e.key === "Enter" && submitEditComment(r.id)}
+																		className="h-9 flex-1 rounded-full border border-outline-variant bg-surface-container-low px-3 text-caption font-caption focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+																	/>
+																	<Button size="sm" onClick={() => submitEditComment(r.id)}>
+																		저장
+																	</Button>
+																	<button
+																		type="button"
+																		onClick={cancelEditComment}
+																		className="text-caption font-caption text-secondary hover:text-on-surface"
+																	>
+																		취소
+																	</button>
+																</div>
+															) : (
+																<p className="text-body-md text-on-surface">{r.content}</p>
+															)}
+															<div className="flex items-center gap-3 text-caption font-caption text-secondary">
+																<span>{formatDateLabel(r.createdAt)}</span>
+																{user?.memberId === r.memberId && editingCommentId !== r.id && (
+																	<>
+																		<button
+																			type="button"
+																			onClick={() => startEditComment(r)}
+																			className="hover:text-primary"
+																		>
+																			수정
+																		</button>
+																		<button
+																			type="button"
+																			onClick={() => handleDeleteComment(r.id)}
+																			className="hover:text-error"
+																		>
+																			삭제
+																		</button>
+																	</>
+																)}
+															</div>
 														</div>
 													</div>
 												))}
