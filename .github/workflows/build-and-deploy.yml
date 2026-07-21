@@ -1,0 +1,165 @@
+name: Build and Deploy (dev → OCI)
+
+# dev 브랜치에 push가 발생할 때(= 다른 브랜치 PR이 dev로 머지될 때) 실행.
+# 프론트/백엔드 arm64 이미지를 빌드해 GHCR에 올리고, OCI ARM 인스턴스에 배포한다.
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.deploy.yml"
+      - "Caddyfile"
+      - "deploy/**"
+      - ".github/workflows/build-and-deploy.yml"
+
+# 배포가 겹치지 않도록 직전 실행이 진행 중이면 새 실행이 대기했다가 이어받는다.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR는 소문자만 허용 → 소유자명을 소문자로 고정 (docker-compose.deploy.yml 과 일치해야 함)
+  BACKEND_IMAGE: ghcr.io/amitawhite/handdamx2-backend
+  FRONTEND_IMAGE: ghcr.io/amitawhite/handdamx2-frontend
+
+jobs:
+  # ---------------------------------------------------------
+  # 백엔드: x86 러너에서 bootJar 네이티브 빌드 → arm64 이미지에 JAR만 담기
+  # ---------------------------------------------------------
+  build-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Build bootJar (native x86, arch-independent)
+        working-directory: backend
+        run: |
+          chmod +x gradlew
+          ./gradlew bootJar -x test
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:dev
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+  # ---------------------------------------------------------
+  # 프론트엔드: x86 러너에서 bun build → arm64 nginx 이미지에 dist만 담기
+  # VITE_API_BASE_URL 은 빌드 시점에 번들로 구워지므로 여기서 도메인 값을 주입한다.
+  # (SITE_DOMAIN 은 리포지토리 Variables 에 설정. 비어 있으면 상대경로 /api 로 폴백)
+  # ---------------------------------------------------------
+  build-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend (inject prod API base URL)
+        working-directory: frontend
+        env:
+          # 백엔드와 같은 도메인 + /api. Caddy가 /api·/ws 를 백엔드로 라우팅한다.
+          VITE_API_BASE_URL: ${{ vars.SITE_DOMAIN != '' && format('https://{0}/api', vars.SITE_DOMAIN) || '/api' }}
+        run: bun run build
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push frontend image (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:dev
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  # ---------------------------------------------------------
+  # 배포: OCI 인스턴스에 SSH → 새 이미지 pull 후 재기동
+  # (앱 값은 서버의 ~/handdam/.env.deploy 에 있으므로 Actions에서 주입하지 않는다)
+  # ---------------------------------------------------------
+  deploy:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: GHCR_ACTOR,GHCR_TOKEN
+          script: |
+            set -e
+            cd ~/handdam
+            # 서버는 이 리포의 git clone 이다. 최신 compose/Caddy 설정을 가져온다.
+            # (.env.deploy 는 git 미추적이라 덮어써지지 않는다.)
+            git pull --ff-only
+            # GHCR 패키지가 private 이어도 이 job에 발급된 GITHUB_TOKEN으로 pull 인증.
+            # (별도 PAT/패키지 공개 전환 불필요)
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+            docker compose -f docker-compose.deploy.yml --env-file .env.deploy pull
+            docker compose -f docker-compose.deploy.yml --env-file .env.deploy up -d
+            docker image prune -f
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

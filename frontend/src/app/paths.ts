@@ -8,6 +8,7 @@ export const paths = {
 	login: "/login",
 	signup: "/signup",
 	forgotPassword: "/forgot-password",
+	resetPassword: "/reset-password",
 	oauthCallback: "/oauth/callback",
 	emailVerify: "/email-verify",
 

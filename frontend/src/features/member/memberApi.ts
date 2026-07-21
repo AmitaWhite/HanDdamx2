@@ -1,5 +1,8 @@
 import { ensureFreshAccessToken, http, unwrap, unwrapVoid } from "@/lib/api";
-import type { MemberProfileResponse, MemberSummaryResponse } from "./types";
+import type { SliceResponse } from "@/lib/types";
+import type {MemberProfileResponse, MemberSummaryResponse,
+	MyBoardCommentResponse, MyFeedCommentResponse,
+} from "./types";
 
 
 // KSY-014: 내 프로필 조회
@@ -57,5 +60,19 @@ export function getMySummary() {
 export async function changePassword(currentPassword: string, newPassword: string) {
 	await unwrapVoid(
 		http.patch("/members/me/password", { currentPassword, newPassword }),
+	);
+}
+
+// KSY-020: 작성한 피드 댓글 목록
+export function getMyFeedComments(page = 0, size = 3) {
+	return unwrap<SliceResponse<MyFeedCommentResponse>>(
+		http.get("/members/me/feed-comments", { params: { page, size } }),
+	);
+}
+
+// KSY-021: 작성한 게시판 댓글 목록
+export function getMyBoardComments(page = 0, size = 3) {
+	return unwrap<SliceResponse<MyBoardCommentResponse>>(
+		http.get("/members/me/board-comments", { params: { page, size } }),
 	);
 }

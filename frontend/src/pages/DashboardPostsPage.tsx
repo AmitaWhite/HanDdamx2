@@ -1,14 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { PostCard } from "@/components/social/PostCard";
-import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
-import { mockComments } from "@/mocks/comments";
-import { findCreator } from "@/mocks/creators";
 import { mockPosts } from "@/mocks/posts";
 
 /** 로그인 계정과 mock 크리에이터를 잇는 백엔드 매핑이 아직 없어 임시로 고정한 값. */
@@ -17,22 +13,19 @@ const MOCK_CREATOR_ID = "suyeon";
 export function DashboardPostsPage() {
 	const { user } = useAuth();
 	const isCreator = user?.role === "CREATOR";
-	const creator = findCreator(MOCK_CREATOR_ID);
 	const [sort, setSort] = useState<"recent" | "popular">("recent");
 	const myPosts = mockPosts.filter((p) => p.creatorId === MOCK_CREATOR_ID);
 	const sorted = [...myPosts].sort((a, b) =>
 		sort === "popular" ? b.likeCount - a.likeCount : b.id.localeCompare(a.id),
 	);
-	// mock 데이터엔 실제 로그인 사용자별 댓글 매핑이 없어, 데모용으로 "이수연" 명의 댓글을 그대로 보여준다.
-	const myComments = mockComments.filter((c) => c.authorName === creator.name);
 
 	return (
 		<MyPageShell>
 			<div>
 				<div className="mb-8 flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h1 className="text-headline-lg font-display text-on-surface">게시물 및 댓글 관리</h1>
-						<p className="mt-1 text-body-md text-secondary">작성한 게시물과 댓글을 관리하세요.</p>
+						<h1 className="text-headline-lg font-display text-on-surface">게시물 관리</h1>
+						<p className="mt-1 text-body-md text-secondary">작성한 게시물을 관리하세요.</p>
 					</div>
 					{isCreator && (
 						<LinkButton to={paths.dashboardPostNew}>
@@ -97,27 +90,6 @@ export function DashboardPostsPage() {
 							<p className="text-caption font-caption text-secondary">크리에이터가 되어 나만의 작품을 나누어 보세요!</p>
 						</div>
 					)}
-				</section>
-
-				<section>
-					<h2 className="mb-4 text-headline-md font-display text-on-surface">작성한 댓글</h2>
-					<div className="flex flex-col gap-3">
-						{myComments.map((c) => {
-							const targetHref = c.postId.startsWith("qna-") ? paths.qnaPost(c.postId) : paths.postDetail(c.postId);
-							return (
-								<Card key={c.id} className="p-5">
-									<p className="mb-2 text-body-md text-on-surface">&ldquo;{c.body}&rdquo;</p>
-									<div className="flex items-center justify-between text-caption font-caption text-secondary">
-										<span>{c.createdAtLabel}</span>
-										<Link to={targetHref} className="text-primary hover:underline">
-											원문 보기
-										</Link>
-									</div>
-								</Card>
-							);
-						})}
-						{myComments.length === 0 && <p className="text-body-md text-secondary">아직 댓글이 없어요.</p>}
-					</div>
 				</section>
 			</div>
 		</MyPageShell>
