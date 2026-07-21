@@ -47,7 +47,7 @@ export function MyBoardCommentForm() {
 	}, []);
 
 	useEffect(() => {
-		unmountedRef.current = false; // TODO : Strict Mode 해제 후 true로 변경 필요
+		unmountedRef.current = false;
 		return () => {
 			unmountedRef.current = true;
 		};
