@@ -1,27 +1,53 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { PostCard } from "@/components/social/PostCard";
+import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
+import { getMyFeeds } from "@/features/feed/feedApi";
+import type { FeedSummaryResponse } from "@/features/feed/types";
+import { ApiError } from "@/lib/api";
 import { mockComments } from "@/mocks/comments";
 import { findCreator } from "@/mocks/creators";
-import { mockPosts } from "@/mocks/posts";
 
-/** 로그인 계정과 mock 크리에이터를 잇는 백엔드 매핑이 아직 없어 임시로 고정한 값. */
+/** 댓글 관리 섹션은 아직 "내 댓글" 조회 API가 없어 임시로 고정한 값(mock 데모용). */
 const MOCK_CREATOR_ID = "suyeon";
+
+function formatDateLabel(iso: string): string {
+	const d = new Date(iso);
+	return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function DashboardPostsPage() {
 	const { user } = useAuth();
 	const isCreator = user?.role === "CREATOR";
 	const creator = findCreator(MOCK_CREATOR_ID);
 	const [sort, setSort] = useState<"recent" | "popular">("recent");
-	const myPosts = mockPosts.filter((p) => p.creatorId === MOCK_CREATOR_ID);
-	const sorted = [...myPosts].sort((a, b) =>
-		sort === "popular" ? b.likeCount - a.likeCount : b.id.localeCompare(a.id),
+
+	const [feeds, setFeeds] = useState<FeedSummaryResponse[]>([]);
+	const [feedsLoading, setFeedsLoading] = useState(isCreator);
+	const [feedsError, setFeedsError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!isCreator) return;
+		getMyFeeds()
+			.then((res) => setFeeds(res.content))
+			.catch((err) => {
+				setFeedsError(
+					err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.",
+				);
+			})
+			.finally(() => setFeedsLoading(false));
+	}, [isCreator]);
+
+	const sorted = [...feeds].sort((a, b) =>
+		sort === "popular"
+			? b.likeCount - a.likeCount
+			: new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
 	// mock 데이터엔 실제 로그인 사용자별 댓글 매핑이 없어, 데모용으로 "이수연" 명의 댓글을 그대로 보여준다.
 	const myComments = mockComments.filter((c) => c.authorName === creator.name);
@@ -46,6 +72,7 @@ export function DashboardPostsPage() {
 					<h2 className="mb-4 text-headline-md font-display text-on-surface">작성한 게시물</h2>
 					{isCreator ? (
 						<>
+							{feedsError && <Alert className="mb-4">{feedsError}</Alert>}
 							<div className="mb-4 flex items-center gap-4">
 								{(["recent", "popular"] as const).map((s) => (
 									<button
@@ -62,13 +89,18 @@ export function DashboardPostsPage() {
 							</div>
 							<div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-3">
 								{sorted.map((post) => (
-									<PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={post.imageSeed} imageAlt={post.title}>
+									<PostCard
+										key={post.id}
+										href={paths.postDetail(post.id)}
+										imageSeed={`feed-${post.id}`}
+										imageAlt={post.title}
+									>
 										<div className="p-4">
 											<span className="mb-2 inline-block rounded bg-surface-container px-2 py-0.5 text-caption font-caption text-secondary">
-												{post.category}
+												{post.category.name}
 											</span>
 											<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
-											<p className="mb-2 truncate text-caption font-caption text-secondary">{post.excerpt}</p>
+											<p className="mb-2 truncate text-caption font-caption text-secondary">{post.content}</p>
 											<div className="flex items-center justify-between text-caption font-caption text-secondary">
 												<span className="flex items-center gap-3">
 													<span className="flex items-center gap-1">
@@ -80,13 +112,16 @@ export function DashboardPostsPage() {
 														{post.commentCount}
 													</span>
 												</span>
-												<span>{post.createdAtLabel}</span>
+												<span>{formatDateLabel(post.createdAt)}</span>
 											</div>
 										</div>
 									</PostCard>
 								))}
 							</div>
-							{sorted.length === 0 && (
+							{feedsLoading && (
+								<p className="py-8 text-center text-body-md text-secondary">불러오는 중…</p>
+							)}
+							{!feedsLoading && sorted.length === 0 && !feedsError && (
 								<p className="py-8 text-center text-body-md text-secondary">작성한 게시물이 없어요.</p>
 							)}
 						</>
