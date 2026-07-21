@@ -21,6 +21,24 @@
 	handle /ws/* {
 		reverse_proxy backend:8080
 	}
+	# Spring Security의 OAuth2 로그인 시작/콜백 경로. /api 접두사가 없어
+	# 프론트로 새면 안 되므로 명시적으로 백엔드로 보낸다.
+	handle /oauth2/* {
+		reverse_proxy backend:8080
+	}
+	handle /login/oauth2/* {
+		reverse_proxy backend:8080
+	}
+	# Swagger/OpenAPI, Actuator 헬스체크도 같은 이유로 백엔드 직결.
+	handle /swagger-ui* {
+		reverse_proxy backend:8080
+	}
+	handle /v3/api-docs/* {
+		reverse_proxy backend:8080
+	}
+	handle /actuator/* {
+		reverse_proxy backend:8080
+	}
 
 	# 나머지 모든 경로 → 프론트엔드 정적 서버
 	handle {
