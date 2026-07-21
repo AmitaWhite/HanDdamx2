@@ -3,7 +3,9 @@ package com.white.handdam.board.controller;
 import com.white.handdam.board.dto.request.CreateBoardAnswerRequest;
 import com.white.handdam.board.dto.request.UpdateBoardAnswerRequest;
 import com.white.handdam.board.dto.response.BoardAnswerResponse;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.service.BoardAnswerService;
+import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
@@ -11,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +26,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class BoardAnswerController {
 
 	private final BoardAnswerService boardAnswerService;
+
+	/**
+	 * 게시글의 활성 공식 답변 조회.
+	 * 권한: 게시글 접근 가능자(크리에이터/작성자/유료 구독자)
+	 */
+	@GetMapping("/api/premium-board/posts/{postId}/answer")
+	public ApiResponse<BoardAnswerResponse> getAnswer(
+		@PathVariable Long postId,
+		@AuthenticationPrincipal AuthMember member
+	) {
+		if (member == null) {
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
+		}
+		return ApiResponse.success(boardAnswerService.getAnswer(postId, member.id()));
+	}
 
 	/**
 	 * 크리에이터 공식 답변 작성.

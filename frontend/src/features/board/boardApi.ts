@@ -1,4 +1,13 @@
-import { http, ensureFreshAccessToken, unwrap, unwrapVoid, ApiError } from "@/lib/api";
+import axios from "axios";
+import {
+	http,
+	ensureFreshAccessToken,
+	unwrap,
+	unwrapVoid,
+	ApiError,
+	asApiError,
+} from "@/lib/api";
+import type { ApiResponse } from "@/lib/types";
 
 /**
  * 백엔드 BoardPostType (com.white.handdam.board.entity.BoardPostType)
@@ -31,6 +40,7 @@ export interface BoardPostResponse {
 	id: number;
 	creatorId: number;
 	memberId: number;
+	memberNickname: string;
 	title: string;
 	type: BoardPostType;
 	content: string;
@@ -62,6 +72,31 @@ export interface GetPremiumBoardPostsParams {
 	status?: BoardPostStatus;
 	page?: number;
 	size?: number;
+}
+
+export interface GetMyBoardPostsParams {
+	type?: BoardPostType;
+	status?: BoardPostStatus;
+	page?: number;
+	size?: number;
+}
+
+/**
+ * 마이페이지 — 내가 작성한 유료 게시판 글 목록(크리에이터 구분 없이 전체).
+ * 백엔드: GET /api/members/me/board-posts
+ * 권한: 본인(JWT 인증된 회원)만.
+ */
+export function getMyBoardPosts({
+	type,
+	status,
+	page = 0,
+	size = 20,
+}: GetMyBoardPostsParams = {}) {
+	return unwrap<PageResponse<BoardPostResponse>>(
+		http.get("/members/me/board-posts", {
+			params: { type, status, page, size, sort: "createdAt,desc" },
+		}),
+	);
 }
 
 /**
@@ -182,7 +217,10 @@ export async function deletePremiumBoardPost(postId: number) {
  * 권한: 작성자, 공식 답변 전(WAITING)만.
  * @returns 이번에 추가된 이미지 목록
  */
-export async function addPremiumBoardPostImages(postId: number, images: File[]) {
+export async function addPremiumBoardPostImages(
+	postId: number,
+	images: File[],
+) {
 	await ensureFreshAccessToken();
 
 	const formData = new FormData();
@@ -207,4 +245,148 @@ export async function deletePremiumBoardPostImage(
 	await unwrapVoid(
 		http.delete(`/premium-board/posts/${postId}/images/${imageId}`),
 	);
+}
+
+/** 백엔드 BoardAnswerResponse */
+export interface BoardAnswerResponse {
+	id: number;
+	boardPostId: number;
+	creatorId: number;
+	content: string;
+	createdAt: string;
+	updatedAt: string;
+	deletedAt: string | null;
+}
+
+/**
+ * 게시글 공식 답변 조회.
+ * 백엔드: GET /api/premium-board/posts/{postId}/answer
+ * 답변 없으면 null (data:null 또는 BOARD_ANSWER_NOT_FOUND).
+ */
+export async function getBoardAnswer(
+	postId: number,
+): Promise<BoardAnswerResponse | null> {
+	try {
+		const { data: body } = await http.get<ApiResponse<BoardAnswerResponse>>(
+			`/premium-board/posts/${postId}/answer`,
+		);
+		if (body.success) {
+			return body.data;
+		}
+		if (body.error?.code === "BOARD_ANSWER_NOT_FOUND") {
+			return null;
+		}
+		throw new ApiError(
+			body.error?.code ?? "UNKNOWN",
+			body.error?.message ?? "공식 답변을 불러오지 못했습니다.",
+		);
+	} catch (err) {
+		if (err instanceof ApiError) {
+			if (err.code === "BOARD_ANSWER_NOT_FOUND") return null;
+			throw err;
+		}
+		const apiErr = asApiError(err);
+		if (
+			apiErr.code === "BOARD_ANSWER_NOT_FOUND" ||
+			(axios.isAxiosError(err) && err.response?.status === 404)
+		) {
+			return null;
+		}
+		throw apiErr;
+	}
+}
+
+/**
+ * 크리에이터 공식 답변 작성 (LDJ-009).
+ * 백엔드: POST /api/premium-board/posts/{postId}/answer
+ * 권한: 게시판 소유 크리에이터
+ */
+export function createBoardAnswer(postId: number, content: string) {
+	return unwrap<BoardAnswerResponse>(
+		http.post(`/premium-board/posts/${postId}/answer`, { content }),
+	);
+}
+
+/**
+ * 공식 답변 수정 (LDJ-010).
+ * 백엔드: PATCH /api/board-answers/{answerId}
+ * 권한: 답변 작성 크리에이터
+ */
+export function updateBoardAnswer(answerId: number, content: string) {
+	return unwrap<BoardAnswerResponse>(
+		http.patch(`/board-answers/${answerId}`, { content }),
+	);
+}
+
+/**
+ * 공식 답변 소프트 삭제 (LDJ-011).
+ * 백엔드: DELETE /api/board-answers/{answerId}
+ * 권한: 답변 작성 크리에이터
+ */
+export async function deleteBoardAnswer(answerId: number) {
+	await unwrapVoid(http.delete(`/board-answers/${answerId}`));
+}
+
+/** 백엔드 BoardCommentResponse (트리: 최상위 + replies) */
+export interface BoardCommentResponse {
+	id: number;
+	boardPostId: number;
+	memberId: number;
+	memberNickname: string;
+	parentCommentId: number | null;
+	depth: number;
+	content: string;
+	deleted: boolean;
+	createdAt: string;
+	updatedAt: string;
+	deletedAt: string | null;
+	replies: BoardCommentResponse[];
+}
+
+/**
+ * 게시글 댓글·대댓글 목록 조회 (LDJ-012).
+ * 백엔드: GET /api/premium-board/posts/{postId}/comments
+ */
+export function getBoardComments(postId: number) {
+	return unwrap<BoardCommentResponse[]>(
+		http.get(`/premium-board/posts/${postId}/comments`),
+	);
+}
+
+/**
+ * 일반 댓글 작성 (LDJ-013).
+ * 백엔드: POST /api/premium-board/posts/{postId}/comments
+ */
+export function createBoardComment(postId: number, content: string) {
+	return unwrap<BoardCommentResponse>(
+		http.post(`/premium-board/posts/${postId}/comments`, { content }),
+	);
+}
+
+/**
+ * 대댓글 작성 (LDJ-014).
+ * 백엔드: POST /api/board-comments/{commentId}/replies
+ */
+export function createBoardCommentReply(commentId: number, content: string) {
+	return unwrap<BoardCommentResponse>(
+		http.post(`/board-comments/${commentId}/replies`, { content }),
+	);
+}
+
+/**
+ * 댓글·대댓글 수정 (LDJ-015).
+ * 백엔드: PATCH /api/board-comments/{commentId}
+ */
+export function updateBoardComment(commentId: number, content: string) {
+	return unwrap<BoardCommentResponse>(
+		http.patch(`/board-comments/${commentId}`, { content }),
+	);
+}
+
+/**
+ * 댓글·대댓글 소프트 삭제 (LDJ-016).
+ * 백엔드: DELETE /api/board-comments/{commentId}
+ */
+export async function deleteBoardComment(commentId: number) {
+	await unwrapVoid(http.delete(`/board-comments/${commentId}`));
 }

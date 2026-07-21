@@ -17,6 +17,7 @@ import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MyPage } from "@/pages/MyPage";
 import { MyPageSettingsPage } from "@/pages/MyPageSettingsPage";
+import { MyQnaPage } from "@/pages/MyQnaPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
@@ -24,10 +25,13 @@ import { PostDetailPage } from "@/pages/PostDetailPage";
 import { QnaBoardPage } from "@/pages/QnaBoardPage";
 import { QnaCreatePage } from "@/pages/QnaCreatePage";
 import { QnaPostPage } from "@/pages/QnaPostPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { SignupPage } from "@/pages/SignupPage";
 import { SubscribeCompletePage } from "@/pages/SubscribeCompletePage";
 import { SubscribeFeedPage } from "@/pages/SubscribeFeedPage";
 import { SubscribeSelectPage } from "@/pages/SubscribeSelectPage";
+import { AdminCreatorApplicationsPage } from "@/pages/AdminCreatorApplicationsPage";
+import { AdminOnlyRoute } from "@/features/auth/AdminOnlyRoute";
 import { paths } from "./paths";
 
 /**
@@ -60,6 +64,7 @@ export const router = createBrowserRouter([
 				),
 			},
 			{ path: paths.forgotPassword, element: <ForgotPasswordPage /> },
+			{ path: paths.resetPassword, element: <ResetPasswordPage /> },
 			{ path: paths.oauthCallback, element: <OAuthCallbackPage /> },
 			{ path: paths.emailVerify, element: <EmailVerifyPage /> },
 		],
@@ -138,6 +143,14 @@ export const router = createBrowserRouter([
 				),
 			},
 			{
+				path: paths.myQna,
+				element: (
+					<AuthOnlyRoute>
+						<MyQnaPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
 				path: paths.subscribeSelect(),
 				element: (
 					<AuthOnlyRoute>
@@ -194,5 +207,19 @@ export const router = createBrowserRouter([
 			},
 		],
 	},
+  {
+    // 어드민 전용
+    element: (
+      <AdminOnlyRoute>
+        <ConsumerLayout />
+      </AdminOnlyRoute>
+    ),
+    children: [
+      {
+        path: paths.adminCreatorApplications,
+        element: <AdminCreatorApplicationsPage />,
+      },
+    ],
+  },
 	{ path: "*", element: <PagePlaceholder title="404" /> },
 ]);

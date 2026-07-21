@@ -23,6 +23,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.ApplicationEventPublisher;
+import com.white.handdam.creator.event.CreatorApplicationApprovedEvent;
+import com.white.handdam.creator.event.CreatorApplicationRejectedEvent;
 
 /**
  * 크리에이터 전환 신청 비즈니스 로직.
@@ -36,6 +39,7 @@ public class CreatorApplicationService {
     private final CreatorProfileRepository creatorProfileRepository;
     private final MemberRepository memberRepository;
     private final ObjectStorage objectStorage;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 크리에이터 전환 신청
@@ -155,7 +159,10 @@ public class CreatorApplicationService {
 
         // 2) 신청 상태 APPROVED
         application.approve(adminId);
-
+        eventPublisher.publishEvent(new CreatorApplicationApprovedEvent(
+            applicationId,
+            application.getMemberId()
+        ));
         return CreatorApplicationConverter.toResponse(application);
     }
 
@@ -171,6 +178,11 @@ public class CreatorApplicationService {
         assertPending(application);
 
         application.reject(adminId, request.rejectReason());
+        eventPublisher.publishEvent(new CreatorApplicationRejectedEvent(
+            applicationId,
+            application.getMemberId(),
+            request.rejectReason()
+        ));
         return CreatorApplicationConverter.toResponse(application);
     }
 

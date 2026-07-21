@@ -5,6 +5,10 @@ import { defineConfig } from "vite";
 // https://vitejs.dev/config/
 export default defineConfig({
 	plugins: [react()],
+	// sockjs-client(STOMP 알림 소켓)가 Node의 global을 참조 — Vite는 기본적으로 폴리필하지 않아 직접 지정.
+	define: {
+		global: "globalThis",
+	},
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
@@ -17,6 +21,17 @@ export default defineConfig({
 			"/api": {
 				target: "http://localhost:8080",
 				changeOrigin: true,
+			},
+			// OAuth 리다이렉트 (구글 로그인)
+			"/oauth2": {
+				target: "http://localhost:8080",
+				changeOrigin: true,
+			},
+			// SockJS/STOMP (채팅·알림) — backendOrigin이 빈 문자열일 때 /ws 로 접속
+			"/ws": {
+				target: "http://localhost:8080",
+				changeOrigin: true,
+				ws: true,
 			},
 		},
 	},

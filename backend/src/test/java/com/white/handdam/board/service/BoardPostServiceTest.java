@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -68,6 +69,9 @@ class BoardPostServiceTest {
 	@Mock
 	private ApplicationEventPublisher eventPublisher;
 
+	@Mock
+	private BoardMemberNicknameResolver nicknameResolver;
+
 	@InjectMocks
 	private BoardPostService boardPostService;
 
@@ -76,6 +80,9 @@ class BoardPostServiceTest {
 	@BeforeEach
 	void setUp() {
 		pageable = PageRequest.of(0, 20);
+		lenient().when(nicknameResolver.resolve(any())).thenReturn("테스트유저");
+		lenient().when(nicknameResolver.resolveAll(any())).thenReturn(Map.of());
+		lenient().when(nicknameResolver.fromMap(any(), any())).thenReturn("테스트유저");
 	}
 
 	@Test
@@ -578,7 +585,8 @@ class BoardPostServiceTest {
 			boardPostImageRepository,
 			paidSubscriptionChecker,
 			realStorage,
-			eventPublisher
+			eventPublisher,
+			nicknameResolver
 		);
 
 		Long creatorId = 1L;
@@ -636,7 +644,8 @@ class BoardPostServiceTest {
 			boardPostImageRepository,
 			paidSubscriptionChecker,
 			realStorage,
-			eventPublisher
+			eventPublisher,
+			nicknameResolver
 		);
 
 		Long creatorId = 1L;
@@ -679,7 +688,8 @@ class BoardPostServiceTest {
 			boardPostImageRepository,
 			paidSubscriptionChecker,
 			realStorage,
-			eventPublisher
+			eventPublisher,
+			nicknameResolver
 		);
 
 		Long creatorId = 1L;

@@ -6,12 +6,14 @@ import com.white.handdam.board.dto.request.UpdateBoardAnswerRequest;
 import com.white.handdam.board.dto.response.BoardAnswerResponse;
 import com.white.handdam.board.entity.BoardAnswer;
 import com.white.handdam.board.entity.BoardPost;
+import com.white.handdam.board.event.BoardAnswerCreatedEvent;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardAnswerRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
 import com.white.handdam.global.exception.CustomException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,23 @@ public class BoardAnswerService {
 
 	private final BoardPostRepository boardPostRepository;
 	private final BoardAnswerRepository boardAnswerRepository;
+	private final BoardPostService boardPostService;
+	private final ApplicationEventPublisher eventPublisher;
+
+	/**
+	 * 게시글의 활성 공식 답변 조회.
+	 * 권한: 게시글 접근 가능자(크리에이터/작성자/유료 구독자)와 동일.
+	 * 답변이 없으면 null (WAITING 게시글은 정상).
+	 */
+	public BoardAnswerResponse getAnswer(Long postId, Long requesterId) {
+		BoardPost post = boardPostRepository.findByIdAndDeletedFalse(postId)
+			.orElseThrow(() -> new CustomException(BoardErrorCode.BOARD_POST_NOT_FOUND));
+		boardPostService.assertCanAccessPost(post, requesterId);
+
+		return boardAnswerRepository.findByBoardPostIdAndDeletedFalse(postId)
+			.map(BoardAnswerConverter::toResponse)
+			.orElse(null);
+	}
 
 	/**
 	 * 크리에이터 공식 답변 작성 (BOARD-010).
@@ -73,6 +92,13 @@ public class BoardAnswerService {
 
 		// 게시글 상태를 WAITING → ANSWERED 로 전환
 		post.markAnswered();
+		eventPublisher.publishEvent(new BoardAnswerCreatedEvent(
+			postId,
+			saved.getId(),
+			requesterId,
+			post.getMemberId(),
+			request.content()
+		));
 		return BoardAnswerConverter.toResponse(saved);
 	}
 
@@ -135,11 +161,12 @@ public class BoardAnswerService {
 	}
 
 	/**
-	 * 공식 답변 수정·삭제: 해당 답변을 작성한 크리에이터만 허용.
+	 * 공식 답변 수정·삭제: 게시판 소유 크리에이터만 허용.
+	 * (answer.creatorId 가 아닌 board_post.creator_id 기준)
 	 */
 	void assertCanEditAnswer(BoardAnswer answer, Long requesterId) {
 		BoardOwnershipAsserter.assertOwner(
-			answer.getCreatorId(),
+			answer.getBoardPost().getCreatorId(),
 			requesterId,
 			BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN
 		);

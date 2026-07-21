@@ -55,3 +55,14 @@ export async function confirmEmailVerification(token: string) {
 export async function resendVerificationEmail(email: string) {
 	await unwrapVoid(http.post("/auth/email-verifications/resend", { email }));
 }
+
+// KSY-012 비밀번호 재설정 이메일 발송
+export async function requestPasswordReset(email: string) {
+  await unwrapVoid(http.post("/auth/password-reset", { email }));
+}
+
+// KSY-013 비밀번호 재설정 완료
+export async function confirmPasswordReset(token: string, newPassword: string) {
+  await unwrapVoid(http.patch("/auth/password-reset", { token, newPassword }));
+}
+
