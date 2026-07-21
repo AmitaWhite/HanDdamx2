@@ -9,20 +9,34 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { LinkButton } from "@/components/ui/LinkButton";
+import { requestPasswordReset } from "@/features/auth/authApi";
 import { validateEmail } from "@/features/auth/validation";
+import { asApiError } from "@/lib/api";
 
-/** 시안 없음 — 로그인/회원가입과 동일한 톤으로 가볍게 구성. 실제 API 연동은 범위 밖(목데이터). */
+/** 시안 없음 — 로그인/회원가입과 동일한 톤으로 가볍게 구성. */
 export function ForgotPasswordPage() {
 	const [email, setEmail] = useState("");
 	const [error, setError] = useState<string | undefined>();
+	const [sending, setSending] = useState(false);
 	const [sent, setSent] = useState(false);
 
-	function onSubmit(e: FormEvent) {
+	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
 		const err = validateEmail(email);
 		setError(err ?? undefined);
 		if (err) return;
-		setSent(true);
+
+		setSending(true);
+		try {
+			await requestPasswordReset(email);
+			setSent(true);
+		} catch (resetErr) {
+			setError(
+				asApiError(resetErr, "메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.").message,
+			);
+		} finally {
+			setSending(false);
+		}
 	}
 
 	if (sent) {
@@ -59,11 +73,15 @@ export function ForgotPasswordPage() {
 							autoComplete="email"
 							placeholder="example@email.com"
 							value={email}
-							onChange={(e) => setEmail(e.target.value)}
+							disabled={sending}
+							onChange={(e) => {
+								setEmail(e.target.value);
+								setError(undefined);
+							}}
 							error={error}
 						/>
-						<Button type="submit" size="lg" fullWidth>
-							재설정 링크 보내기
+						<Button type="submit" size="lg" fullWidth disabled={sending}>
+							{sending ? "보내는 중…" : "재설정 링크 보내기"}
 						</Button>
 					</form>
 					<Link

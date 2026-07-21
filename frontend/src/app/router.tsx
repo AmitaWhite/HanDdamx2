@@ -25,6 +25,7 @@ import { PostDetailPage } from "@/pages/PostDetailPage";
 import { QnaBoardPage } from "@/pages/QnaBoardPage";
 import { QnaCreatePage } from "@/pages/QnaCreatePage";
 import { QnaPostPage } from "@/pages/QnaPostPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { SignupPage } from "@/pages/SignupPage";
 import { SubscribeCompletePage } from "@/pages/SubscribeCompletePage";
 import { SubscribeFeedPage } from "@/pages/SubscribeFeedPage";
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
 				),
 			},
 			{ path: paths.forgotPassword, element: <ForgotPasswordPage /> },
+			{ path: paths.resetPassword, element: <ResetPasswordPage /> },
 			{ path: paths.oauthCallback, element: <OAuthCallbackPage /> },
 			{ path: paths.emailVerify, element: <EmailVerifyPage /> },
 		],

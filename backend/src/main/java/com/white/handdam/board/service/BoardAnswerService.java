@@ -6,12 +6,14 @@ import com.white.handdam.board.dto.request.UpdateBoardAnswerRequest;
 import com.white.handdam.board.dto.response.BoardAnswerResponse;
 import com.white.handdam.board.entity.BoardAnswer;
 import com.white.handdam.board.entity.BoardPost;
+import com.white.handdam.board.event.BoardAnswerCreatedEvent;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardAnswerRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
 import com.white.handdam.global.exception.CustomException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ public class BoardAnswerService {
 	private final BoardPostRepository boardPostRepository;
 	private final BoardAnswerRepository boardAnswerRepository;
 	private final BoardPostService boardPostService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	/**
 	 * 게시글의 활성 공식 답변 조회.
@@ -89,6 +92,13 @@ public class BoardAnswerService {
 
 		// 게시글 상태를 WAITING → ANSWERED 로 전환
 		post.markAnswered();
+		eventPublisher.publishEvent(new BoardAnswerCreatedEvent(
+			postId,
+			saved.getId(),
+			requesterId,
+			post.getMemberId(),
+			request.content()
+		));
 		return BoardAnswerConverter.toResponse(saved);
 	}
 

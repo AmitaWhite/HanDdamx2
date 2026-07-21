@@ -9,8 +9,7 @@ import type { NotificationResponse } from "./notificationsApi";
 export async function resolveNotificationHref(n: NotificationResponse): Promise<string> {
 	switch (n.referenceType) {
 		case "CHAT_ROOM":
-			// 채팅이 아직 단일 스레드라 room id 라우팅 자체가 없음 — 멀티룸 채팅 UI가 생기면 정리.
-			return paths.chat;
+			return paths.chatRoom(n.referenceId);
 		case "FEED":
 			return paths.postDetail(n.referenceId);
 		case "BOARD_POST":
