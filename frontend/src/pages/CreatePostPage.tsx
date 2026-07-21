@@ -99,6 +99,7 @@ export function CreatePostPage() {
 			previewUrl: URL.createObjectURL(file),
 		}));
 		setAttachments((prev) => [...prev, ...next]);
+		e.target.value = "";
 	}
 
 	function removeAttachment(id: string) {

@@ -30,6 +30,7 @@ export function HomePage() {
 
 	useEffect(() => {
 		setLoading(true);
+		setError(null);
 		getExploreFeeds(activeCategoryId)
 			.then((res) => setFeeds(res.content))
 			.catch((err) => {

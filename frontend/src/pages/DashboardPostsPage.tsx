@@ -34,6 +34,8 @@ export function DashboardPostsPage() {
 
 	useEffect(() => {
 		if (!isCreator) return;
+		setFeedsLoading(true);
+		setFeedsError(null);
 		getMyFeeds()
 			.then((res) => setFeeds(res.content))
 			.catch((err) => {
@@ -46,6 +48,7 @@ export function DashboardPostsPage() {
 
 	async function handleDeletePost(feedId: number) {
 		if (!window.confirm("이 게시물을 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.")) return;
+		setFeedsError(null);
 		try {
 			await deleteFeed(feedId);
 			setFeeds((prev) => prev.filter((f) => f.id !== feedId));
