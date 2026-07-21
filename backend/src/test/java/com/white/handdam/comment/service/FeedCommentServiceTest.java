@@ -114,7 +114,7 @@ class FeedCommentServiceTest {
 // LYJ-016 댓글 작성
 // ---------------------------------------------------------------
     @Test
-    @DisplayName("[LYJ-016] PUBLIC 피드에 댓글 작성 성공 - 생성된 commentId 반환")
+    @DisplayName("[LYJ-016] PUBLIC 피드에 댓글 작성 성공 - 생성된 commentId 반환 + commentCount 증가")
     void createComment_public_success() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
@@ -127,6 +127,7 @@ class FeedCommentServiceTest {
         Long commentId = feedCommentService.createComment(1L, 1L, new FeedCommentCreateRequest("테스트 댓글"));
 
         assertThat(commentId).isEqualTo(10L);
+        assertThat(feed.getCommentCount()).isEqualTo(1L);
     }
 
     @Test
@@ -157,7 +158,7 @@ class FeedCommentServiceTest {
     // LYJ-017 대댓글 작성
     // ---------------------------------------------------------------
     @Test
-    @DisplayName("[LYJ-017] PUBLIC 피드에 대댓글 작성 성공 - 생성된 commentId 반환")
+    @DisplayName("[LYJ-017] PUBLIC 피드에 대댓글 작성 성공 - 생성된 commentId 반환 + commentCount 증가")
     void createReply_public_success() {
         Feed feed = sampleFeed(Visibility.PUBLIC);
         given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
@@ -173,6 +174,7 @@ class FeedCommentServiceTest {
         Long commentId = feedCommentService.createReply(1L, 10L, 2L, new FeedCommentCreateRequest("대댓글"));
 
         assertThat(commentId).isEqualTo(20L);
+        assertThat(feed.getCommentCount()).isEqualTo(1L);
     }
 
     @Test
@@ -306,9 +308,11 @@ class FeedCommentServiceTest {
     // LYJ-019 댓글 삭제
     // ---------------------------------------------------------------
     @Test
-    @DisplayName("[LYJ-019] 댓글 삭제 성공 - 대댓글 없는 경우")
+    @DisplayName("[LYJ-019] 댓글 삭제 성공 - 대댓글 없는 경우, commentCount 1 감소")
     void deleteComment_success_noReplies() {
-        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        ReflectionTestUtils.setField(feed, "commentCount", 1L);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
 
         FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "댓글");
         given(feedCommentRepository.findByIdAndDeletedFalse(10L)).willReturn(Optional.of(comment));
@@ -317,12 +321,15 @@ class FeedCommentServiceTest {
         feedCommentService.deleteComment(1L, 10L, 1L);
 
         assertThat(comment.isDeleted()).isTrue();
+        assertThat(feed.getCommentCount()).isEqualTo(0L);
     }
 
     @Test
-    @DisplayName("[LYJ-019] 부모 댓글 삭제 시 대댓글도 함께 soft delete")
+    @DisplayName("[LYJ-019] 부모 댓글 삭제 시 대댓글도 함께 soft delete, commentCount 3 감소")
     void deleteComment_success_cascadesReplies() {
-        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        ReflectionTestUtils.setField(feed, "commentCount", 3L);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
 
         FeedComment comment = sampleComment(10L, 1L, null, (short) 0, "부모 댓글");
         FeedComment reply1  = sampleComment(20L, 2L, 10L, (short) 1, "대댓글1");
@@ -336,12 +343,15 @@ class FeedCommentServiceTest {
         assertThat(comment.isDeleted()).isTrue();
         assertThat(reply1.isDeleted()).isTrue();
         assertThat(reply2.isDeleted()).isTrue();
+        assertThat(feed.getCommentCount()).isEqualTo(0L);
     }
 
     @Test
-    @DisplayName("[LYJ-019] 대댓글(depth=1) 삭제 성공 - cascade 없음")
+    @DisplayName("[LYJ-019] 대댓글(depth=1) 삭제 성공 - cascade 없음, commentCount 1 감소")
     void deleteComment_success_reply() {
-        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        ReflectionTestUtils.setField(feed, "commentCount", 1L);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
 
         FeedComment reply = sampleComment(20L, 1L, 10L, (short) 1, "대댓글");
         given(feedCommentRepository.findByIdAndDeletedFalse(20L)).willReturn(Optional.of(reply));
@@ -349,6 +359,7 @@ class FeedCommentServiceTest {
         feedCommentService.deleteComment(1L, 20L, 1L);
 
         assertThat(reply.isDeleted()).isTrue();
+        assertThat(feed.getCommentCount()).isEqualTo(0L);
     }
 
     @Test

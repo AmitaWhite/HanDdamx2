@@ -18,7 +18,15 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { getFeed } from "@/features/feed/feedApi";
 import type { FeedDetailResponse } from "@/features/feed/types";
 import { likeFeed, unlikeFeed } from "@/features/like/likeApi";
-import { changePollVote, getPoll, getPollResults, votePoll } from "@/features/poll/pollApi";
+import {
+	changePollVote,
+	closePoll,
+	deletePoll,
+	getPoll,
+	getPollResults,
+	updatePoll,
+	votePoll,
+} from "@/features/poll/pollApi";
 import type { PollResponse, PollResultResponse } from "@/features/poll/types";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -36,6 +44,18 @@ function formatDateLabel(iso: string): string {
 
 function totalCommentCount(comments: FeedCommentResponse[]): number {
 	return comments.reduce((sum, c) => sum + 1 + c.replies.length, 0);
+}
+
+function toDatetimeLocalValue(iso: string): string {
+	const d = new Date(iso);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatDateTimeLabel(iso: string): string {
+	const d = new Date(iso);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function PostDetailPage() {
@@ -64,6 +84,12 @@ export function PostDetailPage() {
 	const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
 	const [pollEditMode, setPollEditMode] = useState(false);
 	const [pollSubmitting, setPollSubmitting] = useState(false);
+
+	const [pollManageOpen, setPollManageOpen] = useState(false);
+	const [editQuestion, setEditQuestion] = useState("");
+	const [editEndAt, setEditEndAt] = useState("");
+	const [pollActionError, setPollActionError] = useState<string | null>(null);
+	const [pollActionSubmitting, setPollActionSubmitting] = useState(false);
 
 	useEffect(() => {
 		setLoading(true);
@@ -219,6 +245,83 @@ export function PostDetailPage() {
 		}
 	}
 
+	function startPollManage() {
+		if (!poll) return;
+		setEditQuestion(poll.question);
+		setEditEndAt(toDatetimeLocalValue(poll.endAt));
+		setPollActionError(null);
+		setPollManageOpen(true);
+	}
+
+	function cancelPollManage() {
+		setPollManageOpen(false);
+		setPollActionError(null);
+	}
+
+	async function submitPollEdit() {
+		if (!poll) return;
+		const trimmedQuestion = editQuestion.trim();
+		if (!trimmedQuestion || !editEndAt) {
+			setPollActionError("질문과 종료 일시를 입력해 주세요.");
+			return;
+		}
+		setPollActionSubmitting(true);
+		setPollActionError(null);
+		try {
+			await updatePoll(poll.pollId, {
+				question: trimmedQuestion,
+				endAt: new Date(editEndAt).toISOString(),
+			});
+			const [freshPoll, freshResults] = await Promise.all([
+				getPoll(poll.pollId),
+				getPollResults(poll.pollId),
+			]);
+			setPoll(freshPoll);
+			setPollResults(freshResults);
+			setPollManageOpen(false);
+		} catch (err) {
+			setPollActionError(err instanceof ApiError ? err.message : "투표 수정에 실패했습니다.");
+		} finally {
+			setPollActionSubmitting(false);
+		}
+	}
+
+	async function handleClosePoll() {
+		if (!poll) return;
+		if (!window.confirm("투표를 조기 종료하시겠어요? 종료 후에는 되돌릴 수 없습니다.")) return;
+		setPollActionSubmitting(true);
+		setPollActionError(null);
+		try {
+			await closePoll(poll.pollId);
+			const [freshPoll, freshResults] = await Promise.all([
+				getPoll(poll.pollId),
+				getPollResults(poll.pollId),
+			]);
+			setPoll(freshPoll);
+			setPollResults(freshResults);
+		} catch (err) {
+			setPollActionError(err instanceof ApiError ? err.message : "투표 종료에 실패했습니다.");
+		} finally {
+			setPollActionSubmitting(false);
+		}
+	}
+
+	async function handleDeletePoll() {
+		if (!poll) return;
+		if (!window.confirm("이 투표를 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.")) return;
+		setPollActionSubmitting(true);
+		setPollActionError(null);
+		try {
+			await deletePoll(poll.pollId);
+			setPoll(null);
+			setPollResults(null);
+			setPollManageOpen(false);
+		} catch (err) {
+			setPollActionError(err instanceof ApiError ? err.message : "투표 삭제에 실패했습니다.");
+			setPollActionSubmitting(false);
+		}
+	}
+
 	async function toggleLike() {
 		if (!feed) return;
 		setLikeError(null);
@@ -238,6 +341,8 @@ export function PostDetailPage() {
 		return <p className="container-page py-16 text-center text-body-md text-secondary">{error ?? "게시물을 찾을 수 없어요."}</p>;
 	}
 
+	const isOwner = user?.memberId === feed.creator.creatorId;
+
 	return (
 		<div className="container-page grid grid-cols-1 gap-gutter py-6 lg:grid-cols-[1fr_400px]">
 			<div>
@@ -251,7 +356,10 @@ export function PostDetailPage() {
 
 				<div className="mb-4 flex items-center gap-3">
 					<Link to={paths.creator(feed.creator.creatorId)}>
-						<Avatar src={mockImg(feed.creator.profileImageUrl ?? `creator-${feed.creator.creatorId}`, 80, 80)} size={40} />
+						<Avatar
+							src={feed.creator.profileImageUrl ?? mockImg(`creator-${feed.creator.creatorId}`, 80, 80)}
+							size={40}
+						/>
 					</Link>
 					<div className="min-w-0">
 						<Link
@@ -341,7 +449,8 @@ export function PostDetailPage() {
 							})}
 						</div>
 						<p className="mt-3 text-caption font-caption text-secondary">
-							{pollResults?.totalWeight ?? 0}표 참여{poll.closed ? " · 투표 종료" : ""}
+							{pollResults?.totalWeight ?? 0}표 참여 ·{" "}
+							{poll.closed ? "투표 종료" : `마감 ${formatDateTimeLabel(poll.endAt)}`}
 						</p>
 
 						{!poll.closed && (
@@ -370,6 +479,68 @@ export function PostDetailPage() {
 						)}
 
 						{pollError && <p className="mt-2 text-caption font-caption text-error">{pollError}</p>}
+
+						{isOwner && (
+							<div className="mt-3 border-t border-outline-variant/50 pt-3">
+								{pollManageOpen ? (
+									<div className="flex flex-col gap-2">
+										<input
+											value={editQuestion}
+											onChange={(e) => setEditQuestion(e.target.value)}
+											placeholder="투표 질문"
+											className="h-9 rounded border border-outline-variant bg-surface-container-low px-3 text-caption font-caption focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+										/>
+										<input
+											type="datetime-local"
+											value={editEndAt}
+											onChange={(e) => setEditEndAt(e.target.value)}
+											className="h-9 rounded border border-outline-variant bg-surface-container-low px-3 text-caption font-caption focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+										/>
+										<div className="flex items-center gap-3">
+											<Button size="sm" onClick={submitPollEdit} disabled={pollActionSubmitting}>
+												{pollActionSubmitting ? "저장하는 중…" : "저장"}
+											</Button>
+											<button
+												type="button"
+												onClick={cancelPollManage}
+												className="text-caption font-caption text-secondary hover:text-on-surface"
+											>
+												취소
+											</button>
+										</div>
+									</div>
+								) : (
+									<div className="flex items-center gap-4 text-caption font-caption text-secondary">
+										{!poll.closed && (
+											<>
+												<button type="button" onClick={startPollManage} className="hover:text-primary">
+													투표 수정
+												</button>
+												<button
+													type="button"
+													onClick={handleClosePoll}
+													disabled={pollActionSubmitting}
+													className="hover:text-primary"
+												>
+													조기 종료
+												</button>
+											</>
+										)}
+										<button
+											type="button"
+											onClick={handleDeletePoll}
+											disabled={pollActionSubmitting}
+											className="hover:text-error"
+										>
+											투표 삭제
+										</button>
+									</div>
+								)}
+								{pollActionError && (
+									<p className="mt-2 text-caption font-caption text-error">{pollActionError}</p>
+								)}
+							</div>
+						)}
 					</div>
 				)}
 

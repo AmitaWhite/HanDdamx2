@@ -76,4 +76,14 @@ public class Feed extends BaseTimeEntity {
         if (this.likeCount > 0) this.likeCount--;
     }
 
+    // 댓글 증가
+    public void increaseCommentCount() {
+        this.commentCount++;
+    }
+
+    // 댓글 감소
+    public void decreaseCommentCount() {
+        if (this.commentCount > 0) this.commentCount--;
+    }
+
 }

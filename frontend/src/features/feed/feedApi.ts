@@ -60,6 +60,47 @@ export function getMyFeeds(page = 0) {
 	);
 }
 
+/**
+ * 최근 전체공개(PUBLIC) 피드 목록 — 비로그인 접근 가능 (LYJ-006).
+ * 백엔드: GET /api/feeds/public
+ */
+export function getPublicFeeds(page = 0) {
+	return unwrap<SliceResponse<FeedSummaryResponse>>(
+		http.get("/feeds/public", { params: { page } }),
+	);
+}
+
+/**
+ * 회원 홈 피드 = 구독 중인 작가의 글 + 카테고리 필터 (LYJ-007).
+ * 백엔드: GET /api/feeds/home
+ * 권한: 로그인 필요
+ */
+export function getHomeFeed(categoryId?: number, page = 0) {
+	return unwrap<SliceResponse<FeedSummaryResponse>>(
+		http.get("/feeds/home", { params: { categoryId, page } }),
+	);
+}
+
+/**
+ * 전체 탐색 피드 = 전체 크리에이터의 PUBLIC 글 + 카테고리 필터, 비로그인 접근 가능 (LYJ-008).
+ * 백엔드: GET /api/feeds/explore
+ */
+export function getExploreFeeds(categoryId?: number, page = 0) {
+	return unwrap<SliceResponse<FeedSummaryResponse>>(
+		http.get("/feeds/explore", { params: { categoryId, page } }),
+	);
+}
+
+/**
+ * 특정 크리에이터의 피드 목록 — 구독 등급에 따라 공개범위 다르게 적용 (LYJ-009).
+ * 백엔드: GET /api/feeds/creators/{creatorId}
+ */
+export function getCreatorFeeds(creatorId: number, page = 0) {
+	return unwrap<SliceResponse<FeedSummaryResponse>>(
+		http.get(`/feeds/creators/${creatorId}`, { params: { page } }),
+	);
+}
+
 export interface UpdateFeedParams {
 	title: string;
 	content: string;

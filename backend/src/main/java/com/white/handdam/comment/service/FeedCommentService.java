@@ -116,6 +116,7 @@ public class FeedCommentService {
 
         FeedComment comment = FeedComment.create(feedId, memberId, null, (short) 0, request.content());
         FeedComment saved = feedCommentRepository.save(comment);
+        feed.increaseCommentCount();
         eventPublisher.publishEvent(new FeedCommentCreatedEvent(
             feedId,
             saved.getId(),
@@ -155,6 +156,7 @@ public class FeedCommentService {
 
         FeedComment reply = FeedComment.create(feedId, memberId, parentCommentId, (short) 1, request.content());
         FeedComment saved = feedCommentRepository.save(reply);
+        feed.increaseCommentCount();
         eventPublisher.publishEvent(new FeedReplyCreatedEvent(
             feedId,
             parentCommentId,
@@ -190,7 +192,7 @@ public class FeedCommentService {
     // [LYJ-019] 댓글 삭제
     @Transactional
     public void deleteComment(Long feedId, Long commentId, Long memberId){
-        feedRepository.findByIdAndDeletedFalse(feedId)
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
                 .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
         FeedComment comment = feedCommentRepository.findByIdAndDeletedFalse(commentId)
                 .orElseThrow(() -> new CustomException(FeedCommentErrorCode.COMMENT_NOT_FOUND));
@@ -204,9 +206,13 @@ public class FeedCommentService {
         }
 
         comment.delete();
+        feed.decreaseCommentCount();
         if(comment.getDepth() == 0){
-            feedCommentRepository.findByParentCommentIdAndDeletedFalse(commentId)
-                    .forEach(reply -> reply.delete());
+            List<FeedComment> replies = feedCommentRepository.findByParentCommentIdAndDeletedFalse(commentId);
+            replies.forEach(reply -> {
+                reply.delete();
+                feed.decreaseCommentCount();
+            });
         }
     }
 

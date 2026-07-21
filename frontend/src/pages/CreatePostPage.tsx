@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useSubmitState } from "@/features/auth/useSubmitState";
-import { addFeedAttachment, createFeed } from "@/features/feed/feedApi";
+import { addFeedAttachment, createFeed, deleteFeed } from "@/features/feed/feedApi";
 import type { Visibility } from "@/features/feed/types";
 import { createFeedPoll } from "@/features/poll/pollApi";
 import { getMyProjects } from "@/features/project/projectApi";
@@ -143,15 +143,21 @@ export function CreatePostPage() {
 				content: trimmedBody,
 				visibility,
 			});
-			for (const attachment of attachments) {
-				await addFeedAttachment(created.feedId, attachment.file);
-			}
-			if (pollEnabled) {
-				await createFeedPoll(created.feedId, {
-					question: pollQuestion.trim(),
-					endAt: new Date(pollEndAt).toISOString(),
-					options: trimmedPollOptions,
-				});
+			try {
+				for (const attachment of attachments) {
+					await addFeedAttachment(created.feedId, attachment.file);
+				}
+				if (pollEnabled) {
+					await createFeedPoll(created.feedId, {
+						question: pollQuestion.trim(),
+						endAt: new Date(pollEndAt).toISOString(),
+						options: trimmedPollOptions,
+					});
+				}
+			} catch (err) {
+				// 첨부·투표 실패 시 재시도하면 피드가 중복 생성되므로, 방금 만든 피드를 되돌린다.
+				await deleteFeed(created.feedId).catch(() => {});
+				throw err;
 			}
 			return created.feedId;
 		});
