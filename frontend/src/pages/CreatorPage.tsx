@@ -20,6 +20,15 @@ import { type MockQnaPost, type QnaCategory } from "@/mocks/qna";
 const PROJECT_SCROLL_STEP = 220;
 const QNA_PREVIEW_SIZE = 5;
 
+/** 피드 API 연동 전까지의 임시 게시물 카드 형태. 실제 API 응답 타입으로 교체 예정. */
+interface PlaceholderPost {
+  id: number;
+  imageSeed: string;
+  title: string;
+  likeCount: number;
+  commentCount: number;
+}
+
 const TYPE_TO_CATEGORY: Record<BoardPostType, QnaCategory> = {
   QUESTION: "제작 질문",
   FEEDBACK: "작품 피드백",
@@ -143,7 +152,7 @@ export function CreatorPage() {
   const creatorStringId = String(creator.creatorId);
   const subscribed = isFreeSubscribed(creatorStringId);
   // posts는 피드 API 연동 전까지 빈 배열
-  const posts: never[] = [];
+  const posts: PlaceholderPost[] = [];
 
   function handleToggleSubscribe() {
     if (!isAuthenticated) {
