@@ -17,6 +17,8 @@ export const paths = {
 	feed: "/feed", // 구독 피드
 	notifications: "/notifications",
 	chat: "/chat",
+	chatRoom: (roomId: number | string) => `/chat?roomId=${roomId}`,
+	chatWithCreator: (creatorId: number | string) => `/chat?creatorId=${creatorId}`,
 	mypage: "/mypage",
 	mypageSettings: "/mypage/settings",
 	myQna: "/mypage/qna",

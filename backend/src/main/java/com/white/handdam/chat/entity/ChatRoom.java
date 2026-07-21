@@ -86,4 +86,19 @@ public class ChatRoom extends BaseTimeEntity {
 		this.closedAt = Instant.now();
 		return true;
 	}
+
+	/**
+	 * 종료된 방을 다시 활성화(ACTIVE)한다.
+	 * closedBy·closedAt 은 초기화 — 이전 대화 내용은 그대로 유지된다.
+	 * 이미 ACTIVE 면 false 반환.
+	 */
+	public boolean reopen() {
+		if (isActive()) {
+			return false;
+		}
+		this.status = ChatRoomStatus.ACTIVE;
+		this.closedBy = null;
+		this.closedAt = null;
+		return true;
+	}
 }

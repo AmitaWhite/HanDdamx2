@@ -6,6 +6,8 @@ import com.white.handdam.board.dto.request.UpdateBoardCommentRequest;
 import com.white.handdam.board.dto.response.BoardCommentResponse;
 import com.white.handdam.board.entity.BoardComment;
 import com.white.handdam.board.entity.BoardPost;
+import com.white.handdam.board.event.BoardCommentCreatedEvent;
+import com.white.handdam.board.event.BoardReplyCreatedEvent;
 import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.repository.BoardCommentRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
@@ -15,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class BoardCommentService {
 	private final BoardCommentRepository boardCommentRepository;
 	private final BoardPostService boardPostService;
 	private final BoardMemberNicknameResolver nicknameResolver;
+	private final ApplicationEventPublisher eventPublisher;
 
 	/**
 	 * 게시글 댓글·대댓글 목록 조회 (BOARD-013, BOARD-014, BOARD-018).
@@ -81,6 +85,13 @@ public class BoardCommentService {
 			.build();
 
 		BoardComment saved = boardCommentRepository.save(comment);
+		eventPublisher.publishEvent(new BoardCommentCreatedEvent(
+			postId,
+			saved.getId(),
+			requesterId,
+			post.getMemberId(),
+			request.content()
+		));
 		return BoardCommentConverter.toResponse(
 			saved,
 			List.of(),
@@ -128,6 +139,14 @@ public class BoardCommentService {
 			.build();
 
 		BoardComment saved = boardCommentRepository.save(reply);
+		eventPublisher.publishEvent(new BoardReplyCreatedEvent(
+			post.getId(),
+			commentId,
+			saved.getId(),
+			requesterId,
+			parent.getMemberId(),
+			request.content()
+		));
 		return BoardCommentConverter.toResponse(
 			saved,
 			List.of(),

@@ -10,6 +10,25 @@ export function getMyProfile() {
 	return unwrap<MemberProfileResponse>(http.get("/members/me"));
 }
 
+/** 백엔드 MemberPublicProfileResponse */
+export interface MemberPublicProfileResponse {
+	id: number;
+	nickname: string;
+	profileImageUrl: string | null;
+	isCreator: boolean;
+	createdAt: string;
+}
+
+/**
+ * 회원 공개 프로필 조회 (닉네임·프로필 이미지).
+ * 백엔드: GET /api/members/{memberId}
+ */
+export function getMemberPublicProfile(memberId: number) {
+	return unwrap<MemberPublicProfileResponse>(
+		http.get(`/members/${memberId}`),
+	);
+}
+
 // KSY-016: 닉네임 변경
 export function updateMyProfile(nickname: string) {
 	return unwrap<MemberProfileResponse>(http.patch("/members/me", { nickname }));

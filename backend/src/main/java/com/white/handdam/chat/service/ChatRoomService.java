@@ -6,7 +6,7 @@ import com.white.handdam.chat.dto.response.ChatRoomListItemResponse;
 import com.white.handdam.chat.dto.response.ChatRoomResponse;
 import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatRoom;
-import com.white.handdam.chat.event.ChatRoomCreatedEvent;
+import com.white.handdam.chat.entity.ChatRoomStatus;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.repository.ChatRoomRepository;
@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +28,6 @@ public class ChatRoomService {
 	private final ChatRoomRepository chatRoomRepository;
 	private final ChatMessageRepository chatMessageRepository;
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
-	private final ApplicationEventPublisher eventPublisher;
 
 	/**
 	 * 채팅방 생성 또는 기존 방 반환 (CHAT-001 / LDJ-017).
@@ -38,11 +36,14 @@ public class ChatRoomService {
 	 * 1. 로그인 확인
 	 * 2. 자기 자신과의 채팅 방지
 	 * 3. 활성 유료 구독자만 허용 (아니면 403)
-	 * 4. (creatorId, memberId) 기존 방 있으면 반환
-	 * 5. 없으면 ACTIVE 채팅방 생성 후 ChatRoomCreatedEvent 발행 (Phase 1: Spring Application Event)
+	 * 4. (creatorId, memberId) 로 기존 방이 있으면:
+	 *    - ACTIVE → 재사용 (200)
+	 *    - CLOSED → reopen 후 반환 (201)
+	 * 5. 없으면 새 ACTIVE 채팅방 생성 (201)
+	 *    - DB uq_chat_room 제약으로 (creator_id, member_id) 조합은 1개만 허용
 	 * </pre>
 	 *
-	 * @return result.created() == true 이면 신규 생성
+	 * @return result.created() == true 이면 신규 생성 또는 재오픈
 	 */
 	@Transactional
 	public CreateOrGetResult createOrGetChatRoom(Long creatorId, Long requesterId) {
@@ -57,7 +58,10 @@ public class ChatRoomService {
 		}
 
 		return chatRoomRepository.findByCreatorIdAndMemberId(creatorId, requesterId)
-			.map(room -> new CreateOrGetResult(ChatRoomConverter.toResponse(room), false))
+			.map(room -> {
+				boolean reopened = room.reopen();
+				return new CreateOrGetResult(ChatRoomConverter.toResponse(room), reopened);
+			})
 			.orElseGet(() -> {
 				ChatRoom saved = chatRoomRepository.save(
 					ChatRoom.builder()
@@ -65,12 +69,6 @@ public class ChatRoomService {
 						.memberId(requesterId)
 						.build()
 				);
-				// TODO(NOTIFICATION): ChatRoomCreatedEvent 구독 리스너에서 알림 저장·전송 처리 (현재는 발행만)
-				eventPublisher.publishEvent(new ChatRoomCreatedEvent(
-					saved.getId(),
-					saved.getCreatorId(),
-					saved.getMemberId()
-				));
 				return new CreateOrGetResult(ChatRoomConverter.toResponse(saved), true);
 			});
 	}
