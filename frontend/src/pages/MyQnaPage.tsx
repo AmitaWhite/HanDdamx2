@@ -13,7 +13,8 @@ import {
 	getBoardComments,
 	getMyBoardPosts,
 } from "@/features/board/boardApi";
-import { type CreatorProfileResponse, getCreatorProfile } from "@/features/creator/creatorApi";
+import { getCreatorProfile } from "@/features/creator/creatorApi";
+import type { CreatorProfile } from "@/features/creator/types";
 import { ApiError } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/relativeTime";
 
@@ -30,7 +31,7 @@ async function loadExtras(posts: BoardPostResponse[]) {
 		Promise.all(posts.map((p) => getBoardComments(p.id).catch(() => []))),
 	]);
 
-	const creatorEntries: [number, CreatorProfileResponse][] = [];
+	const creatorEntries: [number, CreatorProfile][] = [];
 	uniqueCreatorIds.forEach((id, i) => {
 		const profile = creatorResults[i];
 		if (profile) creatorEntries.push([id, profile]);
@@ -49,7 +50,7 @@ async function loadExtras(posts: BoardPostResponse[]) {
 /** 마이페이지 — 내가 여러 크리에이터에게 남긴 유료 Q&A 글 모음. */
 export function MyQnaPage() {
 	const [posts, setPosts] = useState<BoardPostResponse[]>([]);
-	const [creators, setCreators] = useState<Map<number, CreatorProfileResponse>>(
+	const [creators, setCreators] = useState<Map<number, CreatorProfile>>(
 		new Map(),
 	);
 	const [lastComments, setLastComments] = useState<
