@@ -21,6 +21,8 @@ import { MyQnaPage } from "@/pages/MyQnaPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
+import { PaymentFailPage } from "@/pages/PaymentFailPage";
+import { PaymentSuccessPage } from "@/pages/PaymentSuccessPage";
 import { PostDetailPage } from "@/pages/PostDetailPage";
 import { QnaBoardPage } from "@/pages/QnaBoardPage";
 import { QnaCreatePage } from "@/pages/QnaCreatePage";
@@ -163,6 +165,22 @@ export const router = createBrowserRouter([
 				element: (
 					<AuthOnlyRoute>
 						<SubscribeCompletePage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.paymentSuccess,
+				element: (
+					<AuthOnlyRoute>
+						<PaymentSuccessPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.paymentFail,
+				element: (
+					<AuthOnlyRoute>
+						<PaymentFailPage />
 					</AuthOnlyRoute>
 				),
 			},
