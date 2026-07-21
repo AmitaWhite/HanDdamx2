@@ -65,6 +65,27 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
             Pageable pageable
     );
 
+    @Query("""
+            select new com.white.handdam.subscription.repository.SubscriptionExpiringSoonTarget(
+                subscription.id,
+                subscription.currentPeriodEndAt
+            )
+            from Subscription subscription
+            where subscription.subscriptionLevel = :subscriptionLevel
+              and subscription.status = :status
+              and subscription.currentPeriodEndAt is not null
+              and subscription.currentPeriodEndAt >= :targetStart
+              and subscription.currentPeriodEndAt < :targetEnd
+            order by subscription.currentPeriodEndAt asc, subscription.id asc
+            """)
+    List<SubscriptionExpiringSoonTarget> findExpiringSoonSubscriptionTargets(
+            @Param("subscriptionLevel") SubscriptionLevel subscriptionLevel,
+            @Param("status") SubscriptionStatus status,
+            @Param("targetStart") Instant targetStart,
+            @Param("targetEnd") Instant targetEnd,
+            Pageable pageable
+    );
+
     List<Subscription> findBySubscriberIdOrderByStartedAtDesc(Long subscriberId);
 
     // 크리에이터 구독자 수 조회

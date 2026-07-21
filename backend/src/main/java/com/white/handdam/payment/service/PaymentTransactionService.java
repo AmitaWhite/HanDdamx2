@@ -7,12 +7,14 @@ import com.white.handdam.payment.dto.response.PaymentConfirmResponse;
 import com.white.handdam.payment.dto.response.PaymentFailResponse;
 import com.white.handdam.payment.dto.toss.TossConfirmResponse;
 import com.white.handdam.payment.entity.Payment;
+import com.white.handdam.payment.event.PaymentSucceededEvent;
 import com.white.handdam.payment.exception.PaymentErrorCode;
 import com.white.handdam.payment.repository.PaymentRepository;
 import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.exception.SubscriptionErrorCode;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class PaymentTransactionService {
 
     private final PaymentRepository paymentRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Payment createPendingPayment(Long memberId, Long creatorId, int amount) {
@@ -113,6 +116,13 @@ public class PaymentTransactionService {
         } catch (DataIntegrityViolationException exception) {
             throw new CustomException(PaymentErrorCode.DUPLICATE_PAYMENT_KEY);
         }
+
+        eventPublisher.publishEvent(new PaymentSucceededEvent(
+                payment.getId(),
+                payment.getMemberId(),
+                payment.getAmount(),
+                payment.getOrderId()
+        ));
 
         return PaymentConfirmResponse.of(payment, subscription);
     }

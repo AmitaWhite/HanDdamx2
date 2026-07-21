@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SubscriptionRepositoryTest {
 
     private static final Instant NOW = Instant.parse("2026-08-13T00:00:00Z");
+    private static final Instant TARGET_START = Instant.parse("2026-08-12T15:00:00Z");
+    private static final Instant TARGET_END = Instant.parse("2026-08-13T15:00:00Z");
 
     @Autowired
     private SubscriptionRepository subscriptionRepository;
@@ -89,6 +91,85 @@ class SubscriptionRepositoryTest {
         );
 
         assertThat(subscriptionIds).containsExactly(firstTarget.getId());
+    }
+
+    @Test
+    @DisplayName("findExpiringSoonSubscriptionTargets returns only cancel-scheduled paid subscriptions in target date range")
+    void findExpiringSoonSubscriptionTargetsReturnsOnlyTargets() {
+        Subscription startTarget = saveScheduledPaid(1L, 101L, TARGET_START);
+        Subscription insideTarget = saveScheduledPaid(2L, 102L, TARGET_START.plusSeconds(60));
+        saveScheduledPaid(3L, 103L, TARGET_START.minusSeconds(1));
+        saveScheduledPaid(4L, 104L, TARGET_END);
+        saveScheduledPaid(5L, 105L, TARGET_END.plusSeconds(1));
+        saveActivePaid(6L, 106L, TARGET_START.plusSeconds(60));
+        saveFree(7L, 107L);
+        saveScheduledPaidWithoutPeriodEnd(8L, 108L);
+
+        List<SubscriptionExpiringSoonTarget> targets = subscriptionRepository.findExpiringSoonSubscriptionTargets(
+                SubscriptionLevel.PAID,
+                SubscriptionStatus.CANCEL_SCHEDULED,
+                TARGET_START,
+                TARGET_END,
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(targets)
+                .extracting(target -> target.subscriptionId())
+                .containsExactly(startTarget.getId(), insideTarget.getId());
+    }
+
+    @Test
+    @DisplayName("findExpiringSoonSubscriptionTargets orders by period end and id")
+    void findExpiringSoonSubscriptionTargetsOrdersByPeriodEndAndId() {
+        Subscription secondByPeriod = saveScheduledPaid(1L, 101L, TARGET_START.plusSeconds(20));
+        Subscription firstByPeriodAndId = saveScheduledPaid(2L, 102L, TARGET_START.plusSeconds(10));
+        Subscription secondByPeriodAndId = saveScheduledPaid(3L, 103L, TARGET_START.plusSeconds(10));
+
+        List<SubscriptionExpiringSoonTarget> targets = subscriptionRepository.findExpiringSoonSubscriptionTargets(
+                SubscriptionLevel.PAID,
+                SubscriptionStatus.CANCEL_SCHEDULED,
+                TARGET_START,
+                TARGET_END,
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(targets)
+                .extracting(target -> target.subscriptionId())
+                .containsExactly(
+                        firstByPeriodAndId.getId(),
+                        secondByPeriodAndId.getId(),
+                        secondByPeriod.getId()
+                );
+    }
+
+    @Test
+    @DisplayName("findExpiringSoonSubscriptionTargets supports paging")
+    void findExpiringSoonSubscriptionTargetsSupportsPaging() {
+        Subscription firstTarget = saveScheduledPaid(1L, 101L, TARGET_START.plusSeconds(10));
+        Subscription secondTarget = saveScheduledPaid(2L, 102L, TARGET_START.plusSeconds(20));
+        Subscription thirdTarget = saveScheduledPaid(3L, 103L, TARGET_START.plusSeconds(30));
+
+        List<SubscriptionExpiringSoonTarget> firstPage = subscriptionRepository.findExpiringSoonSubscriptionTargets(
+                SubscriptionLevel.PAID,
+                SubscriptionStatus.CANCEL_SCHEDULED,
+                TARGET_START,
+                TARGET_END,
+                PageRequest.of(0, 2)
+        );
+        List<SubscriptionExpiringSoonTarget> secondPage = subscriptionRepository.findExpiringSoonSubscriptionTargets(
+                SubscriptionLevel.PAID,
+                SubscriptionStatus.CANCEL_SCHEDULED,
+                TARGET_START,
+                TARGET_END,
+                PageRequest.of(1, 2)
+        );
+
+        assertThat(firstPage)
+                .extracting(target -> target.subscriptionId())
+                .containsExactly(firstTarget.getId(), secondTarget.getId());
+        assertThat(secondPage)
+                .extracting(target -> target.subscriptionId())
+                .containsExactly(thirdTarget.getId());
     }
 
     private Subscription saveScheduledPaid(Long subscriberId, Long creatorId, Instant periodEndAt) {
