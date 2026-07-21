@@ -17,6 +17,8 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
+import com.white.handdam.like.repository.FeedLikeRepository;
+import com.white.handdam.poll.repository.PollRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.repository.MemberRepository;
@@ -60,9 +62,11 @@ class FeedServiceTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private CategoryRepository categoryRepository;
-    @InjectMocks private FeedService feedService;
     @Mock private FeedAttachmentRepository feedAttachmentRepository;
     @Mock private ObjectStorage objectStorage;
+    @Mock private PollRepository pollRepository;
+    @Mock private FeedLikeRepository feedLikeRepository;
+    @InjectMocks private FeedService feedService;
 
     // ---------------------------------------------------------------
     // LYJ-001 피드 작성

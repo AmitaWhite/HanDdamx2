@@ -21,7 +21,7 @@ export function EngagementBar({ likeCount, commentCount, liked, onToggleLike, cl
 					liked ? "text-primary" : "text-secondary hover:text-on-surface",
 				)}
 			>
-				<Icon name={liked ? "favorite" : "favorite_border"} className="text-[20px]" />
+				<Icon name="favorite" filled={liked} className="text-[20px]" />
 				{likeCount}
 			</button>
 			<span className="flex items-center gap-1.5 text-label-md font-label-md text-secondary">
