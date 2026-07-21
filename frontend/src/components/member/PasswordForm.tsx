@@ -12,27 +12,40 @@ export function PasswordForm() {
 	const [showCurrent, setShowCurrent] = useState(false);
 	const [showNew, setShowNew] = useState(false);
 	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
+	const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+	const [formError, setFormError] = useState<string | null>(null);
 	const [saved, setSaved] = useState(false);
+
+	function clearErrors() {
+		setCurrentPasswordError(null);
+		setNewPasswordError(null);
+		setFormError(null);
+	}
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		setError(null);
+		clearErrors();
 		setSaved(false);
 		setSaving(true);
 		try {
 			await changePassword(currentPassword, newPassword);
 			setCurrentPassword("");
 			setNewPassword("");
-			setError(null);
 			setSaved(true);
 		} catch (err) {
 			const apiErr = asApiError(err);
-			setError(
-				apiErr.code === "OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD"
-					? "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."
-					: "현재 비밀번호를 확인해주세요.",
-			);
+			if (apiErr.code === "OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD") {
+				setFormError("소셜 로그인 계정은 비밀번호를 변경할 수 없습니다.");
+			} else if (apiErr.code === "INVALID_CURRENT_PASSWORD") {
+				setCurrentPasswordError("현재 비밀번호가 일치하지 않습니다.");
+			} else if (apiErr.code === "INVALID_REQUEST") {
+				setNewPasswordError(
+					"비밀번호는 영문 대문자, 소문자, 숫자, 특수문자 중 3개 이상을 포함하여 8자 이상이어야 하며, 동일한 문자를 3회 이상 연속 사용할 수 없습니다.",
+				);
+			} else {
+				setFormError(apiErr.message);
+			}
 		} finally {
 			setSaving(false);
 		}
@@ -50,9 +63,10 @@ export function PasswordForm() {
 					onChange={(e) => {
 						setCurrentPassword(e.target.value);
 						setSaved(false);
-						setError(null);
+						setCurrentPasswordError(null);
+						setFormError(null);
 					}}
-					error={error ?? undefined}
+					error={currentPasswordError ?? undefined}
 				/>
 				<button
 					type="button"
@@ -74,8 +88,10 @@ export function PasswordForm() {
 					onChange={(e) => {
 						setNewPassword(e.target.value);
 						setSaved(false);
-						setError(null);
+						setNewPasswordError(null);
+						setFormError(null);
 					}}
+					error={newPasswordError ?? undefined}
 				/>
 				<button
 					type="button"
@@ -86,6 +102,12 @@ export function PasswordForm() {
 					<Icon name={showNew ? "visibility_off" : "visibility"} className="text-[20px]" />
 				</button>
 			</div>
+
+			{formError && (
+				<p role="alert" className="rounded bg-error/10 px-4 py-3 text-label-md font-label-md text-error">
+					{formError}
+				</p>
+			)}
 
 			{saved && (
 				<p role="status" className="rounded bg-primary/10 px-4 py-3 text-label-md font-label-md text-primary">
