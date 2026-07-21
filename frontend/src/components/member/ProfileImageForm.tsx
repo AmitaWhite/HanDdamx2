@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
+import { useAuth } from "@/features/auth/AuthContext";
 import { deleteProfileImage, updateProfileImage } from "@/features/member/memberApi";
 import type { MemberProfileResponse } from "@/features/member/types";
 import { asApiError } from "@/lib/api";
@@ -27,6 +28,7 @@ function validateImageFile(file: File): string | null {
 }
 
 export function ProfileImageForm({ profile, onProfileUpdated }: ProfileImageFormProps) {
+	const { updateUser } = useAuth();
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmOpen, setConfirmOpen] = useState(false);
@@ -53,6 +55,7 @@ export function ProfileImageForm({ profile, onProfileUpdated }: ProfileImageForm
 		try {
 			const updated = await updateProfileImage(file);
 			onProfileUpdated(updated);
+			updateUser({ profileImageUrl: updated.profileImageUrl });
 		} catch (err) {
 			setError(asApiError(err).message);
 		} finally {
@@ -67,6 +70,7 @@ export function ProfileImageForm({ profile, onProfileUpdated }: ProfileImageForm
 		try {
 			const updated = await deleteProfileImage();
 			onProfileUpdated(updated);
+			updateUser({ profileImageUrl: updated.profileImageUrl });
 		} catch (err) {
 			setError(asApiError(err).message);
 		} finally {
@@ -78,7 +82,12 @@ export function ProfileImageForm({ profile, onProfileUpdated }: ProfileImageForm
 		<div className="mb-8">
 			<div className="flex items-center gap-4">
 				<div className="relative">
-					<Avatar src={profile.profileImageUrl ?? undefined} alt={profile.nickname} size={80} />
+					<Avatar
+						src={profile.profileImageUrl ?? undefined}
+						alt={profile.nickname}
+						fallbackText={profile.nickname}
+						size={80}
+					/>
 					<button
 						type="button"
 						onClick={openFilePicker}

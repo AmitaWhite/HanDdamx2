@@ -136,7 +136,11 @@ export function MyPage() {
           {roleBadge.label}
         </span>
 
-				<Avatar src={summary.profileImageUrl ?? undefined} size={140} />
+				<Avatar
+					src={summary.profileImageUrl ?? undefined}
+					fallbackText={summary.nickname}
+					size={140}
+				/>
 				<div className="min-w-0">
 					<p className="text-[29px] font-display font-semibold text-on-surface">{summary.nickname}</p>
 				</div>

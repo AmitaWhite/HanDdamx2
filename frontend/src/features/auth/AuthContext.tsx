@@ -14,6 +14,8 @@ interface AuthContextValue {
 	/** 구글 OAuth 콜백에서 refresh 쿠키로 access token 확보 */
 	completeOAuth: () => Promise<void>;
 	logout: () => Promise<void>;
+	// 프로필 수정 등 accessToken 재발급 없이 user 표시 정보(닉네임/이미지)만 즉시 반영할 때 사용
+	updateUser: (patch: Partial<Pick<AuthUser, "nickname" | "profileImageUrl">>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
-	// 닉네임(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
+	// 닉네임/프로필 이미지(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
 	// cleanup 가드: 계정 전환 등으로 accessToken이 바뀌면 이전 요청의 결과는 무시한다(레이스 컨디션 방지).
 	useEffect(() => {
 		if (!accessToken) return;
@@ -61,7 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		getMyProfile()
 			.then((profile) => {
 				if (cancelled) return;
-				setUser((prev) => (prev ? { ...prev, nickname: profile.nickname } : prev));
+				setUser((prev) =>
+					prev
+						? { ...prev, nickname: profile.nickname, profileImageUrl: profile.profileImageUrl }
+						: prev,
+				);
 			})
 			.catch(() => {});
 		return () => {
@@ -94,6 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	const updateUser = useCallback(
+		(patch: Partial<Pick<AuthUser, "nickname" | "profileImageUrl">>) => {
+			setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+		},
+		[],
+	);
+
 	const value: AuthContextValue = {
 		accessToken,
 		user,
@@ -101,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		login,
 		completeOAuth,
 		logout,
+		updateUser,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

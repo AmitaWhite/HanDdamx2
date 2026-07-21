@@ -7,7 +7,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 
 /** 헤더 우측 아바타 클릭 시 열리는 프로필 드롭다운(마이페이지/로그아웃). 시안엔 없어 새로 설계. */
 export function ProfileMenu() {
-	const { logout } = useAuth();
+	const { user, logout } = useAuth();
 	const navigate = useNavigate();
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -42,7 +42,12 @@ export function ProfileMenu() {
 				aria-expanded={open}
 				onClick={() => setOpen((v) => !v)}
 			>
-				<Avatar size={36} className="ring-1 ring-outline-variant" />
+				<Avatar
+					src={user?.profileImageUrl ?? undefined}
+					fallbackText={user?.nickname}
+					size={36}
+					className="ring-1 ring-outline-variant"
+				/>
 			</button>
 
 			{open && (
