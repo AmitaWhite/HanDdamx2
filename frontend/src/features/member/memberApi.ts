@@ -1,20 +1,8 @@
-import { http, unwrap } from "@/lib/api";
+import { ensureFreshAccessToken, http, unwrap, unwrapVoid } from "@/lib/api";
+import type { MemberProfileResponse, MemberSummaryResponse } from "./types";
 
-/**
- * 백엔드 MemberProfileResponse (com.white.handdam.member.dto.response.MemberProfileResponse)
- * 표시용 필드만 정의 — role/memberId는 JWT로 이미 확보하므로 여기선 닉네임 보강 목적으로만 쓴다.
- */
-export interface MemberProfileResponse {
-	id: number;
-	email: string;
-	nickname: string;
-	profileImageUrl: string | null;
-}
 
-/**
- * 내 프로필 조회.
- * 백엔드: GET /api/members/me
- */
+// KSY-014: 내 프로필 조회
 export function getMyProfile() {
 	return unwrap<MemberProfileResponse>(http.get("/members/me"));
 }
@@ -35,5 +23,39 @@ export interface MemberPublicProfileResponse {
 export function getMemberPublicProfile(memberId: number) {
 	return unwrap<MemberPublicProfileResponse>(
 		http.get(`/members/${memberId}`),
+	);
+}
+
+// KSY-016: 닉네임 변경
+export function updateMyProfile(nickname: string) {
+	return unwrap<MemberProfileResponse>(http.patch("/members/me", { nickname }));
+}
+
+// KSY-017: 프로필 이미지 변경
+export async function updateProfileImage(image: File) {
+	await ensureFreshAccessToken();
+
+	const formData = new FormData();
+	formData.append("image", image, image.name);
+
+	return unwrap<MemberProfileResponse>(
+		http.patch("/members/me/profile-image", formData),
+	);
+}
+
+// KSY-018: 프로필 이미지 제거
+export function deleteProfileImage() {
+	return unwrap<MemberProfileResponse>(http.delete("/members/me/profile-image"));
+}
+
+// KSY-015: 내 활동 요약 (마이페이지 프로필 카드)
+export function getMySummary() {
+	return unwrap<MemberSummaryResponse>(http.get("/members/me/summary"));
+}
+
+// KSY-011: 비밀번호 변경
+export async function changePassword(currentPassword: string, newPassword: string) {
+	await unwrapVoid(
+		http.patch("/members/me/password", { currentPassword, newPassword }),
 	);
 }
