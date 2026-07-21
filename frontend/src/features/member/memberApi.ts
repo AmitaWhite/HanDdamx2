@@ -34,11 +34,7 @@ export function getMySummary() {
 	return unwrap<MemberSummaryResponse>(http.get("/members/me/summary"));
 }
 
-/**
- * 비밀번호 변경.
- * 백엔드: PATCH /members/me/password
- * OAuth 가입자(oauthProvider !== "NONE")가 호출하면 OAUTH_MEMBER_CANNOT_CHANGE_PASSWORD 에러.
- */
+// KSY-011: 비밀번호 변경
 export async function changePassword(currentPassword: string, newPassword: string) {
 	await unwrapVoid(
 		http.patch("/members/me/password", { currentPassword, newPassword }),
