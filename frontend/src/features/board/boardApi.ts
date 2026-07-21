@@ -40,6 +40,7 @@ export interface BoardPostResponse {
 	id: number;
 	creatorId: number;
 	memberId: number;
+	memberNickname: string;
 	title: string;
 	type: BoardPostType;
 	content: string;
@@ -296,4 +297,68 @@ export function updateBoardAnswer(answerId: number, content: string) {
  */
 export async function deleteBoardAnswer(answerId: number) {
 	await unwrapVoid(http.delete(`/board-answers/${answerId}`));
+}
+
+/** 백엔드 BoardCommentResponse (트리: 최상위 + replies) */
+export interface BoardCommentResponse {
+	id: number;
+	boardPostId: number;
+	memberId: number;
+	memberNickname: string;
+	parentCommentId: number | null;
+	depth: number;
+	content: string;
+	deleted: boolean;
+	createdAt: string;
+	updatedAt: string;
+	deletedAt: string | null;
+	replies: BoardCommentResponse[];
+}
+
+/**
+ * 게시글 댓글·대댓글 목록 조회 (LDJ-012).
+ * 백엔드: GET /api/premium-board/posts/{postId}/comments
+ */
+export function getBoardComments(postId: number) {
+	return unwrap<BoardCommentResponse[]>(
+		http.get(`/premium-board/posts/${postId}/comments`),
+	);
+}
+
+/**
+ * 일반 댓글 작성 (LDJ-013).
+ * 백엔드: POST /api/premium-board/posts/{postId}/comments
+ */
+export function createBoardComment(postId: number, content: string) {
+	return unwrap<BoardCommentResponse>(
+		http.post(`/premium-board/posts/${postId}/comments`, { content }),
+	);
+}
+
+/**
+ * 대댓글 작성 (LDJ-014).
+ * 백엔드: POST /api/board-comments/{commentId}/replies
+ */
+export function createBoardCommentReply(commentId: number, content: string) {
+	return unwrap<BoardCommentResponse>(
+		http.post(`/board-comments/${commentId}/replies`, { content }),
+	);
+}
+
+/**
+ * 댓글·대댓글 수정 (LDJ-015).
+ * 백엔드: PATCH /api/board-comments/{commentId}
+ */
+export function updateBoardComment(commentId: number, content: string) {
+	return unwrap<BoardCommentResponse>(
+		http.patch(`/board-comments/${commentId}`, { content }),
+	);
+}
+
+/**
+ * 댓글·대댓글 소프트 삭제 (LDJ-016).
+ * 백엔드: DELETE /api/board-comments/{commentId}
+ */
+export async function deleteBoardComment(commentId: number) {
+	await unwrapVoid(http.delete(`/board-comments/${commentId}`));
 }

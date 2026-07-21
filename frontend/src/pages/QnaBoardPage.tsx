@@ -118,7 +118,7 @@ export function QnaBoardPage() {
 				title: post.title,
 				status: post.status === "ANSWERED" ? "answered" : "pending",
 				category: TYPE_TO_CATEGORY[post.type],
-				authorName: `회원 #${post.memberId}`, // 백엔드에 닉네임 필드 확장 시 교체
+				authorName: post.memberNickname,
 				commentCount: 0, // 백엔드 확장 예정
 				createdAtLabel: toRelativeLabel(post.createdAt),
 			}))

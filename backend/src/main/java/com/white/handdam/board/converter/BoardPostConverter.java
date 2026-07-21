@@ -12,14 +12,19 @@ public final class BoardPostConverter {
 	}
 
 	public static BoardPostResponse toResponse(BoardPost post) {
-		return toResponse(post, List.of());
+		return toResponse(post, List.of(), "알 수 없음");
 	}
 
 	public static BoardPostResponse toResponse(BoardPost post, List<BoardPostImage> images) {
+		return toResponse(post, images, "알 수 없음");
+	}
+
+	public static BoardPostResponse toResponse(BoardPost post, List<BoardPostImage> images, String memberNickname) {
 		return new BoardPostResponse(
 			post.getId(),
 			post.getCreatorId(),
 			post.getMemberId(),
+			memberNickname,
 			post.getTitle(),
 			post.getType(),
 			post.getContent(),

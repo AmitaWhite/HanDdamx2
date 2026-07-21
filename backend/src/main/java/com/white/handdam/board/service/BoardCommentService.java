@@ -11,6 +11,9 @@ import com.white.handdam.board.repository.BoardCommentRepository;
 import com.white.handdam.board.repository.BoardPostRepository;
 import com.white.handdam.global.exception.CustomException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ public class BoardCommentService {
 	private final BoardPostRepository boardPostRepository;
 	private final BoardCommentRepository boardCommentRepository;
 	private final BoardPostService boardPostService;
+	private final BoardMemberNicknameResolver nicknameResolver;
 
 	/**
 	 * 게시글 댓글·대댓글 목록 조회 (BOARD-013, BOARD-014, BOARD-018).
@@ -41,7 +45,11 @@ public class BoardCommentService {
 
 		List<BoardComment> comments =
 			boardCommentRepository.findByBoardPostIdOrderByCreatedAtAsc(postId);
-		return BoardCommentConverter.toTree(comments);
+		Set<Long> memberIds = comments.stream()
+			.map(BoardComment::getMemberId)
+			.collect(Collectors.toSet());
+		Map<Long, String> nicknameMap = nicknameResolver.resolveAll(memberIds);
+		return BoardCommentConverter.toTree(comments, nicknameMap);
 	}
 
 	/**
@@ -73,7 +81,11 @@ public class BoardCommentService {
 			.build();
 
 		BoardComment saved = boardCommentRepository.save(comment);
-		return BoardCommentConverter.toResponse(saved, List.of());
+		return BoardCommentConverter.toResponse(
+			saved,
+			List.of(),
+			Map.of(saved.getMemberId(), nicknameResolver.resolve(requesterId))
+		);
 	}
 
 	/**
@@ -116,7 +128,11 @@ public class BoardCommentService {
 			.build();
 
 		BoardComment saved = boardCommentRepository.save(reply);
-		return BoardCommentConverter.toResponse(saved, List.of());
+		return BoardCommentConverter.toResponse(
+			saved,
+			List.of(),
+			Map.of(saved.getMemberId(), nicknameResolver.resolve(requesterId))
+		);
 	}
 
 	/**
@@ -142,7 +158,11 @@ public class BoardCommentService {
 		boardPostService.assertCanWriteOnPost(comment.getBoardPost(), requesterId);
 		comment.updateContent(request.content());
 
-		return BoardCommentConverter.toResponse(comment, List.of());
+		return BoardCommentConverter.toResponse(
+			comment,
+			List.of(),
+			Map.of(comment.getMemberId(), nicknameResolver.resolve(comment.getMemberId()))
+		);
 	}
 
 	/**

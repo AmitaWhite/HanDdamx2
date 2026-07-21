@@ -7,6 +7,7 @@ public record BoardCommentResponse(
 	Long id,
 	Long boardPostId,
 	Long memberId,
+	String memberNickname,
 	Long parentCommentId,
 	short depth,
 	String content,

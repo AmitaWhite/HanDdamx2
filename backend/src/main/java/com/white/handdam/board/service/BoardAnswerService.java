@@ -151,11 +151,12 @@ public class BoardAnswerService {
 	}
 
 	/**
-	 * 공식 답변 수정·삭제: 해당 답변을 작성한 크리에이터만 허용.
+	 * 공식 답변 수정·삭제: 게시판 소유 크리에이터만 허용.
+	 * (answer.creatorId 가 아닌 board_post.creator_id 기준)
 	 */
 	void assertCanEditAnswer(BoardAnswer answer, Long requesterId) {
 		BoardOwnershipAsserter.assertOwner(
-			answer.getCreatorId(),
+			answer.getBoardPost().getCreatorId(),
 			requesterId,
 			BoardErrorCode.BOARD_ANSWER_EDIT_FORBIDDEN
 		);

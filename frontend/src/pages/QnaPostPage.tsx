@@ -13,16 +13,22 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useSubmitState } from "@/features/auth/useSubmitState";
 import {
 	type BoardAnswerResponse,
+	type BoardCommentResponse,
 	type BoardPostResponse,
 	type BoardPostType,
 	addPremiumBoardPostImages,
 	createBoardAnswer,
+	createBoardComment,
+	createBoardCommentReply,
 	deleteBoardAnswer,
+	deleteBoardComment,
 	deletePremiumBoardPost,
 	deletePremiumBoardPostImage,
 	getBoardAnswer,
+	getBoardComments,
 	getPremiumBoardPost,
 	updateBoardAnswer,
+	updateBoardComment,
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
 import { ApiError } from "@/lib/api";
@@ -65,6 +71,78 @@ function toRelativeLabel(iso: string): string {
 	return `${Math.floor(days / 7)}주 전`;
 }
 
+function countComments(comments: BoardCommentResponse[]): number {
+	return comments.reduce(
+		(sum, c) => sum + 1 + (c.replies?.length ?? 0),
+		0,
+	);
+}
+
+function upsertRootComment(
+	list: BoardCommentResponse[],
+	comment: BoardCommentResponse,
+): BoardCommentResponse[] {
+	const idx = list.findIndex((c) => c.id === comment.id);
+	if (idx < 0) {
+		return [...list, { ...comment, replies: comment.replies ?? [] }];
+	}
+	const next = [...list];
+	next[idx] = {
+		...comment,
+		replies: comment.replies ?? next[idx].replies ?? [],
+	};
+	return next;
+}
+
+function markCommentDeleted(
+	list: BoardCommentResponse[],
+	commentId: number,
+): BoardCommentResponse[] {
+	return list.map((c) => {
+		if (c.id === commentId) {
+			return { ...c, deleted: true, content: "삭제된 댓글입니다." };
+		}
+		return {
+			...c,
+			replies: (c.replies ?? []).map((r) =>
+				r.id === commentId
+					? { ...r, deleted: true, content: "삭제된 댓글입니다." }
+					: r,
+			),
+		};
+	});
+}
+
+function appendReply(
+	list: BoardCommentResponse[],
+	parentId: number,
+	reply: BoardCommentResponse,
+): BoardCommentResponse[] {
+	return list.map((c) =>
+		c.id === parentId
+			? { ...c, replies: [...(c.replies ?? []), reply] }
+			: c,
+	);
+}
+
+function replaceCommentContent(
+	list: BoardCommentResponse[],
+	commentId: number,
+	content: string,
+): BoardCommentResponse[] {
+	return list.map((c) => {
+		if (c.id === commentId) {
+			return { ...c, content };
+		}
+		return {
+			...c,
+			replies: (c.replies ?? []).map((r) =>
+				r.id === commentId ? { ...r, content } : r,
+			),
+		};
+	});
+}
+
 /** 숫자 postId → 실API(LDJ-003~005, 007~011), 그 외 → 기존 mock UI */
 export function QnaPostPage() {
 	const { postId = "" } = useParams();
@@ -83,6 +161,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 
 	const [post, setPost] = useState<BoardPostResponse | null>(null);
 	const [answer, setAnswer] = useState<BoardAnswerResponse | null>(null);
+	const [comments, setComments] = useState<BoardCommentResponse[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const imageUploadFailed =
@@ -96,6 +175,12 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 
 	const [answerDraft, setAnswerDraft] = useState("");
 	const [answerEditing, setAnswerEditing] = useState(false);
+
+	const [commentDraft, setCommentDraft] = useState("");
+	const [replyToId, setReplyToId] = useState<number | null>(null);
+	const [replyDraft, setReplyDraft] = useState("");
+	const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+	const [editingCommentDraft, setEditingCommentDraft] = useState("");
 
 	const {
 		loading: saving,
@@ -117,6 +202,11 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		error: answerError,
 		run: runAnswer,
 	} = useSubmitState("공식 답변 처리에 실패했습니다. 다시 시도해 주세요.");
+	const {
+		loading: commentBusy,
+		error: commentError,
+		run: runComment,
+	} = useSubmitState("댓글 처리에 실패했습니다. 다시 시도해 주세요.");
 
 	useEffect(() => {
 		let cancelled = false;
@@ -126,11 +216,13 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		Promise.all([
 			getPremiumBoardPost(postId),
 			getBoardAnswer(postId).catch(() => null),
+			getBoardComments(postId).catch(() => [] as BoardCommentResponse[]),
 		])
-			.then(([data, answerData]) => {
+			.then(([data, answerData, commentData]) => {
 				if (cancelled) return;
 				setPost(data);
 				setAnswer(answerData);
+				setComments(commentData);
 				setEditTitle(data.title);
 				setEditType(data.type);
 				setEditContent(data.content);
@@ -145,6 +237,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 				);
 				setPost(null);
 				setAnswer(null);
+				setComments([]);
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
@@ -156,11 +249,12 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 	}, [postId]);
 
 	const isAuthor = !!user && !!post && user.memberId === post.memberId;
+	/** 게시판 소유 크리에이터만 공식 답변 작성·수정·삭제 */
 	const isBoardOwner = !!user && !!post && user.memberId === post.creatorId;
 	const canEdit = isAuthor && post?.status === "WAITING";
 	const canWriteAnswer = isBoardOwner && post?.status === "WAITING" && !answer;
-	const canManageAnswer =
-		!!user && !!answer && user.memberId === answer.creatorId;
+	const canManageAnswer = isBoardOwner && !!answer;
+	const canWriteComment = !!user;
 
 	function startEdit() {
 		if (!post) return;
@@ -288,6 +382,219 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		}
 	}
 
+	/** LDJ-013: 일반 댓글 작성 */
+	async function onCreateComment() {
+		const content = commentDraft.trim();
+		if (!content) return;
+		const created = await runComment(() => createBoardComment(postId, content));
+		if (created) {
+			setComments((prev) => upsertRootComment(prev, created));
+			setCommentDraft("");
+		}
+	}
+
+	/** LDJ-014: 대댓글 작성 */
+	async function onCreateReply(parentId: number) {
+		const content = replyDraft.trim();
+		if (!content) return;
+		const created = await runComment(() =>
+			createBoardCommentReply(parentId, content),
+		);
+		if (created) {
+			setComments((prev) => appendReply(prev, parentId, created));
+			setReplyToId(null);
+			setReplyDraft("");
+		}
+	}
+
+	/** LDJ-015: 댓글·대댓글 수정 */
+	async function onUpdateComment(commentId: number) {
+		const content = editingCommentDraft.trim();
+		if (!content) return;
+		const updated = await runComment(() =>
+			updateBoardComment(commentId, content),
+		);
+		if (updated) {
+			setComments((prev) =>
+				replaceCommentContent(prev, commentId, updated.content),
+			);
+			setEditingCommentId(null);
+			setEditingCommentDraft("");
+		}
+	}
+
+	/** LDJ-016: 댓글·대댓글 삭제 */
+	async function onDeleteComment(commentId: number) {
+		if (!window.confirm("이 댓글을 삭제할까요?")) return;
+		const ok = await runComment(async () => {
+			await deleteBoardComment(commentId);
+			return true;
+		});
+		if (ok) {
+			setComments((prev) => markCommentDeleted(prev, commentId));
+			if (editingCommentId === commentId) {
+				setEditingCommentId(null);
+				setEditingCommentDraft("");
+			}
+			if (replyToId === commentId) {
+				setReplyToId(null);
+				setReplyDraft("");
+			}
+		}
+	}
+
+	function renderCommentItem(
+		comment: BoardCommentResponse,
+		isReply = false,
+	) {
+		const mine = !!user && user.memberId === comment.memberId;
+		const editingThis = editingCommentId === comment.id;
+
+		return (
+			<div key={comment.id} className={isReply ? "ml-10 mt-3" : ""}>
+				<div className="flex gap-3">
+					<Avatar size={isReply ? 28 : 32} />
+					<div className="min-w-0 flex-1">
+						<div className="flex flex-wrap items-center gap-2">
+							<span className="text-label-md font-label-md text-on-surface">
+								{comment.memberNickname}
+							</span>
+							<span className="text-caption font-caption text-secondary">
+								{toRelativeLabel(comment.createdAt)}
+							</span>
+						</div>
+
+						{editingThis ? (
+							<div className="mt-2 flex flex-col gap-2">
+								<textarea
+									value={editingCommentDraft}
+									onChange={(e) => setEditingCommentDraft(e.target.value)}
+									rows={3}
+									maxLength={1000}
+									className="w-full resize-y rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-body-md focus:border-on-surface focus:outline-none focus:ring-1 focus:ring-on-surface"
+								/>
+								<div className="flex gap-2">
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										disabled={commentBusy}
+										onClick={() => {
+											setEditingCommentId(null);
+											setEditingCommentDraft("");
+										}}
+									>
+										취소
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										disabled={commentBusy}
+										onClick={() => onUpdateComment(comment.id)}
+									>
+										{commentBusy ? "저장 중…" : "저장"}
+									</Button>
+								</div>
+							</div>
+						) : (
+							<p
+								className={
+									"mt-1 text-body-md " +
+									(comment.deleted
+										? "italic text-secondary"
+										: "text-on-surface")
+								}
+							>
+								{comment.deleted ? "삭제된 댓글입니다." : comment.content}
+							</p>
+						)}
+
+						{!comment.deleted && !editingThis && (
+							<div className="mt-1.5 flex flex-wrap gap-3">
+								{!isReply && canWriteComment && (
+									<button
+										type="button"
+										className="text-caption font-caption text-secondary hover:text-primary"
+										onClick={() => {
+											setReplyToId(comment.id);
+											setReplyDraft("");
+											setEditingCommentId(null);
+										}}
+									>
+										답글
+									</button>
+								)}
+								{mine && (
+									<>
+										<button
+											type="button"
+											className="text-caption font-caption text-secondary hover:text-primary"
+											onClick={() => {
+												setEditingCommentId(comment.id);
+												setEditingCommentDraft(comment.content);
+												setReplyToId(null);
+											}}
+										>
+											수정
+										</button>
+										<button
+											type="button"
+											className="text-caption font-caption text-secondary hover:text-primary"
+											disabled={commentBusy}
+											onClick={() => onDeleteComment(comment.id)}
+										>
+											삭제
+										</button>
+									</>
+								)}
+							</div>
+						)}
+
+						{!isReply && replyToId === comment.id && (
+							<div className="mt-3 flex items-start gap-2">
+								<input
+									value={replyDraft}
+									onChange={(e) => setReplyDraft(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											void onCreateReply(comment.id);
+										}
+									}}
+									placeholder="답글을 입력하세요"
+									maxLength={1000}
+									className="h-10 flex-1 rounded-full border border-outline-variant bg-surface-container-low px-4 text-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+								/>
+								<Button
+									size="sm"
+									variant="secondary"
+									disabled={commentBusy}
+									onClick={() => {
+										setReplyToId(null);
+										setReplyDraft("");
+									}}
+								>
+									취소
+								</Button>
+								<Button
+									size="sm"
+									disabled={commentBusy}
+									onClick={() => onCreateReply(comment.id)}
+								>
+									등록
+								</Button>
+							</div>
+						)}
+					</div>
+				</div>
+
+				{(comment.replies ?? []).map((reply) =>
+					renderCommentItem(reply, true),
+				)}
+			</div>
+		);
+	}
+
 	if (loading) {
 		return (
 			<div className="container-page max-w-2xl py-10 text-center text-body-md text-secondary">
@@ -320,13 +627,19 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 				Q&A 게시판
 			</Link>
 
-			{(saveError || deleteError || imageError || answerError || imageUploadFailed) && (
+			{(saveError ||
+				deleteError ||
+				imageError ||
+				answerError ||
+				commentError ||
+				imageUploadFailed) && (
 				<div className="mb-4">
 					<Alert>
 						{saveError ??
 							deleteError ??
 							imageError ??
 							answerError ??
+							commentError ??
 							"글은 등록됐지만 이미지가 저장되지 않았습니다. 아래에서 다시 추가해 주세요."}
 					</Alert>
 				</div>
@@ -479,7 +792,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 					</h1>
 					<div className="mb-5 flex items-center gap-2 text-caption font-caption text-secondary">
 						<Avatar size={24} />
-						회원 #{post.memberId} · {toRelativeLabel(post.createdAt)}
+						{post.memberNickname} · {toRelativeLabel(post.createdAt)}
 					</div>
 					<div className="mb-5 whitespace-pre-wrap text-body-md text-on-surface">
 						{post.content}
@@ -600,6 +913,56 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						{answerBusy ? "등록 중…" : "답변 등록"}
 					</Button>
 				</form>
+			)}
+
+			{/* LDJ-012~016: 댓글·대댓글 */}
+			{!editing && (
+				<section className="mt-10">
+					<h2 className="mb-4 text-label-md font-label-md text-on-surface">
+						댓글 {countComments(comments)}
+					</h2>
+
+					{comments.length === 0 ? (
+						<p className="mb-5 text-body-md text-secondary">
+							아직 댓글이 없습니다.
+						</p>
+					) : (
+						<div className="mb-5 flex flex-col gap-5">
+							{comments.map((c) => renderCommentItem(c))}
+						</div>
+					)}
+
+					{canWriteComment ? (
+						<div className="flex items-center gap-3">
+							<Avatar size={32} />
+							<input
+								value={commentDraft}
+								onChange={(e) => setCommentDraft(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										e.preventDefault();
+										void onCreateComment();
+									}
+								}}
+								placeholder="댓글을 입력하세요"
+								maxLength={1000}
+								disabled={commentBusy}
+								className="h-11 flex-1 rounded-full border border-outline-variant bg-surface-container-low px-4 text-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+							/>
+							<Button
+								size="sm"
+								disabled={commentBusy}
+								onClick={() => void onCreateComment()}
+							>
+								{commentBusy ? "등록 중…" : "등록"}
+							</Button>
+						</div>
+					) : (
+						<p className="text-body-md text-secondary">
+							댓글을 작성하려면 로그인해 주세요.
+						</p>
+					)}
+				</section>
 			)}
 		</div>
 	);

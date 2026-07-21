@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -45,8 +46,17 @@ class BoardCommentServiceTest {
 	@Mock
 	private BoardPostService boardPostService;
 
+	@Mock
+	private BoardMemberNicknameResolver nicknameResolver;
+
 	@InjectMocks
 	private BoardCommentService boardCommentService;
+
+	@org.junit.jupiter.api.BeforeEach
+	void setUp() {
+		lenient().when(nicknameResolver.resolve(any())).thenReturn("테스트유저");
+		lenient().when(nicknameResolver.resolveAll(any())).thenReturn(java.util.Map.of());
+	}
 
 	@Test
 	@DisplayName("접근 가능한 사용자는 댓글·대댓글 트리를 조회할 수 있다")
