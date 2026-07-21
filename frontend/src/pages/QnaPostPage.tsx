@@ -209,29 +209,6 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		run: runComment,
 	} = useSubmitState("댓글 처리에 실패했습니다. 다시 시도해 주세요.");
 
-	const [comments, setComments] = useState<BoardCommentResponse[]>([]);
-	const [commentsLoading, setCommentsLoading] = useState(true);
-
-	useEffect(() => {
-		let cancelled = false;
-		setCommentsLoading(true);
-
-		getBoardComments(postId)
-			.then((data) => {
-				if (!cancelled) setComments(data);
-			})
-			.catch(() => {
-				if (!cancelled) setComments([]);
-			})
-			.finally(() => {
-				if (!cancelled) setCommentsLoading(false);
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [postId]);
-
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
