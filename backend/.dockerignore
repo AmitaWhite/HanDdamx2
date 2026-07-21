@@ -1,4 +1,9 @@
 # 이미지에는 CI가 미리 빌드한 실행 JAR만 필요하다.
 # 소스/그래들 캐시/로그를 컨텍스트에서 제외해 전송을 가볍게 한다.
 *
+# 레거시 docker build(non-BuildKit)는 부모 디렉터리가 제외되면 그 안의 파일 하나만
+# 예외로 되살릴 수 없다. 현재 BuildKit에서는 문제없이 동작하지만, 명시적으로
+# build/, build/libs/ 도 함께 예외 처리해 두면 더 안전하다.
+!build
+!build/libs
 !build/libs/app.jar

@@ -7,8 +7,12 @@
 #
 # 사용:
 #   서버(OCI)에서만 사용한다. 로컬 개발은 기존 docker-compose.yml 을 쓴다.
-#   $ docker compose -f docker-compose.deploy.yml pull
-#   $ docker compose -f docker-compose.deploy.yml up -d
+#   $ docker compose -f docker-compose.deploy.yml --env-file .env.deploy pull
+#   $ docker compose -f docker-compose.deploy.yml --env-file .env.deploy up -d
+#
+#   주의: docker compose는 정확히 ".env" 라는 파일만 자동으로 읽는다. 이 파일은
+#   의도적으로 이름을 ".env.deploy" 로 다르게 지었으므로, --env-file 을 빼먹으면
+#   SITE_DOMAIN 등이 빈 값으로 치환되어(예: caddy 라우팅이 깨짐) 조용히 실패한다.
 #
 # 값 주입:
 #   - 앱 시크릿/외부 키는 같은 폴더의 .env.deploy 에서 주입한다(git 미추적).

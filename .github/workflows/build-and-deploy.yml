@@ -137,6 +137,9 @@ jobs:
   deploy:
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
@@ -144,14 +147,19 @@ jobs:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          envs: GHCR_ACTOR,GHCR_TOKEN
           script: |
             set -e
             cd ~/handdam
             # 서버는 이 리포의 git clone 이다. 최신 compose/Caddy 설정을 가져온다.
-            # (.env.deploy 는 git 미추적이라 덮어써지지 않는다. clone 이 아니면 이 줄은 무시된다.)
-            git pull --ff-only || true
-            # GHCR 패키지가 private 이면 아래 한 줄의 주석을 풀고 GHCR_PAT 시크릿을 사용:
-            # echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose -f docker-compose.deploy.yml pull
-            docker compose -f docker-compose.deploy.yml up -d
+            # (.env.deploy 는 git 미추적이라 덮어써지지 않는다.)
+            git pull --ff-only
+            # GHCR 패키지가 private 이어도 이 job에 발급된 GITHUB_TOKEN으로 pull 인증.
+            # (별도 PAT/패키지 공개 전환 불필요)
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+            docker compose -f docker-compose.deploy.yml --env-file .env.deploy pull
+            docker compose -f docker-compose.deploy.yml --env-file .env.deploy up -d
             docker image prune -f
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
