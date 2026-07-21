@@ -22,6 +22,12 @@ export default defineConfig({
 				target: "http://localhost:8080",
 				changeOrigin: true,
 			},
+			// SockJS/STOMP (채팅·알림) — backendOrigin이 빈 문자열일 때 /ws 로 접속
+			"/ws": {
+				target: "http://localhost:8080",
+				changeOrigin: true,
+				ws: true,
+			},
 		},
 	},
 });
