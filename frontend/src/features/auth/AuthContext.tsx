@@ -40,13 +40,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	});
 
 	// 닉네임(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
+	// cleanup 가드: 계정 전환 등으로 accessToken이 바뀌면 이전 요청의 결과는 무시한다(레이스 컨디션 방지).
 	useEffect(() => {
 		if (!accessToken) return;
+		let cancelled = false;
 		getMyProfile()
 			.then((profile) => {
+				if (cancelled) return;
 				setUser((prev) => (prev ? { ...prev, nickname: profile.nickname } : prev));
 			})
 			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
 	}, [accessToken]);
 
 	const login = useCallback(async (email: string, password: string) => {

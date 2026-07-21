@@ -23,6 +23,7 @@ import {
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
 import { ApiError } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/relativeTime";
 import { commentsFor } from "@/mocks/comments";
 import { mockImg } from "@/mocks/helpers";
 import { findQnaPost, mockQnaAnswers, type QnaCategory } from "@/mocks/qna";
@@ -47,19 +48,6 @@ function toNumericPostId(value: string): number | null {
 	if (!value) return null;
 	const n = Number(value);
 	return Number.isInteger(n) && n > 0 ? n : null;
-}
-
-function toRelativeLabel(iso: string): string {
-	const diffMs = Date.now() - new Date(iso).getTime();
-	if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
-	const minutes = Math.floor(diffMs / 60_000);
-	if (minutes < 1) return "방금";
-	if (minutes < 60) return `${minutes}분 전`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}시간 전`;
-	const days = Math.floor(hours / 24);
-	if (days < 7) return `${days}일 전`;
-	return `${Math.floor(days / 7)}주 전`;
 }
 
 /** 숫자 postId → 실API(LDJ-003~005, 007~008), 그 외 → 기존 mock UI */
@@ -433,7 +421,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 					</h1>
 					<div className="mb-5 flex items-center gap-2 text-caption font-caption text-secondary">
 						<Avatar size={24} />
-						회원 #{post.memberId} · {toRelativeLabel(post.createdAt)}
+						회원 #{post.memberId} · {formatRelativeTime(post.createdAt)}
 					</div>
 					<div className="mb-5 whitespace-pre-wrap text-body-md text-on-surface">
 						{post.content}
@@ -508,7 +496,7 @@ function CommentRow({
 						{comment.content}
 					</p>
 					<p className="text-caption font-caption text-secondary">
-						{toRelativeLabel(comment.createdAt)}
+						{formatRelativeTime(comment.createdAt)}
 					</p>
 				</div>
 			</div>

@@ -12,6 +12,7 @@ import {
 } from "@/features/board/boardApi";
 import { useSubscriptionAccess } from "@/features/subscription/useSubscriptionAccess";
 import { ApiError } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/relativeTime";
 import { findCreator } from "@/mocks/creators";
 import { mockQnaPosts, type QnaCategory } from "@/mocks/qna";
 
@@ -49,21 +50,6 @@ function toNumericCreatorId(value: string): number | null {
 	if (!value) return null;
 	const n = Number(value);
 	return Number.isInteger(n) && n > 0 ? n : null;
-}
-
-/** ISO 문자열 → "n분/시간/일 전" 간단 라벨. */
-function toRelativeLabel(iso: string): string {
-	const diffMs = Date.now() - new Date(iso).getTime();
-	if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
-	const minutes = Math.floor(diffMs / 60_000);
-	if (minutes < 1) return "방금";
-	if (minutes < 60) return `${minutes}분 전`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}시간 전`;
-	const days = Math.floor(hours / 24);
-	if (days < 7) return `${days}일 전`;
-	const weeks = Math.floor(days / 7);
-	return `${weeks}주 전`;
 }
 
 export function QnaBoardPage() {
@@ -125,7 +111,7 @@ export function QnaBoardPage() {
 				category: TYPE_TO_CATEGORY[post.type],
 				authorName: `회원 #${post.memberId}`, // 백엔드에 닉네임 필드 확장 시 교체
 				commentCount: 0, // 백엔드 확장 예정
-				createdAtLabel: toRelativeLabel(post.createdAt),
+				createdAtLabel: formatRelativeTime(post.createdAt),
 			}))
 		: mockQnaPosts
 				.filter((q) => q.creatorId === creator.id)

@@ -33,6 +33,12 @@ export function useSubscriptionAccess(
 			setHasActivePaidSubscription(false);
 			return;
 		}
+		// 비로그인 — 구독 상태를 알 수 없으니 API 호출 없이 fail-closed.
+		if (!user) {
+			setLoading(false);
+			setHasActivePaidSubscription(false);
+			return;
+		}
 
 		let cancelled = false;
 		setLoading(true);
@@ -51,7 +57,8 @@ export function useSubscriptionAccess(
 		return () => {
 			cancelled = true;
 		};
-	}, [creatorId, isCreator]);
+		// user?.memberId를 넣어 로그인/로그아웃·계정 전환 시 재조회한다(isCreator만으로는 감지 못하는 케이스가 있음).
+	}, [creatorId, isCreator, user?.memberId]);
 
 	return { loading, isCreator, hasActivePaidSubscription };
 }
