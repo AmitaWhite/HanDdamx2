@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { createContext, useCallback, useContext, useState } from "react";
-import { tokenStore } from "@/lib/api";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { decodeJwtPayload, tokenStore } from "@/lib/api";
+import { getMyProfile } from "@/features/member/memberApi";
 import { loginRequest, logoutRequest, refreshRequest } from "./authApi";
-import type { AuthUser } from "./types";
+import type { AuthUser, Role } from "./types";
 
 interface AuthContextValue {
 	accessToken: string | null;
@@ -17,11 +18,42 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * accessToken(JWT)의 sub/role 클레임에서 memberId/role을 동기적으로 복원.
+ * 닉네임은 JWT에 없어 여기선 채우지 않는다 — 표시용이라 비동기(getMyProfile)로 나중에 보강.
+ */
+function userFromToken(token: string): AuthUser | null {
+	const claims = decodeJwtPayload(token);
+	if (!claims?.sub || !claims.role) return null;
+	const memberId = Number(claims.sub);
+	if (Number.isNaN(memberId)) return null;
+	return { memberId, role: claims.role as Role };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
 	const [accessToken, setAccessToken] = useState<string | null>(() =>
 		tokenStore.get(),
 	);
-	const [user, setUser] = useState<AuthUser | null>(null);
+	const [user, setUser] = useState<AuthUser | null>(() => {
+		const token = tokenStore.get();
+		return token ? userFromToken(token) : null;
+	});
+
+	// 닉네임(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
+	// cleanup 가드: 계정 전환 등으로 accessToken이 바뀌면 이전 요청의 결과는 무시한다(레이스 컨디션 방지).
+	useEffect(() => {
+		if (!accessToken) return;
+		let cancelled = false;
+		getMyProfile()
+			.then((profile) => {
+				if (cancelled) return;
+				setUser((prev) => (prev ? { ...prev, nickname: profile.nickname } : prev));
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [accessToken]);
 
 	const login = useCallback(async (email: string, password: string) => {
 		const res = await loginRequest(email, password);
@@ -34,7 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		const res = await refreshRequest();
 		tokenStore.set(res.accessToken);
 		setAccessToken(res.accessToken);
-		// user(nickname/role) 보강은 후속(/me 엔드포인트 또는 JWT 디코드). 지금은 토큰만으로 인증 처리.
+		setUser(userFromToken(res.accessToken));
+		// 닉네임은 위 useEffect(accessToken 변경 감지)가 채워준다.
 	}, []);
 
 	const logout = useCallback(async () => {

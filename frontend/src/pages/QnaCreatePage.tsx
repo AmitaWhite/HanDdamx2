@@ -1,16 +1,17 @@
-import { useEffect, useId, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
+import { useSubmitState } from "@/features/auth/useSubmitState";
 import {
 	type BoardPostType,
 	createPremiumBoardPost,
 } from "@/features/board/boardApi";
-import { useSubmitState } from "@/features/auth/useSubmitState";
+import { useSubscriptionAccess } from "@/features/subscription/useSubscriptionAccess";
 import { findCreator } from "@/mocks/creators";
 import type { QnaCategory } from "@/mocks/qna";
 
@@ -65,6 +66,11 @@ export function QnaCreatePage() {
 	const navigate = useNavigate();
 	const creator = findCreator(creatorId);
 	const numericCreatorId = toNumericCreatorId(creatorId);
+	const {
+		loading: accessLoading,
+		isCreator,
+		hasActivePaidSubscription,
+	} = useSubscriptionAccess(numericCreatorId);
 	const fileInputId = useId();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const imagesRef = useRef<ImageItem[]>([]);
@@ -97,6 +103,19 @@ export function QnaCreatePage() {
 	}
 
 	const creatorMemberId: number = numericCreatorId;
+	// 질문 작성은 활성 유료 구독자만 — 크리에이터 본인도 이 버튼의 대상이 아니다.
+	const canAskQuestion = !isCreator && hasActivePaidSubscription;
+
+	if (accessLoading) {
+		return (
+			<div className="container-page max-w-2xl py-10 text-center text-body-md text-secondary">
+				확인 중…
+			</div>
+		);
+	}
+	if (!canAskQuestion) {
+		return <Navigate to={paths.creatorQna(creatorMemberId)} replace />;
+	}
 
 	function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files;

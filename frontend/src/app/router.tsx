@@ -17,6 +17,7 @@ import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MyPage } from "@/pages/MyPage";
 import { MyPageSettingsPage } from "@/pages/MyPageSettingsPage";
+import { MyQnaPage } from "@/pages/MyQnaPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { PagePlaceholder } from "@/pages/PagePlaceholder";
@@ -134,6 +135,14 @@ export const router = createBrowserRouter([
 				element: (
 					<AuthOnlyRoute>
 						<MyPageSettingsPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.myQna,
+				element: (
+					<AuthOnlyRoute>
+						<MyQnaPage />
 					</AuthOnlyRoute>
 				),
 			},

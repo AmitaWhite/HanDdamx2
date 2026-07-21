@@ -1,4 +1,10 @@
-import { http, ensureFreshAccessToken, unwrap, unwrapVoid, ApiError } from "@/lib/api";
+import {
+	ApiError,
+	ensureFreshAccessToken,
+	http,
+	unwrap,
+	unwrapVoid,
+} from "@/lib/api";
 
 /**
  * 백엔드 BoardPostType (com.white.handdam.board.entity.BoardPostType)
@@ -62,6 +68,31 @@ export interface GetPremiumBoardPostsParams {
 	status?: BoardPostStatus;
 	page?: number;
 	size?: number;
+}
+
+export interface GetMyBoardPostsParams {
+	type?: BoardPostType;
+	status?: BoardPostStatus;
+	page?: number;
+	size?: number;
+}
+
+/**
+ * 마이페이지 — 내가 작성한 유료 게시판 글 목록(크리에이터 구분 없이 전체).
+ * 백엔드: GET /api/members/me/board-posts
+ * 권한: 본인(JWT 인증된 회원)만.
+ */
+export function getMyBoardPosts({
+	type,
+	status,
+	page = 0,
+	size = 20,
+}: GetMyBoardPostsParams = {}) {
+	return unwrap<PageResponse<BoardPostResponse>>(
+		http.get("/members/me/board-posts", {
+			params: { type, status, page, size, sort: "createdAt,desc" },
+		}),
+	);
 }
 
 /**
@@ -182,7 +213,10 @@ export async function deletePremiumBoardPost(postId: number) {
  * 권한: 작성자, 공식 답변 전(WAITING)만.
  * @returns 이번에 추가된 이미지 목록
  */
-export async function addPremiumBoardPostImages(postId: number, images: File[]) {
+export async function addPremiumBoardPostImages(
+	postId: number,
+	images: File[],
+) {
 	await ensureFreshAccessToken();
 
 	const formData = new FormData();
@@ -206,5 +240,31 @@ export async function deletePremiumBoardPostImage(
 ) {
 	await unwrapVoid(
 		http.delete(`/premium-board/posts/${postId}/images/${imageId}`),
+	);
+}
+
+/** 백엔드 BoardCommentResponse */
+export interface BoardCommentResponse {
+	id: number;
+	boardPostId: number;
+	memberId: number;
+	parentCommentId: number | null;
+	depth: number;
+	content: string;
+	deleted: boolean;
+	createdAt: string;
+	updatedAt: string;
+	deletedAt: string | null;
+	replies: BoardCommentResponse[];
+}
+
+/**
+ * 게시글 댓글·대댓글 목록 조회.
+ * 백엔드: GET /api/premium-board/posts/{postId}/comments
+ * 권한: 게시판 크리에이터 / 글 작성자 / 활성 유료 구독자.
+ */
+export function getBoardComments(postId: number) {
+	return unwrap<BoardCommentResponse[]>(
+		http.get(`/premium-board/posts/${postId}/comments`),
 	);
 }

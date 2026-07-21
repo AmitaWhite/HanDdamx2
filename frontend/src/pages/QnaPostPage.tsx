@@ -1,26 +1,29 @@
-import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
-import { Avatar } from "@/components/ui/Avatar";
+import { EngagementBar } from "@/components/social/EngagementBar";
 import { Alert } from "@/components/ui/Alert";
+import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { EngagementBar } from "@/components/social/EngagementBar";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSubmitState } from "@/features/auth/useSubmitState";
 import {
+	addPremiumBoardPostImages,
+	type BoardCommentResponse,
 	type BoardPostResponse,
 	type BoardPostType,
-	addPremiumBoardPostImages,
 	deletePremiumBoardPost,
 	deletePremiumBoardPostImage,
+	getBoardComments,
 	getPremiumBoardPost,
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
 import { ApiError } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/relativeTime";
 import { commentsFor } from "@/mocks/comments";
 import { mockImg } from "@/mocks/helpers";
 import { findQnaPost, mockQnaAnswers, type QnaCategory } from "@/mocks/qna";
@@ -47,19 +50,6 @@ function toNumericPostId(value: string): number | null {
 	return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-function toRelativeLabel(iso: string): string {
-	const diffMs = Date.now() - new Date(iso).getTime();
-	if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
-	const minutes = Math.floor(diffMs / 60_000);
-	if (minutes < 1) return "방금";
-	if (minutes < 60) return `${minutes}분 전`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}시간 전`;
-	const days = Math.floor(hours / 24);
-	if (days < 7) return `${days}일 전`;
-	return `${Math.floor(days / 7)}주 전`;
-}
-
 /** 숫자 postId → 실API(LDJ-003~005, 007~008), 그 외 → 기존 mock UI */
 export function QnaPostPage() {
 	const { postId = "" } = useParams();
@@ -80,8 +70,8 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const imageUploadFailed =
-		(location.state as { imageUploadFailed?: boolean } | null)?.imageUploadFailed ===
-		true;
+		(location.state as { imageUploadFailed?: boolean } | null)
+			?.imageUploadFailed === true;
 
 	const [editing, setEditing] = useState(false);
 	const [editTitle, setEditTitle] = useState("");
@@ -103,6 +93,29 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		error: imageError,
 		run: runImage,
 	} = useSubmitState("이미지 처리에 실패했습니다. 다시 시도해 주세요.");
+
+	const [comments, setComments] = useState<BoardCommentResponse[]>([]);
+	const [commentsLoading, setCommentsLoading] = useState(true);
+
+	useEffect(() => {
+		let cancelled = false;
+		setCommentsLoading(true);
+
+		getBoardComments(postId)
+			.then((data) => {
+				if (!cancelled) setComments(data);
+			})
+			.catch(() => {
+				if (!cancelled) setComments([]);
+			})
+			.finally(() => {
+				if (!cancelled) setCommentsLoading(false);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [postId]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -189,9 +202,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		);
 		if (added) {
 			setPost((prev) =>
-				prev
-					? { ...prev, images: [...prev.images, ...added] }
-					: prev,
+				prev ? { ...prev, images: [...prev.images, ...added] } : prev,
 			);
 		}
 	}
@@ -384,7 +395,12 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						{isAuthor && (
 							<div className="flex gap-2">
 								{canEdit && (
-									<Button type="button" variant="secondary" size="sm" onClick={startEdit}>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										onClick={startEdit}
+									>
 										수정
 									</Button>
 								)}
@@ -405,7 +421,7 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 					</h1>
 					<div className="mb-5 flex items-center gap-2 text-caption font-caption text-secondary">
 						<Avatar size={24} />
-						회원 #{post.memberId} · {toRelativeLabel(post.createdAt)}
+						회원 #{post.memberId} · {formatRelativeTime(post.createdAt)}
 					</div>
 					<div className="mb-5 whitespace-pre-wrap text-body-md text-on-surface">
 						{post.content}
@@ -425,6 +441,76 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						</div>
 					)}
 				</article>
+			)}
+
+			<section className="mt-8 border-t border-outline-variant/50 pt-6">
+				<h2 className="mb-4 text-label-md font-label-md text-on-surface">
+					댓글 {comments.length}
+				</h2>
+
+				{commentsLoading && (
+					<p className="text-body-md text-secondary">불러오는 중…</p>
+				)}
+				{!commentsLoading && comments.length === 0 && (
+					<p className="mb-5 text-body-md text-secondary">
+						아직 댓글이 없어요.
+					</p>
+				)}
+				{!commentsLoading && comments.length > 0 && (
+					<div className="mb-5 flex flex-col gap-4">
+						{comments.map((c) => (
+							<CommentRow key={c.id} comment={c} creatorId={post.creatorId} />
+						))}
+					</div>
+				)}
+			</section>
+		</div>
+	);
+}
+
+function CommentRow({
+	comment,
+	creatorId,
+	depth = 0,
+}: {
+	comment: BoardCommentResponse;
+	creatorId: number;
+	depth?: number;
+}) {
+	return (
+		<div className={depth > 0 ? "ml-8" : undefined}>
+			<div className="flex gap-3">
+				<Avatar size={32} />
+				<div className="min-w-0 flex-1">
+					<div className="flex items-center gap-2">
+						<span className="text-label-md font-label-md text-on-surface">
+							회원 #{comment.memberId}
+						</span>
+						{comment.memberId === creatorId && (
+							<span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+								크리에이터
+							</span>
+						)}
+					</div>
+					<p className="whitespace-pre-wrap text-body-md text-on-surface">
+						{comment.content}
+					</p>
+					<p className="text-caption font-caption text-secondary">
+						{formatRelativeTime(comment.createdAt)}
+					</p>
+				</div>
+			</div>
+			{comment.replies.length > 0 && (
+				<div className="mt-3 flex flex-col gap-3">
+					{comment.replies.map((reply) => (
+						<CommentRow
+							key={reply.id}
+							comment={reply}
+							creatorId={creatorId}
+							depth={depth + 1}
+						/>
+					))}
+				</div>
 			)}
 		</div>
 	);
@@ -469,7 +555,9 @@ function MockQnaPostPage({ postId }: { postId: string }) {
 					<Chip active={post.status === "answered"} size="sm">
 						{post.status === "answered" ? "답변 완료" : "답변 대기"}
 					</Chip>
-					<span className="text-caption font-caption text-secondary">{post.category}</span>
+					<span className="text-caption font-caption text-secondary">
+						{post.category}
+					</span>
 				</div>
 				<h1 className="mb-3 text-headline-lg font-display text-on-surface">
 					{post.title}
