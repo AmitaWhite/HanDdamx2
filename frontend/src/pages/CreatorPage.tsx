@@ -95,7 +95,7 @@ export function CreatorPage() {
 						title: post.title,
 						status: post.status === "ANSWERED" ? "answered" : "pending",
 						category: TYPE_TO_CATEGORY[post.type],
-						authorName: `회원 #${post.memberId}`,
+						authorName: post.memberNickname,
 						commentCount: 0,
 						createdAtLabel: toRelativeLabel(post.createdAt),
 						body: [post.content],

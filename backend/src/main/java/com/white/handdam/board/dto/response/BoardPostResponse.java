@@ -9,6 +9,7 @@ public record BoardPostResponse(
 	Long id,
 	Long creatorId,
 	Long memberId,
+	String memberNickname,
 	String title,
 	BoardPostType type,
 	String content,

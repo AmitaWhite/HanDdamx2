@@ -18,6 +18,9 @@ import com.white.handdam.storage.ObjectStorage;
 import com.white.handdam.storage.StoredObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,6 +41,7 @@ public class BoardPostService {
 	private final PaidSubscriptionChecker paidSubscriptionChecker;
 	private final ObjectStorage objectStorage;
 	private final ApplicationEventPublisher eventPublisher;
+	private final BoardMemberNicknameResolver nicknameResolver;
 
 	// -------------------------------------------------------------------------
 	// 목록 · 작성 (게시판 단위) — assertCanAccessBoard 공통
@@ -67,10 +71,10 @@ public class BoardPostService {
 	) {
 		// 1) 게시판 접근 권한: 크리에이터 또는 활성 유료 구독자
 		assertCanAccessBoard(creatorId, requesterId);
-		// 2) 조건에 맞는 글 페이지 조회 후 DTO로 변환 (이미지 포함)
-		return boardPostRepository
-			.findByCreator(creatorId, type, status, pageable)
-			.map(this::toResponseWithImages);
+		Page<BoardPost> page =
+			boardPostRepository.findByCreator(creatorId, type, status, pageable);
+		Map<Long, String> nicknameMap = nicknameMapForPosts(page.getContent());
+		return page.map(post -> toResponseWithImages(post, nicknameMap));
 	}
 
 	// -------------------------------------------------------------------------
@@ -95,9 +99,10 @@ public class BoardPostService {
 		if (memberId == null) {
 			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
 		}
-		return boardPostRepository
-			.findByMember(memberId, type, status, pageable)
-			.map(this::toResponseWithImages);
+		Page<BoardPost> page =
+			boardPostRepository.findByMember(memberId, type, status, pageable);
+		Map<Long, String> nicknameMap = nicknameMapForPosts(page.getContent());
+		return page.map(post -> toResponseWithImages(post, nicknameMap));
 	}
 
 	/**
@@ -155,13 +160,31 @@ public class BoardPostService {
 			nonEmpty
 		);
 		List<BoardPostImage> images = uploadAndSaveImages(saved, creatorId, imageFiles, 0);
-		return BoardPostConverter.toResponse(saved, images);
+		return BoardPostConverter.toResponse(
+			saved,
+			images,
+			nicknameResolver.resolve(requesterId)
+		);
 	}
 
 	private BoardPostResponse toResponseWithImages(BoardPost post) {
+		return toResponseWithImages(post, null);
+	}
+
+	private BoardPostResponse toResponseWithImages(BoardPost post, Map<Long, String> nicknameMap) {
 		List<BoardPostImage> images =
 			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(post.getId());
-		return BoardPostConverter.toResponse(post, images);
+		String memberNickname = nicknameMap == null
+			? nicknameResolver.resolve(post.getMemberId())
+			: nicknameResolver.fromMap(nicknameMap, post.getMemberId());
+		return BoardPostConverter.toResponse(post, images, memberNickname);
+	}
+
+	private Map<Long, String> nicknameMapForPosts(List<BoardPost> posts) {
+		Set<Long> memberIds = posts.stream()
+			.map(BoardPost::getMemberId)
+			.collect(Collectors.toSet());
+		return nicknameResolver.resolveAll(memberIds);
 	}
 
 	// -------------------------------------------------------------------------
@@ -349,10 +372,7 @@ public class BoardPostService {
 		// 2) 게시판 크리에이터 / 작성자 / 활성 유료 구독자
 		assertCanAccessPost(post, requesterId);
 
-		// 3) 이미지 order_index 오름차순 (없으면 빈 리스트)
-		List<BoardPostImage> images =
-			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
-		return BoardPostConverter.toResponse(post, images);
+		return toResponseWithImages(post);
 	}
 
 	/**
@@ -433,10 +453,7 @@ public class BoardPostService {
 		// 5) 엔티티 필드 갱신. updated_at 은 JPA Auditing(`@LastModifiedDate`)에서 자동 설정
 		post.update(request.title(), request.type(), request.content());
 
-		// 6) 기존 이미지는 그대로 두고, 글+이미지로 응답 DTO 구성
-		List<BoardPostImage> images =
-			boardPostImageRepository.findByBoardPostIdOrderByOrderIndexAsc(postId);
-		return BoardPostConverter.toResponse(post, images);
+		return toResponseWithImages(post);
 	}
 
 	/**

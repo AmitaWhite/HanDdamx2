@@ -3,7 +3,9 @@ package com.white.handdam.board.controller;
 import com.white.handdam.board.dto.request.CreateBoardAnswerRequest;
 import com.white.handdam.board.dto.request.UpdateBoardAnswerRequest;
 import com.white.handdam.board.dto.response.BoardAnswerResponse;
+import com.white.handdam.board.exception.BoardErrorCode;
 import com.white.handdam.board.service.BoardAnswerService;
+import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import jakarta.validation.Valid;
@@ -34,6 +36,9 @@ public class BoardAnswerController {
 		@PathVariable Long postId,
 		@AuthenticationPrincipal AuthMember member
 	) {
+		if (member == null) {
+			throw new CustomException(BoardErrorCode.BOARD_LOGIN_REQUIRED);
+		}
 		return ApiResponse.success(boardAnswerService.getAnswer(postId, member.id()));
 	}
 
