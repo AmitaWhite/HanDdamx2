@@ -149,7 +149,7 @@ export function CreatorPage() {
     return <div className="flex min-h-[60vh] items-center justify-center text-secondary">{creatorError ?? "크리에이터를 찾을 수 없습니다."}</div>;
   }
 
-  const creatorStringId = String(creator.creatorId);
+  const creatorStringId = String(creator.memberId);
   const subscribed = isFreeSubscribed(creatorStringId);
   // posts는 피드 API 연동 전까지 빈 배열
   const posts: PlaceholderPost[] = [];
@@ -208,7 +208,7 @@ export function CreatorPage() {
         <CreatorQnaList qnaPosts={remoteQna} />
       )}
       <div className="mt-4 text-center">
-        <Link to={paths.creatorQna(creator.creatorId)} className="text-label-md font-label-md text-primary hover:underline">
+        <Link to={paths.creatorQna(creator.memberId)} className="text-label-md font-label-md text-primary hover:underline">
           Q&A 게시판 전체보기 →
         </Link>
       </div>
@@ -238,14 +238,14 @@ export function CreatorPage() {
           </div>
           {!creator.isMine && (
             <div className="flex shrink-0 flex-wrap justify-center gap-2">
-              <LinkButton to={`${paths.chat}?creatorId=${creator.creatorId}`} variant="secondary">
+              <LinkButton to={`${paths.chat}?creatorId=${creator.memberId}`} variant="secondary">
                 메시지
               </LinkButton>
               <Button variant={subscribed ? "secondary" : "primary"} onClick={handleToggleSubscribe}>
                 {subscribed ? "구독 중" : "구독하기"}
               </Button>
               {subscribed && (
-                <LinkButton to={paths.subscribeSelect(creator.creatorId)} state={{ mode: "support" }}>
+                <LinkButton to={paths.subscribeSelect(creator.memberId)} state={{ mode: "support" }}>
                   후원하기
                 </LinkButton>
               )}
