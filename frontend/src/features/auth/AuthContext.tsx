@@ -39,6 +39,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		return token ? userFromToken(token) : null;
 	});
 
+	// tokenStore.set/clear를 구독해 401 인터셉터의 백그라운드 토큰 재발급도 반영
+	useEffect(() => {
+		return tokenStore.subscribe((token) => {
+			setAccessToken(token);
+			setUser((prev) => {
+				if (!token) return null;
+				const next = userFromToken(token);
+				if (!next) return null;
+				// 새 토큰엔 닉네임이 없으니 기존 값을 유지
+				return prev ? { ...next, nickname: prev.nickname } : next;
+			});
+		});
+	}, []);
+
 	// 닉네임(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
 	// cleanup 가드: 계정 전환 등으로 accessToken이 바뀌면 이전 요청의 결과는 무시한다(레이스 컨디션 방지).
 	useEffect(() => {
