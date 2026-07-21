@@ -1,6 +1,7 @@
 package com.white.handdam.member.controller;
 
 import com.white.handdam.global.response.ApiResponse;
+import com.white.handdam.global.response.SliceResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.member.dto.request.MemberUpdateRequest;
 import com.white.handdam.member.dto.response.*;
@@ -9,7 +10,6 @@ import com.white.handdam.member.service.MyActivityService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -52,15 +52,15 @@ public class MemberController {
     }
 
     @GetMapping("/me/feed-comments")
-    public ApiResponse<Slice<MyFeedCommentResponse>> getMyFeedComments(@AuthenticationPrincipal AuthMember authMember,
+    public ApiResponse<SliceResponse<MyFeedCommentResponse>> getMyFeedComments(@AuthenticationPrincipal AuthMember authMember,
                                                                        @PageableDefault(size=3) Pageable pageable) {
-        return ApiResponse.success(myActivityService.getMyFeedComments(authMember.id(), pageable));
+        return ApiResponse.success(SliceResponse.from(myActivityService.getMyFeedComments(authMember.id(), pageable)));
     }
 
     @GetMapping("/me/board-comments")
-    public ApiResponse<Slice<MyBoardCommentResponse>> getMyBoardComments(@AuthenticationPrincipal AuthMember authMember,
+    public ApiResponse<SliceResponse<MyBoardCommentResponse>> getMyBoardComments(@AuthenticationPrincipal AuthMember authMember,
                                                                          @PageableDefault(size=3) Pageable pageable) {
-        return ApiResponse.success(myActivityService.getMyBoardComments(authMember.id(), pageable));
+        return ApiResponse.success(SliceResponse.from(myActivityService.getMyBoardComments(authMember.id(), pageable)));
     }
 
     @GetMapping("/me/summary")
