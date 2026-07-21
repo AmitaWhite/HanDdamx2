@@ -38,4 +38,5 @@ export const paths = {
 		`/dashboard/projects/${id}`,
 	dashboardPosts: "/dashboard/posts",
 	dashboardPostNew: "/dashboard/posts/new",
+  adminCreatorApplications: "/admin/creator-applications",
 } as const;

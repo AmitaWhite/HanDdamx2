@@ -29,6 +29,8 @@ import { SignupPage } from "@/pages/SignupPage";
 import { SubscribeCompletePage } from "@/pages/SubscribeCompletePage";
 import { SubscribeFeedPage } from "@/pages/SubscribeFeedPage";
 import { SubscribeSelectPage } from "@/pages/SubscribeSelectPage";
+import { AdminCreatorApplicationsPage } from "@/pages/AdminCreatorApplicationsPage";
+import { AdminOnlyRoute } from "@/features/auth/AdminOnlyRoute";
 import { paths } from "./paths";
 
 /**
@@ -203,5 +205,19 @@ export const router = createBrowserRouter([
 			},
 		],
 	},
+  {
+    // 어드민 전용
+    element: (
+      <AdminOnlyRoute>
+        <ConsumerLayout />
+      </AdminOnlyRoute>
+    ),
+    children: [
+      {
+        path: paths.adminCreatorApplications,
+        element: <AdminCreatorApplicationsPage />,
+      },
+    ],
+  },
 	{ path: "*", element: <PagePlaceholder title="404" /> },
 ]);
