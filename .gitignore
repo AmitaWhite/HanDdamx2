@@ -75,6 +75,7 @@ dist/
 coverage/
 *.local
 *.tsbuildinfo
+package-lock.json
 
 ######################################
 # Logs
