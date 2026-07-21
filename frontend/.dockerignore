@@ -1,0 +1,5 @@
+# 이미지에는 CI가 미리 빌드한 정적 산출물(dist)과 nginx 설정만 필요하다.
+# node_modules/소스를 컨텍스트에서 제외해 전송을 가볍게 한다.
+*
+!dist
+!nginx.conf
