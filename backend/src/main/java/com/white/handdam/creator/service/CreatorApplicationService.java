@@ -70,7 +70,7 @@ public class CreatorApplicationService {
         }
 
         // 1) 신청 이력 생성
-        CreatorApplication application = CreatorApplication.create(memberId);
+        CreatorApplication application = CreatorApplication.create(memberId, request.introduction(), finalImageUrl);
         creatorApplicationRepository.save(application);
 
         // 2) 크리에이터 프로필 초안 생성 또는 갱신
@@ -123,8 +123,8 @@ public class CreatorApplicationService {
                 .map(row -> {
                     CreatorApplication application = (CreatorApplication) row[0];
                     CreatorProfile profile = (CreatorProfile) row[1]; // LEFT JOIN이라 null 가능
-                    String introduction = profile != null ? profile.getIntroduction() : null;
-                    String imageUrl = profile != null ? profile.getRepresentativeImageUrl() : null;
+                    String introduction = application.getIntroduction();
+                    String imageUrl = application.getRepresentativeImageUrl();
                     return CreatorApplicationConverter.toResponse(application, introduction, imageUrl);
                 });
     }
