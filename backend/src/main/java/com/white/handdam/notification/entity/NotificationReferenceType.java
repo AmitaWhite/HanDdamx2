@@ -26,6 +26,8 @@ public enum NotificationReferenceType {
 	/** 결제 — 결제 성공·실패 알림 */
 	PAYMENT,
 
+	SUBSCRIPTION,
+
 	/** 크리에이터 전환 신청 — 심사 승인·거절 알림 */
 	CREATOR_APPLICATION,
 

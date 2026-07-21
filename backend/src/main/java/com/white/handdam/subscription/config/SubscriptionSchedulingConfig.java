@@ -6,6 +6,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(SubscriptionExpirationProperties.class)
+@EnableConfigurationProperties({
+        SubscriptionExpirationProperties.class,
+        SubscriptionExpiringNotificationProperties.class
+})
 public class SubscriptionSchedulingConfig {
 }
