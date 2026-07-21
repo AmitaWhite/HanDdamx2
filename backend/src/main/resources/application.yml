@@ -108,6 +108,12 @@ subscription:
     enabled: ${SUBSCRIPTION_EXPIRATION_ENABLED:true}
     cron: "${SUBSCRIPTION_EXPIRATION_CRON:0 */10 * * * *}"
     batch-size: ${SUBSCRIPTION_EXPIRATION_BATCH_SIZE:100}
+  expiring-notification:
+    enabled: ${SUBSCRIPTION_EXPIRING_NOTIFICATION_ENABLED:true}
+    cron: "${SUBSCRIPTION_EXPIRING_NOTIFICATION_CRON:0 0 9 * * *}"
+    zone: "${SUBSCRIPTION_EXPIRING_NOTIFICATION_ZONE:Asia/Seoul}"
+    days-before: ${SUBSCRIPTION_EXPIRING_NOTIFICATION_DAYS_BEFORE:3}
+    batch-size: ${SUBSCRIPTION_EXPIRING_NOTIFICATION_BATCH_SIZE:100}
 
 
 ---
@@ -162,6 +168,12 @@ subscription:
   expiration:
     enabled: false
     cron: "0 */10 * * * *"
+    batch-size: 100
+  expiring-notification:
+    enabled: false
+    cron: "0 0 9 * * *"
+    zone: "Asia/Seoul"
+    days-before: 3
     batch-size: 100
 
 toss:
@@ -260,3 +272,9 @@ subscription:
     enabled: ${SUBSCRIPTION_EXPIRATION_ENABLED:true}
     cron: "${SUBSCRIPTION_EXPIRATION_CRON:0 */10 * * * *}"
     batch-size: ${SUBSCRIPTION_EXPIRATION_BATCH_SIZE:100}
+  expiring-notification:
+    enabled: ${SUBSCRIPTION_EXPIRING_NOTIFICATION_ENABLED:true}
+    cron: "${SUBSCRIPTION_EXPIRING_NOTIFICATION_CRON:0 0 9 * * *}"
+    zone: "${SUBSCRIPTION_EXPIRING_NOTIFICATION_ZONE:Asia/Seoul}"
+    days-before: ${SUBSCRIPTION_EXPIRING_NOTIFICATION_DAYS_BEFORE:3}
+    batch-size: ${SUBSCRIPTION_EXPIRING_NOTIFICATION_BATCH_SIZE:100}

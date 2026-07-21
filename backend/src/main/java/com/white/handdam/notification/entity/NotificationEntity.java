@@ -10,12 +10,21 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Table(name = "notification")
+@Table(
+        name = "notification",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_notification_dedup_key",
+                        columnNames = "dedup_key"
+                )
+        }
+)
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -67,6 +76,9 @@ public class NotificationEntity extends BaseCreatedAtEntity {
     @Column(nullable = false, length = 50)
     private String referenceType;
 
+    @Column(name = "dedup_key", length = 255)
+    private String dedupKey;
+
     @Column(nullable = false)
     private Boolean isRead = false;
 
@@ -77,13 +89,15 @@ public class NotificationEntity extends BaseCreatedAtEntity {
             NotificationType type,
             String message,
             Long referenceId,
-            String referenceType) {
+            String referenceType,
+            String dedupKey) {
         this.memberId = memberId;
         this.senderId = senderId;
         this.type = type;
         this.message = message;
         this.referenceId = referenceId;
         this.referenceType = referenceType;
+        this.dedupKey = dedupKey;
     }
 
     /* entity method */
