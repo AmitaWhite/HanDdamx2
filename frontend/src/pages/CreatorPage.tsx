@@ -9,351 +9,353 @@ import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
-import {
-	type BoardPostType,
-	getPremiumBoardPosts,
-} from "@/features/board/boardApi";
+import { type BoardPostType, getPremiumBoardPosts } from "@/features/board/boardApi";
+import { getCreatorProfile, getCreatorProjects } from "@/features/creator/creatorApi";
+import type { CreatorProfile, ProjectSummary } from "@/features/creator/types";
 import { useSubscription } from "@/features/subscription/SubscriptionContext";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { findCreator } from "@/mocks/creators";
-import { mockImg } from "@/mocks/helpers";
-import { mockPosts } from "@/mocks/posts";
-import { mockProjects } from "@/mocks/projects";
-import { mockQnaPosts, type MockQnaPost, type QnaCategory } from "@/mocks/qna";
+import { type MockQnaPost, type QnaCategory } from "@/mocks/qna";
 
 const PROJECT_SCROLL_STEP = 220;
 const QNA_PREVIEW_SIZE = 5;
 
 const TYPE_TO_CATEGORY: Record<BoardPostType, QnaCategory> = {
-	QUESTION: "제작 질문",
-	FEEDBACK: "작품 피드백",
-	CONTENT_SUGGESTION: "콘텐츠 제안",
-	MATERIAL: "재료 추천",
-	GENERAL: "일반 소통",
+  QUESTION: "제작 질문",
+  FEEDBACK: "작품 피드백",
+  CONTENT_SUGGESTION: "콘텐츠 제안",
+  MATERIAL: "재료 추천",
+  GENERAL: "일반 소통",
 };
 
 function toNumericCreatorId(value: string): number | null {
-	if (!value) return null;
-	const n = Number(value);
-	return Number.isInteger(n) && n > 0 ? n : null;
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 function toRelativeLabel(iso: string): string {
-	const diffMs = Date.now() - new Date(iso).getTime();
-	if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
-	const minutes = Math.floor(diffMs / 60_000);
-	if (minutes < 1) return "방금";
-	if (minutes < 60) return `${minutes}분 전`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}시간 전`;
-	const days = Math.floor(hours / 24);
-	if (days < 7) return `${days}일 전`;
-	return `${Math.floor(days / 7)}주 전`;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(diffMs) || diffMs < 0) return "방금";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}일 전`;
+  return `${Math.floor(days / 7)}주 전`;
 }
 
 export function CreatorPage() {
-	const { creatorId = "" } = useParams();
-	const creator = findCreator(creatorId);
-	const numericCreatorId = toNumericCreatorId(creatorId);
-	const projects = mockProjects.filter((p) => p.creatorId === creator.id);
-	const posts = mockPosts.filter((p) => p.creatorId === creator.id);
-	const mockQna = mockQnaPosts.filter((q) => q.creatorId === creator.id);
+  const { creatorId = "" } = useParams();
+  const numericCreatorId = toNumericCreatorId(creatorId);
 
-	const { isAuthenticated } = useAuth();
-	const navigate = useNavigate();
-	const { isFreeSubscribed, subscribeFree, unsubscribe } = useSubscription();
-	const subscribed = isFreeSubscribed(creator.id);
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { isFreeSubscribed, subscribeFree, unsubscribe } = useSubscription();
 
-	const [activeTab, setActiveTab] = useState<"posts" | "qna">("posts");
-	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-	const projectsRef = useRef<HTMLDivElement>(null);
+  const [creator, setCreator] = useState<CreatorProfile | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [creatorLoading, setCreatorLoading] = useState(true);
+  const [creatorError, setCreatorError] = useState<string | null>(null);
 
-	const [remoteQna, setRemoteQna] = useState<MockQnaPost[]>([]);
-	const [qnaLoading, setQnaLoading] = useState(false);
-	const [qnaError, setQnaError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "qna">("posts");
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const projectsRef = useRef<HTMLDivElement>(null);
 
-	// 숫자 creatorId → 실API 미리보기. mock creator(suyeon 등)는 mockQna 유지.
-	useEffect(() => {
-		if (numericCreatorId === null) return;
+  const [remoteQna, setRemoteQna] = useState<MockQnaPost[]>([]);
+  const [qnaLoading, setQnaLoading] = useState(false);
+  const [qnaError, setQnaError] = useState<string | null>(null);
 
-		let cancelled = false;
-		setQnaLoading(true);
-		setQnaError(null);
+  useEffect(() => {
+    if (!numericCreatorId) return;
+    let cancelled = false;
+    setCreatorLoading(true);
+    setCreatorError(null);
+    Promise.all([getCreatorProfile(numericCreatorId), getCreatorProjects(numericCreatorId)])
+      .then(([profile, projs]) => {
+        if (cancelled) return;
+        setCreator(profile);
+        setProjects(projs);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setCreatorError(e instanceof Error ? e.message : "크리에이터 정보를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setCreatorLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      };
+  }, [numericCreatorId]);
 
-		getPremiumBoardPosts({
-			creatorId: numericCreatorId,
-			page: 0,
-			size: QNA_PREVIEW_SIZE,
-		})
-			.then((page) => {
-				if (cancelled) return;
-				setRemoteQna(
-					page.content.map((post) => ({
-						id: String(post.id),
-						creatorId: String(post.creatorId),
-						title: post.title,
-						status: post.status === "ANSWERED" ? "answered" : "pending",
-						category: TYPE_TO_CATEGORY[post.type],
-						authorName: post.memberNickname,
-						commentCount: 0,
-						createdAtLabel: toRelativeLabel(post.createdAt),
-						body: [post.content],
-					})),
-				);
-			})
-			.catch((err: unknown) => {
-				if (cancelled) return;
-				setRemoteQna([]);
-				setQnaError(
-					err instanceof ApiError
-						? err.message
-						: "Q&A를 불러오지 못했습니다.",
-				);
-			})
-			.finally(() => {
-				if (!cancelled) setQnaLoading(false);
-			});
+  useEffect(() => {
+    if (numericCreatorId === null) return;
 
-		return () => {
-			cancelled = true;
-		};
-	}, [numericCreatorId]);
+    let cancelled = false;
+    setQnaLoading(true);
+    setQnaError(null);
 
-	const qnaPosts =
-		numericCreatorId !== null ? remoteQna : mockQna.slice(0, QNA_PREVIEW_SIZE);
+    getPremiumBoardPosts({
+      creatorId: numericCreatorId,
+      page: 0,
+      size: QNA_PREVIEW_SIZE,
+    })
+      .then((page) => {
+        if (cancelled) return;
+        setRemoteQna(
+          page.content.map((post) => ({
+            id: String(post.id),
+            creatorId: String(post.creatorId),
+            title: post.title,
+            status: post.status === "ANSWERED" ? "answered" : "pending",
+            category: TYPE_TO_CATEGORY[post.type],
+            authorName: post.memberNickname,
+            commentCount: 0,
+            createdAtLabel: toRelativeLabel(post.createdAt),
+            body: [post.content],
+          })),
+        );
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setRemoteQna([]);
+        setQnaError(err instanceof ApiError ? err.message : "Q&A를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setQnaLoading(false);
+      });
 
-	function handleToggleSubscribe() {
-		if (!isAuthenticated) {
-			navigate(paths.login);
-			return;
-		}
-		if (subscribed) unsubscribe(creator.id);
-		else subscribeFree(creator.id);
-	}
+    return () => {
+      cancelled = true;
+    };
+  }, [numericCreatorId]);
 
-	function scrollProjects(direction: "left" | "right") {
-		projectsRef.current?.scrollBy({
-			left: direction === "left" ? -PROJECT_SCROLL_STEP : PROJECT_SCROLL_STEP,
-			behavior: "smooth",
-		});
-	}
+  if (creatorLoading) {
+    return <div className="flex min-h-[60vh] items-center justify-center text-secondary">불러오는 중...</div>;
+  }
+  if (creatorError || !creator) {
+    return <div className="flex min-h-[60vh] items-center justify-center text-secondary">{creatorError ?? "크리에이터를 찾을 수 없습니다."}</div>;
+  }
 
-	const postsGrid = (
-		<div className="grid grid-cols-2 gap-gutter sm:grid-cols-3">
-			{posts.map((post) => (
-				<PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={post.imageSeed} imageAlt={post.title}>
-					<div className="p-4">
-						<h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
-						<div className="flex items-center gap-3 text-caption font-caption text-secondary">
+  const creatorStringId = String(creator.creatorId);
+  const subscribed = isFreeSubscribed(creatorStringId);
+  // posts는 피드 API 연동 전까지 빈 배열
+  const posts: never[] = [];
+
+  function handleToggleSubscribe() {
+    if (!isAuthenticated) {
+      navigate(paths.login);
+      return;
+    }
+    if (subscribed) unsubscribe(creatorStringId);
+    else subscribeFree(creatorStringId);
+  }
+
+  function scrollProjects(direction: "left" | "right") {
+    projectsRef.current?.scrollBy({
+      left: direction === "left" ? -PROJECT_SCROLL_STEP : PROJECT_SCROLL_STEP,
+      behavior: "smooth",
+    });
+  }
+
+  const postsGrid = (
+    <div className="grid grid-cols-2 gap-gutter sm:grid-cols-3">
+      {posts.map((post) => (
+        <PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={post.imageSeed} imageAlt={post.title}>
+          <div className="p-4">
+            <h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
+            <div className="flex items-center gap-3 text-caption font-caption text-secondary">
 							<span className="flex items-center gap-1">
 								<Icon name="favorite" className="text-[14px]" />
-								{post.likeCount}
+                {post.likeCount}
 							</span>
-							<span className="flex items-center gap-1">
+              <span className="flex items-center gap-1">
 								<Icon name="chat_bubble_outline" className="text-[14px]" />
-								{post.commentCount}
+                {post.commentCount}
 							</span>
-						</div>
-					</div>
-				</PostCard>
-			))}
-			{posts.length === 0 && <p className="col-span-full py-8 text-center text-body-md text-secondary">아직 게시물이 없어요.</p>}
-		</div>
-	);
+            </div>
+          </div>
+        </PostCard>
+      ))}
+      {posts.length === 0 && <p className="col-span-full py-8 text-center text-body-md text-secondary">아직 게시물이 없어요.</p>}
+    </div>
+  );
 
-	const qnaPanel = (
-		<div>
-			{qnaError && (
-				<div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-body-md text-primary">
-					{qnaError}
-				</div>
-			)}
-			{qnaLoading ? (
-				<p className="rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-8 text-center text-body-md text-secondary">
-					불러오는 중…
-				</p>
-			) : (
-				<CreatorQnaList qnaPosts={qnaPosts} />
-			)}
-			<div className="mt-4 text-center">
-				<Link
-					to={paths.creatorQna(creator.id)}
-					className="text-label-md font-label-md text-primary hover:underline"
-				>
-					Q&A 게시판 전체보기 →
-				</Link>
-			</div>
-		</div>
-	);
+  const qnaPanel = (
+    <div>
+      {qnaError && (
+        <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-body-md text-primary">
+          {qnaError}
+        </div>
+      )}
+      {qnaLoading ? (
+        <p className="rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-8 text-center text-body-md text-secondary">
+          불러오는 중…
+        </p>
+      ) : (
+        <CreatorQnaList qnaPosts={remoteQna} />
+      )}
+      <div className="mt-4 text-center">
+        <Link to={paths.creatorQna(creator.creatorId)} className="text-label-md font-label-md text-primary hover:underline">
+          Q&A 게시판 전체보기 →
+        </Link>
+      </div>
+    </div>
+  );
 
-	return (
-		<div className="pb-16">
-			<div className="h-[240px] w-full overflow-hidden sm:h-[320px]">
-				<img src={mockImg(creator.coverSeed, 1600, 500)} alt="" className="h-full w-full object-cover" />
-			</div>
-			<div className="container-page relative -mt-16">
-				<Card className="flex flex-col items-center gap-4 p-8 text-center sm:flex-row sm:text-left">
-					<Avatar
-						src={mockImg(creator.avatarSeed, 200, 200)}
-						size={96}
-						className="border-4 border-surface-container-lowest"
-					/>
-					<div className="min-w-0 flex-1">
-						<h1 className="text-headline-md font-display text-on-surface">{creator.name}</h1>
-						<p className="text-body-md text-secondary">{creator.category}</p>
-						<p className="mt-1 text-caption font-caption text-secondary">
-							구독자 {creator.subscriberCount.toLocaleString()}명 · 게시물 {creator.postCount}개
-						</p>
-						<p className="mt-3 text-body-md text-on-surface">{creator.bio}</p>
-					</div>
-					<div className="flex shrink-0 flex-wrap justify-center gap-2">
-						<LinkButton to={`${paths.chat}?creatorId=${creator.id}`} variant="secondary">
-							메시지
-						</LinkButton>
-						<Button variant={subscribed ? "secondary" : "primary"} onClick={handleToggleSubscribe}>
-							{subscribed ? "구독 중" : "구독하기"}
-						</Button>
-						{subscribed && (
-							<LinkButton to={paths.subscribeSelect(creator.id)} state={{ mode: "support" }}>
-								후원하기
-							</LinkButton>
-						)}
-					</div>
-				</Card>
-			</div>
+  return (
+    <div className="pb-16">
+      <div className="h-[240px] w-full overflow-hidden sm:h-[320px]">
+        {creator.coverImageUrl ? (
+          <img src={creator.coverImageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="h-full w-full bg-surface-container-low" />
+        )}
+      </div>
+      <div className="container-page relative -mt-16">
+        <Card className="flex flex-col items-center gap-4 p-8 text-center sm:flex-row sm:text-left">
+          <Avatar src={creator.profileImageUrl ?? undefined} size={96} className="border-4 border-surface-container-lowest" />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-headline-md font-display text-on-surface">{creator.nickname}</h1>
+            <p className="mt-1 text-caption font-caption text-secondary">
+              구독자 {creator.subscriberCount.toLocaleString()}명 · 게시물 {creator.feedCount}개
+            </p>
+            {creator.introduction && (
+              <p className="mt-3 text-body-md text-on-surface">{creator.introduction}</p>
+            )}
+          </div>
+          {!creator.isMine && (
+            <div className="flex shrink-0 flex-wrap justify-center gap-2">
+              <LinkButton to={`${paths.chat}?creatorId=${creator.creatorId}`} variant="secondary">
+                메시지
+              </LinkButton>
+              <Button variant={subscribed ? "secondary" : "primary"} onClick={handleToggleSubscribe}>
+                {subscribed ? "구독 중" : "구독하기"}
+              </Button>
+              {subscribed && (
+                <LinkButton to={paths.subscribeSelect(creator.creatorId)} state={{ mode: "support" }}>
+                  후원하기
+                </LinkButton>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
 
-			{projects.length > 0 && (
-				<div className="container-page mt-10">
-					<div className="mb-4 flex items-center justify-between">
-						<h2 className="text-headline-md font-display text-on-surface">프로젝트 · 최신순</h2>
-						<Link
-							to={paths.dashboardProjects}
-							className="text-label-md font-label-md text-primary hover:underline"
-						>
-							프로젝트별로 보기
-						</Link>
-					</div>
-					<div className="group relative">
-						<button
-							type="button"
-							aria-label="이전 프로젝트"
-							onClick={() => scrollProjects("left")}
-							className="absolute left-0 top-[80px] z-10 hidden h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface opacity-0 shadow-card-hover transition-opacity group-hover:flex group-hover:opacity-100"
-						>
-							<Icon name="chevron_left" />
-						</button>
+      {projects.length > 0 && (
+        <div className="container-page mt-10">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-headline-md font-display text-on-surface">프로젝트 · 최신순</h2>
+            {creator.isMine && (
+              <Link to={paths.dashboardProjects} className="text-label-md font-label-md text-primary hover:underline">
+                프로젝트별로 보기
+              </Link>
+            )}
+          </div>
+          <div className="group relative">
+            <button
+              type="button"
+              aria-label="이전 프로젝트"
+              onClick={() => scrollProjects("left")}
+              className="absolute left-0 top-[80px] z-10 hidden h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface opacity-0 shadow-card-hover transition-opacity group-hover:flex group-hover:opacity-100"
+            >
+              <Icon name="chevron_left" />
+            </button>
 
-						<div ref={projectsRef} className="flex gap-gutter overflow-x-auto scroll-smooth pb-2">
-							{projects.map((project) => {
-								const isSelected = project.id === selectedProjectId;
-								return (
-									<div key={project.id} className="relative w-48 shrink-0">
-										<Card interactive className={cn("overflow-hidden", isSelected && "ring-2 ring-primary")}>
-											<button
-												type="button"
-												aria-pressed={isSelected}
-												onClick={() => setSelectedProjectId(isSelected ? null : project.id)}
-												className="block w-full text-left"
-											>
-												<div className="aspect-square overflow-hidden">
-													<img
-														src={mockImg(project.thumbnailSeed, 400, 400)}
-														alt={project.title}
-														className="h-full w-full object-cover"
-													/>
-												</div>
-												<p className="p-3 text-label-md font-label-md text-on-surface">{project.title}</p>
-											</button>
-										</Card>
-										{isSelected && (
-											<Link
-												to={paths.dashboardProject(project.id)}
-												className="absolute inset-x-3 bottom-14 flex items-center justify-center gap-1 rounded-full bg-primary py-2 text-label-md font-label-md text-on-primary shadow-card-hover hover:bg-primary-hover"
-											>
-												보기
-												<Icon name="arrow_forward" className="text-[16px]" />
-											</Link>
-										)}
-									</div>
-								);
-							})}
-						</div>
+            <div ref={projectsRef} className="flex gap-gutter overflow-x-auto scroll-smooth pb-2">
+              {projects.map((project) => {
+                const isSelected = project.projectId === selectedProjectId;
+                return (
+                  <div key={project.projectId} className="relative w-48 shrink-0">
+                    <Card interactive className={cn("overflow-hidden", isSelected && "ring-2 ring-primary")}>
+                      <button
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedProjectId(isSelected ? null : project.projectId)}
+                        className="block w-full text-left"
+                      >
+                        <div className="aspect-square overflow-hidden bg-surface-container-low">
+                          {project.coverImageUrl && (
+                            <img src={project.coverImageUrl} alt={project.title} className="h-full w-full object-cover" />
+                          )}
+                        </div>
+                        <p className="p-3 text-label-md font-label-md text-on-surface">{project.title}</p>
+                      </button>
+                    </Card>
+                    {isSelected && (
+                      <Link
+                        to={paths.dashboardProject(project.projectId)}
+                        className="absolute inset-x-3 bottom-14 flex items-center justify-center gap-1 rounded-full bg-primary py-2 text-label-md font-label-md text-on-primary shadow-card-hover hover:bg-primary-hover"
+                      >
+                        보기
+                        <Icon name="arrow_forward" className="text-[16px]" />
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-						<button
-							type="button"
-							aria-label="다음 프로젝트"
-							onClick={() => scrollProjects("right")}
-							className="absolute right-0 top-[80px] z-10 hidden h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface opacity-0 shadow-card-hover transition-opacity group-hover:flex group-hover:opacity-100"
-						>
-							<Icon name="chevron_right" />
-						</button>
-					</div>
-				</div>
-			)}
+            <button
+              type="button"
+              aria-label="다음 프로젝트"
+              onClick={() => scrollProjects("right")}
+              className="absolute right-0 top-[80px] z-10 hidden h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface opacity-0 shadow-card-hover transition-opacity group-hover:flex group-hover:opacity-100"
+            >
+              <Icon name="chevron_right" />
+            </button>
+          </div>
+        </div>
+      )}
 
-			<div className="container-page mt-10">
-				{creator.hasQnaTab ? (
-					<>
-						<div className="mb-4 flex items-center justify-center gap-6 border-b border-outline-variant">
-							<button
-								type="button"
-								onClick={() => setActiveTab("posts")}
-								className={cn(
-									"pb-3 text-label-md font-label-md transition-colors",
-									activeTab === "posts"
-										? "border-b-2 border-primary text-primary"
-										: "text-secondary hover:text-primary",
-								)}
-							>
-								게시물
-							</button>
-							<button
-								type="button"
-								onClick={() => setActiveTab("qna")}
-								className={cn(
-									"pb-3 text-label-md font-label-md transition-colors",
-									activeTab === "qna"
-										? "border-b-2 border-primary text-primary"
-										: "text-secondary hover:text-primary",
-								)}
-							>
-								유료 Q&A
-							</button>
-						</div>
-						<div className="overflow-hidden">
-							<div
-								className="flex w-[200%] transition-transform duration-300 ease-out"
-								style={{ transform: activeTab === "posts" ? "translateX(0%)" : "translateX(-50%)" }}
-							>
-								<div
-									className="w-1/2 pr-0 sm:pr-3"
-									aria-hidden={activeTab !== "posts"}
-									{...({ inert: activeTab !== "posts" ? "" : undefined } as Record<string, string | undefined>)}
-								>
-									{postsGrid}
-								</div>
-								<div
-									className="w-1/2 pl-0 sm:pl-3"
-									aria-hidden={activeTab !== "qna"}
-									{...({ inert: activeTab !== "qna" ? "" : undefined } as Record<string, string | undefined>)}
-								>
-									{qnaPanel}
-								</div>
-							</div>
-						</div>
-					</>
-				) : (
-					<>
-						<div className="mb-4 border-b border-outline-variant">
-							<span className="inline-block border-b-2 border-primary pb-3 text-label-md font-label-md text-primary">
-								게시물
-							</span>
-						</div>
-						{postsGrid}
-					</>
-				)}
-			</div>
-		</div>
-	);
+      <div className="container-page mt-10">
+        <div className="mb-4 flex items-center justify-center gap-6 border-b border-outline-variant">
+          <button
+            type="button"
+            onClick={() => setActiveTab("posts")}
+            className={cn(
+              "pb-3 text-label-md font-label-md transition-colors",
+              activeTab === "posts" ? "border-b-2 border-primary text-primary" : "text-secondary hover:text-primary",
+            )}
+          >
+            게시물
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("qna")}
+            className={cn(
+              "pb-3 text-label-md font-label-md transition-colors",
+              activeTab === "qna" ? "border-b-2 border-primary text-primary" : "text-secondary hover:text-primary",
+            )}
+          >
+            유료 Q&A
+          </button>
+        </div>
+        <div className="overflow-hidden">
+          <div
+            className="flex w-[200%] transition-transform duration-300 ease-out"
+            style={{ transform: activeTab === "posts" ? "translateX(0%)" : "translateX(-50%)" }}
+          >
+            <div
+              className="w-1/2 pr-0 sm:pr-3"
+              aria-hidden={activeTab !== "posts"}
+              {...({ inert: activeTab !== "posts" ? "" : undefined } as Record<string, string | undefined>)}
+            >
+              {postsGrid}
+            </div>
+            <div
+              className="w-1/2 pl-0 sm:pl-3"
+              aria-hidden={activeTab !== "qna"}
+              {...({ inert: activeTab !== "qna" ? "" : undefined } as Record<string, string | undefined>)}
+            >
+              {qnaPanel}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
