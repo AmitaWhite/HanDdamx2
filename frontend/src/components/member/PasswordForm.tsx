@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
+import { PASSWORD_HINT, validatePassword } from "@/features/auth/validation";
 import { changePassword } from "@/features/member/memberApi";
 import { asApiError } from "@/lib/api";
 
@@ -27,6 +28,13 @@ export function PasswordForm() {
 		e.preventDefault();
 		clearErrors();
 		setSaved(false);
+
+		const newPasswordErr = validatePassword(newPassword);
+		if (newPasswordErr) {
+			setNewPasswordError(newPasswordErr);
+			return;
+		}
+
 		setSaving(true);
 		try {
 			await changePassword(currentPassword, newPassword);
@@ -40,9 +48,7 @@ export function PasswordForm() {
 			} else if (apiErr.code === "INVALID_CURRENT_PASSWORD") {
 				setCurrentPasswordError("현재 비밀번호가 일치하지 않습니다.");
 			} else if (apiErr.code === "INVALID_REQUEST") {
-				setNewPasswordError(
-					"비밀번호는 영문 대문자, 소문자, 숫자, 특수문자 중 3개 이상을 포함하여 8자 이상이어야 하며, 동일한 문자를 3회 이상 연속 사용할 수 없습니다.",
-				);
+				setNewPasswordError(PASSWORD_HINT);
 			} else {
 				setFormError(apiErr.message);
 			}
@@ -101,6 +107,11 @@ export function PasswordForm() {
 				>
 					<Icon name={showNew ? "visibility_off" : "visibility"} className="text-[20px]" />
 				</button>
+				{!newPasswordError && (
+					<p className="mt-1.5 text-caption font-caption text-secondary">
+						{PASSWORD_HINT}
+					</p>
+				)}
 			</div>
 
 			{formError && (
