@@ -268,14 +268,3 @@ export function getBoardComments(postId: number) {
 		http.get(`/premium-board/posts/${postId}/comments`),
 	);
 }
-
-/**
- * 댓글 작성.
- * 백엔드: POST /api/premium-board/posts/{postId}/comments
- * 권한: 게시판 크리에이터 / 활성 유료 구독자.
- */
-export function createBoardComment(postId: number, content: string) {
-	return unwrap<BoardCommentResponse>(
-		http.post(`/premium-board/posts/${postId}/comments`, { content }),
-	);
-}

@@ -16,14 +16,12 @@ import {
 	type BoardCommentResponse,
 	type BoardPostResponse,
 	type BoardPostType,
-	createBoardComment,
 	deletePremiumBoardPost,
 	deletePremiumBoardPostImage,
 	getBoardComments,
 	getPremiumBoardPost,
 	updatePremiumBoardPost,
 } from "@/features/board/boardApi";
-import { useSubscriptionAccess } from "@/features/subscription/useSubscriptionAccess";
 import { ApiError } from "@/lib/api";
 import { commentsFor } from "@/mocks/comments";
 import { mockImg } from "@/mocks/helpers";
@@ -110,19 +108,6 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 
 	const [comments, setComments] = useState<BoardCommentResponse[]>([]);
 	const [commentsLoading, setCommentsLoading] = useState(true);
-	const [commentDraft, setCommentDraft] = useState("");
-	const {
-		loading: commentSubmitting,
-		error: commentError,
-		run: runComment,
-	} = useSubmitState("댓글 작성에 실패했습니다. 다시 시도해 주세요.");
-	const {
-		loading: accessLoading,
-		isCreator,
-		hasActivePaidSubscription,
-	} = useSubscriptionAccess(post?.creatorId ?? null);
-	// 크리에이터 본인 또는 활성 유료 구독자만 댓글 작성 가능(백엔드 assertCanWriteOnPost와 동일 규칙).
-	const canComment = isCreator || hasActivePaidSubscription;
 
 	useEffect(() => {
 		let cancelled = false;
@@ -143,16 +128,6 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 			cancelled = true;
 		};
 	}, [postId]);
-
-	async function onSubmitComment() {
-		const content = commentDraft.trim();
-		if (!content) return;
-		const created = await runComment(() => createBoardComment(postId, content));
-		if (created) {
-			setComments((prev) => [...prev, created]);
-			setCommentDraft("");
-		}
-	}
 
 	useEffect(() => {
 		let cancelled = false;
@@ -498,34 +473,6 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 						{comments.map((c) => (
 							<CommentRow key={c.id} comment={c} creatorId={post.creatorId} />
 						))}
-					</div>
-				)}
-
-				{commentError && (
-					<div className="mb-3">
-						<Alert>{commentError}</Alert>
-					</div>
-				)}
-
-				{!accessLoading && canComment && (
-					<div className="flex items-center gap-3">
-						<Avatar size={32} />
-						<input
-							value={commentDraft}
-							onChange={(e) => setCommentDraft(e.target.value)}
-							onKeyDown={(e) => e.key === "Enter" && onSubmitComment()}
-							placeholder="댓글을 입력하세요"
-							maxLength={1000}
-							disabled={commentSubmitting}
-							className="h-11 flex-1 rounded-full border border-outline-variant bg-surface-container-low px-4 text-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-						/>
-						<Button
-							size="sm"
-							onClick={onSubmitComment}
-							disabled={commentSubmitting}
-						>
-							{commentSubmitting ? "등록 중…" : "등록"}
-						</Button>
 					</div>
 				)}
 			</section>
