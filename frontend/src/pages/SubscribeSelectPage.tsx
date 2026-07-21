@@ -1,96 +1,608 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
-import { cn } from "@/lib/cn";
-import { findCreator } from "@/mocks/creators";
-import { mockPlans } from "@/mocks/subscriptionPlans";
+import { LinkButton } from "@/components/ui/LinkButton";
+import { CheckoutSummary } from "@/components/subscription/CheckoutSummary";
+import { SubscriptionPlanCard } from "@/components/subscription/SubscriptionPlanCard";
+import { SubscriptionStatusNotice } from "@/components/subscription/SubscriptionStatusNotice";
+import { useAuth } from "@/features/auth/AuthContext";
+import { getCreatorProfile } from "@/features/creator/creatorApi";
+import type { CreatorProfile } from "@/features/creator/types";
+import {
+	getSubscriptionPlans,
+	getSubscriptionStatus,
+	type SubscriptionPlanResponse,
+	type SubscriptionStatusResponse,
+} from "@/features/subscription/subscriptionApi";
+import { ApiError } from "@/lib/api";
 
 interface SubscribeSelectLocationState {
 	mode?: "support";
 }
 
+type LoadErrorSource = "creator" | "plans" | "status";
+type SelectablePlan = "PAID" | null;
+
+const currencyFormatter = new Intl.NumberFormat("ko-KR");
+const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+	year: "numeric",
+	month: "long",
+	day: "numeric",
+	hour: "2-digit",
+	minute: "2-digit",
+});
+
+class SubscribeSelectLoadError extends Error {
+	constructor(
+		public source: LoadErrorSource,
+		public original: unknown,
+	) {
+		super("Subscribe select data load failed.");
+	}
+}
+
 export function SubscribeSelectPage() {
 	const { creatorId = "" } = useParams();
-	const creator = findCreator(creatorId);
-	const navigate = useNavigate();
 	const location = useLocation();
-	// 이미 무료 구독 중인 사람이 "후원하기"로 들어온 경우 — 무료 플랜은 숨기고 유료 플랜만 보여준다.
+	const { isAuthenticated } = useAuth();
+	const numericCreatorId = toNumericCreatorId(creatorId);
 	const isSupportMode = (location.state as SubscribeSelectLocationState | null)?.mode === "support";
-	const [selected, setSelected] = useState<"free" | "paid">("paid");
 
-	const plans = isSupportMode ? mockPlans.filter((p) => p.id === "paid") : mockPlans;
-	const selectedPlan = plans.find((p) => p.id === selected) ?? plans[0];
+	const [creator, setCreator] = useState<CreatorProfile | null>(null);
+	const [plans, setPlans] = useState<SubscriptionPlanResponse[]>([]);
+	const [subscriptionStatus, setSubscriptionStatus] =
+		useState<SubscriptionStatusResponse | null>(null);
+	const [selectedPlan, setSelectedPlan] = useState<SelectablePlan>(null);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
+	const requestIdRef = useRef(0);
+	const mountedRef = useRef(false);
 
-	function handleSubscribe() {
-		navigate(paths.subscribeComplete, { state: { creatorId: creator.id, planId: selectedPlan.id } });
+	const freePlan = useMemo(
+		() => plans.find((plan) => plan.subscriptionLevel === "FREE") ?? null,
+		[plans],
+	);
+	const paidPlan = useMemo(
+		() => plans.find((plan) => plan.subscriptionLevel === "PAID") ?? null,
+		[plans],
+	);
+
+	const isUnsubscribed = isUnsubscribedStatus(subscriptionStatus);
+	const isFreeActive = isFreeActiveStatus(subscriptionStatus);
+	const isPaidActive = isPaidActiveStatus(subscriptionStatus);
+	const isPaidCancelScheduled = isPaidCancelScheduledStatus(subscriptionStatus);
+	const isUnexpectedStatus =
+		subscriptionStatus !== null &&
+		!isUnsubscribed &&
+		!isFreeActive &&
+		!isPaidActive &&
+		!isPaidCancelScheduled;
+	const paidAmountValid = paidPlan ? isValidPaidAmount(paidPlan) : false;
+	const canSelectPaid =
+		isAuthenticated &&
+		numericCreatorId !== null &&
+		creator !== null &&
+		!creator.isMine &&
+		paidPlan !== null &&
+		paidPlan.available &&
+		paidAmountValid &&
+		!isPaidActive &&
+		!isPaidCancelScheduled &&
+		!isUnexpectedStatus;
+	const canProceedToPayment = selectedPlan === "PAID" && canSelectPaid;
+
+	const loadData = useCallback(async () => {
+		if (numericCreatorId === null || !isAuthenticated) return;
+
+		const requestId = requestIdRef.current + 1;
+		requestIdRef.current = requestId;
+		setLoading(true);
+		setError(null);
+		setNotice(null);
+		setCreator(null);
+		setPlans([]);
+		setSubscriptionStatus(null);
+		setSelectedPlan(null);
+
+		try {
+			const [nextCreator, nextPlans, nextStatus] = await Promise.all([
+				wrapLoad(getCreatorProfile(numericCreatorId), "creator"),
+				wrapLoad(getSubscriptionPlans(numericCreatorId), "plans"),
+				wrapLoad(getSubscriptionStatus(numericCreatorId), "status"),
+			]);
+
+			if (!mountedRef.current || requestIdRef.current !== requestId) return;
+
+			setCreator(nextCreator);
+			setPlans(nextPlans);
+			setSubscriptionStatus(nextStatus);
+			setSelectedPlan(getInitialSelectedPlan(nextCreator, nextPlans, nextStatus));
+		} catch (err) {
+			if (!mountedRef.current || requestIdRef.current !== requestId) return;
+			setError(toUserMessage(err));
+		} finally {
+			if (mountedRef.current && requestIdRef.current === requestId) {
+				setLoading(false);
+			}
+		}
+	}, [isAuthenticated, numericCreatorId]);
+
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+			requestIdRef.current += 1;
+		};
+	}, []);
+
+	useEffect(() => {
+		requestIdRef.current += 1;
+		setCreator(null);
+		setPlans([]);
+		setSubscriptionStatus(null);
+		setSelectedPlan(null);
+		setError(null);
+		setNotice(null);
+		setLoading(false);
+
+		if (numericCreatorId === null || !isAuthenticated) return;
+
+		void loadData();
+	}, [isAuthenticated, loadData, numericCreatorId]);
+
+	function handlePaymentPreview() {
+		if (!canProceedToPayment) return;
+		setNotice(
+			"결제창 연동은 다음 단계에서 연결됩니다. 아직 결제 준비 요청은 생성하지 않았습니다.",
+		);
 	}
 
+	if (numericCreatorId === null) {
+		return (
+			<SubscribeSelectShell>
+				<Card className="p-6 text-center">
+					<h1 className="text-headline-lg font-display text-on-surface">
+						잘못된 접근입니다
+					</h1>
+					<p className="mt-3 text-body-md text-secondary">
+						크리에이터 주소를 확인할 수 없습니다.
+					</p>
+					<div className="mt-6">
+						<LinkButton to={paths.home}>홈으로 이동</LinkButton>
+					</div>
+				</Card>
+			</SubscribeSelectShell>
+		);
+	}
+
+	if (!isAuthenticated) {
+		return (
+			<SubscribeSelectShell>
+				<Card className="p-6">
+					<h1 className="text-headline-lg font-display text-on-surface">
+						로그인이 필요합니다
+					</h1>
+					<p className="mt-3 text-body-md text-secondary">
+						구독 요금제를 확인하고 결제를 진행하려면 로그인이 필요합니다.
+					</p>
+					<div className="mt-6 flex flex-col gap-3 sm:flex-row">
+						<LinkButton to={paths.login} fullWidth>
+							로그인하러 가기
+						</LinkButton>
+						<LinkButton
+							to={paths.creator(numericCreatorId)}
+							variant="outline"
+							fullWidth
+						>
+							크리에이터 페이지로
+						</LinkButton>
+					</div>
+				</Card>
+			</SubscribeSelectShell>
+		);
+	}
+
+	if (loading) {
+		return (
+			<SubscribeSelectShell>
+				<Card className="p-8 text-center">
+					<p role="status" className="text-body-md text-secondary">
+						구독 요금제를 불러오는 중입니다.
+					</p>
+				</Card>
+			</SubscribeSelectShell>
+		);
+	}
+
+	if (error) {
+		return (
+			<SubscribeSelectShell>
+				<Link
+					to={paths.creator(numericCreatorId)}
+					className="mb-6 inline-flex items-center gap-1 text-label-md font-label-md text-secondary hover:text-primary"
+				>
+					<Icon name="arrow_back" className="text-[18px]" />
+					크리에이터 페이지로
+				</Link>
+				<Card className="p-6">
+					<Alert>{error}</Alert>
+					<Button
+						type="button"
+						variant="outline"
+						className="mt-4"
+						onClick={() => {
+							void loadData();
+						}}
+					>
+						다시 시도
+					</Button>
+				</Card>
+			</SubscribeSelectShell>
+		);
+	}
+
+	if (!creator || !subscriptionStatus) {
+		return (
+			<SubscribeSelectShell>
+				<Card className="p-6 text-center">
+					<p className="text-body-md text-secondary">
+						구독 정보를 확인할 수 없습니다.
+					</p>
+					<div className="mt-5">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => {
+								void loadData();
+							}}
+						>
+							다시 시도
+						</Button>
+					</div>
+				</Card>
+			</SubscribeSelectShell>
+		);
+	}
+
+	const statusPeriodEndAtLabel =
+		isPaidCancelScheduled && subscriptionStatus.currentPeriodEndAt
+			? formatDateTime(subscriptionStatus.currentPeriodEndAt)
+			: null;
+	const paymentDisabledReason = paidPlan
+		? getPaymentDisabledReason({
+				creator,
+				paidPlan,
+				paidAmountValid,
+				isPaidActive,
+				isPaidCancelScheduled,
+				isUnexpectedStatus,
+			})
+		: "";
+
 	return (
-		<div className="container-page max-w-xl py-10">
+		<SubscribeSelectShell>
 			<Link
-				to={paths.creator(creator.id)}
+				to={paths.creator(creator.memberId)}
 				className="mb-6 inline-flex items-center gap-1 text-label-md font-label-md text-secondary hover:text-primary"
 			>
 				<Icon name="arrow_back" className="text-[18px]" />
-				{creator.name} 프로필로
+				{creator.nickname} 프로필로
 			</Link>
 
 			<h1 className="mb-2 text-headline-lg font-display text-on-surface">
-				{creator.name} 작가 {isSupportMode ? "후원하기" : "구독하기"}
+				{creator.nickname} 작가 {isSupportMode ? "후원하기" : "구독하기"}
 			</h1>
 			<p className="mb-8 text-body-md text-secondary">
-				{isSupportMode ? "작가님의 창작 활동을 더 응원해주세요." : "원하는 구독 플랜을 선택해주세요."}
+				{isSupportMode
+					? "유료 구독으로 창작 활동을 더 응원할 수 있습니다."
+					: "서버에 등록된 구독 요금제를 확인하고 다음 결제 단계를 준비합니다."}
 			</p>
 
-			<div className="mb-8 flex flex-col gap-4">
-				{plans.map((plan) => (
-					<button
-						key={plan.id}
-						type="button"
-						onClick={() => setSelected(plan.id)}
-						className={cn(
-							"relative rounded-xl border p-6 text-left transition-colors",
-							selected === plan.id ? "border-primary bg-primary/5" : "border-outline-variant",
-						)}
-					>
-						{plan.isRecommended && (
-							<span className="absolute right-6 top-6 rounded-full bg-primary px-3 py-1 text-[10px] font-bold text-on-primary">
-								추천
-							</span>
-						)}
-						<div className="flex items-start gap-4">
-							<span
-								className={cn(
-									"mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-									selected === plan.id ? "border-primary" : "border-outline-variant",
-								)}
-							>
-								{selected === plan.id && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
-							</span>
-							<div className="flex-1">
-								<h2 className="text-headline-md font-display text-on-surface">{plan.name}</h2>
-								{plan.description && <p className="mt-1 text-body-md text-secondary">{plan.description}</p>}
-								<ul className="mt-3 flex flex-col gap-1.5">
-									{plan.benefits.map((b) => (
-										<li key={b} className="flex items-center gap-2 text-body-md text-on-surface">
-											<Icon name="check" className="text-[18px] text-primary" />
-											{b}
-										</li>
-									))}
-								</ul>
-								<p className="mt-4 text-headline-md font-display text-on-surface">{plan.priceLabel}</p>
-							</div>
-						</div>
-					</button>
-				))}
-			</div>
+			<SubscriptionStatusNotice
+				label={getStatusLabel(subscriptionStatus)}
+				description={getStatusDescription(subscriptionStatus, creator)}
+				periodEndAtLabel={statusPeriodEndAtLabel}
+			/>
 
-			<Button size="lg" fullWidth onClick={handleSubscribe}>
-				{isSupportMode ? "결제하고 후원하기" : "결제하고 구독하기"}
-			</Button>
-			<p className="mt-4 text-center text-caption font-caption text-secondary">구독은 언제든지 취소할 수 있습니다.</p>
-		</div>
+			{plans.length === 0 ? (
+				<Card className="mb-8 p-6">
+					<p className="text-body-md text-secondary">
+						등록된 구독 요금제가 없습니다.
+					</p>
+				</Card>
+			) : (
+				<div className="mb-8 grid gap-4 md:grid-cols-2">
+					{freePlan && (
+						<SubscriptionPlanCard
+							plan={freePlan}
+							title="무료 구독"
+							description={
+								freePlan.benefitsDescription ??
+								"무료 구독은 크리에이터 페이지에서 시작할 수 있습니다."
+							}
+							priceLabel={formatPrice(freePlan)}
+							current={isFreeActive}
+						>
+							<LinkButton
+								to={paths.creator(creator.memberId)}
+								variant="outline"
+								fullWidth
+							>
+								크리에이터 페이지에서 관리
+							</LinkButton>
+						</SubscriptionPlanCard>
+					)}
+
+					{paidPlan ? (
+						<SubscriptionPlanCard
+							plan={paidPlan}
+							title="유료 구독"
+							description={paidPlan.benefitsDescription}
+							priceLabel={formatPrice(paidPlan)}
+							current={isPaidActive || isPaidCancelScheduled}
+							selected={selectedPlan === "PAID"}
+						>
+							<Button
+								type="button"
+								variant={selectedPlan === "PAID" ? "primary" : "outline"}
+								fullWidth
+								disabled={!canSelectPaid}
+								onClick={() => setSelectedPlan("PAID")}
+							>
+								{getPaidSelectButtonLabel({
+									canSelectPaid,
+									creator,
+									paidPlan,
+									paidAmountValid,
+									isPaidActive,
+									isPaidCancelScheduled,
+								})}
+							</Button>
+						</SubscriptionPlanCard>
+					) : (
+						<Card className="p-6">
+							<h2 className="text-headline-md font-display text-on-surface">
+								유료 구독
+							</h2>
+							<p className="mt-3 text-body-md text-secondary">
+								등록된 유료 요금제가 없습니다.
+							</p>
+						</Card>
+					)}
+				</div>
+			)}
+
+			{paidPlan && (
+				<CheckoutSummary
+					creatorNickname={creator.nickname}
+					amountLabel={formatPrice(paidPlan)}
+					notice={notice}
+					disabled={!canProceedToPayment}
+					disabledReason={paymentDisabledReason}
+					onReadyClick={handlePaymentPreview}
+				/>
+			)}
+		</SubscribeSelectShell>
 	);
+}
+
+function SubscribeSelectShell({ children }: { children: ReactNode }) {
+	return <div className="container-page max-w-3xl py-10">{children}</div>;
+}
+
+function toNumericCreatorId(value: string): number | null {
+	if (!value) return null;
+	const n = Number(value);
+	return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function wrapLoad<T>(promise: Promise<T>, source: LoadErrorSource): Promise<T> {
+	return promise.catch((err: unknown) => {
+		throw new SubscribeSelectLoadError(source, err);
+	});
+}
+
+function getInitialSelectedPlan(
+	creator: CreatorProfile,
+	plans: SubscriptionPlanResponse[],
+	status: SubscriptionStatusResponse,
+): SelectablePlan {
+	const paidPlan = plans.find((plan) => plan.subscriptionLevel === "PAID");
+	if (
+		creator.isMine ||
+		!paidPlan ||
+		!paidPlan.available ||
+		!isValidPaidAmount(paidPlan) ||
+		isPaidActiveStatus(status) ||
+		isPaidCancelScheduledStatus(status) ||
+		isUnexpectedStatusValue(status)
+	) {
+		return null;
+	}
+
+	return "PAID";
+}
+
+function isUnsubscribedStatus(status: SubscriptionStatusResponse | null): boolean {
+	return (
+		status?.subscribed === false &&
+		status.subscriptionLevel === null &&
+		status.status === null
+	);
+}
+
+function isFreeActiveStatus(status: SubscriptionStatusResponse | null): boolean {
+	return (
+		status?.subscribed === true &&
+		status.subscriptionLevel === "FREE" &&
+		status.status === "ACTIVE"
+	);
+}
+
+function isPaidActiveStatus(status: SubscriptionStatusResponse | null): boolean {
+	return (
+		status?.subscribed === true &&
+		status.subscriptionLevel === "PAID" &&
+		status.status === "ACTIVE"
+	);
+}
+
+function isPaidCancelScheduledStatus(
+	status: SubscriptionStatusResponse | null,
+): boolean {
+	return (
+		status?.subscribed === true &&
+		status.subscriptionLevel === "PAID" &&
+		status.status === "CANCEL_SCHEDULED"
+	);
+}
+
+function isUnexpectedStatusValue(status: SubscriptionStatusResponse): boolean {
+	return (
+		!isUnsubscribedStatus(status) &&
+		!isFreeActiveStatus(status) &&
+		!isPaidActiveStatus(status) &&
+		!isPaidCancelScheduledStatus(status)
+	);
+}
+
+function getStatusLabel(status: SubscriptionStatusResponse): string {
+	if (isUnsubscribedStatus(status)) return "미구독";
+	if (isFreeActiveStatus(status)) return "무료 구독 중";
+	if (isPaidActiveStatus(status)) return "유료 구독 중";
+	if (isPaidCancelScheduledStatus(status)) return "해지 예약";
+	return "상태 확인 필요";
+}
+
+function getStatusDescription(
+	status: SubscriptionStatusResponse,
+	creator: CreatorProfile,
+): string {
+	if (creator.isMine) {
+		return "본인 크리에이터 계정은 구독할 수 없습니다.";
+	}
+	if (isUnsubscribedStatus(status)) {
+		return "아직 구독하지 않았습니다. 무료 구독은 크리에이터 페이지에서 시작할 수 있습니다.";
+	}
+	if (isFreeActiveStatus(status)) {
+		return "현재 무료 구독 중입니다. 유료 구독으로 업그레이드할 수 있습니다.";
+	}
+	if (isPaidActiveStatus(status)) {
+		return "이미 유료 구독 중입니다. 동일한 유료 결제는 진행할 수 없습니다.";
+	}
+	if (isPaidCancelScheduledStatus(status)) {
+		return "유료 구독 해지 예약 상태입니다. 해지 예약 관리는 마이페이지에서 진행합니다.";
+	}
+	return "현재 구독 상태를 확인할 수 없습니다. 결제 진행이 제한됩니다.";
+}
+
+function isValidPaidAmount(plan: SubscriptionPlanResponse): boolean {
+	return Number.isFinite(plan.price) && plan.price > 0;
+}
+
+function formatPrice(plan: SubscriptionPlanResponse): string {
+	if (plan.subscriptionLevel === "FREE") return "무료";
+	if (!isValidPaidAmount(plan)) return "가격 확인 필요";
+	return `${currencyFormatter.format(plan.price)}원 / 월`;
+}
+
+function formatDateTime(value: string): string {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return value;
+	return dateTimeFormatter.format(date);
+}
+
+function getPaidSelectButtonLabel({
+	canSelectPaid,
+	creator,
+	paidPlan,
+	paidAmountValid,
+	isPaidActive,
+	isPaidCancelScheduled,
+}: {
+	canSelectPaid: boolean;
+	creator: CreatorProfile;
+	paidPlan: SubscriptionPlanResponse;
+	paidAmountValid: boolean;
+	isPaidActive: boolean;
+	isPaidCancelScheduled: boolean;
+}): string {
+	if (canSelectPaid) return "유료 요금제 선택";
+	if (creator.isMine) return "본인 구독 불가";
+	if (isPaidActive) return "이미 유료 구독 중";
+	if (isPaidCancelScheduled) return "해지 예약 상태";
+	if (!paidPlan.available) return "유료 구독 이용 불가";
+	if (!paidAmountValid) return "가격 정보 확인 필요";
+	return "선택할 수 없음";
+}
+
+function getPaymentDisabledReason({
+	creator,
+	paidPlan,
+	paidAmountValid,
+	isPaidActive,
+	isPaidCancelScheduled,
+	isUnexpectedStatus,
+}: {
+	creator: CreatorProfile;
+	paidPlan: SubscriptionPlanResponse;
+	paidAmountValid: boolean;
+	isPaidActive: boolean;
+	isPaidCancelScheduled: boolean;
+	isUnexpectedStatus: boolean;
+}): string {
+	if (creator.isMine) return "본인 크리에이터 계정은 구독할 수 없습니다.";
+	if (isPaidActive) return "이미 유료 구독 중입니다.";
+	if (isPaidCancelScheduled) return "해지 예약 상태에서는 새 결제를 진행하지 않습니다.";
+	if (!paidPlan.available) return "현재 유료 요금제를 이용할 수 없습니다.";
+	if (!paidAmountValid) return "유료 요금제 금액을 확인할 수 없습니다.";
+	if (isUnexpectedStatus) return "구독 상태 확인이 필요합니다.";
+	return "유료 요금제를 선택할 수 없습니다.";
+}
+
+function toUserMessage(err: unknown): string {
+	if (err instanceof SubscribeSelectLoadError) {
+		return toLoadErrorMessage(err.source, err.original);
+	}
+	return toLoadErrorMessage("creator", err);
+}
+
+function toLoadErrorMessage(source: LoadErrorSource, err: unknown): string {
+	if (!(err instanceof ApiError)) {
+		return getFallbackLoadMessage(source);
+	}
+
+	if (err.code === "UNAUTHORIZED") {
+		return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
+	}
+	if (source === "creator" && err.code === "CREATOR_NOT_FOUND") {
+		return "크리에이터를 찾을 수 없습니다.";
+	}
+
+	return err.message || getFallbackLoadMessage(source);
+}
+
+function getFallbackLoadMessage(source: LoadErrorSource): string {
+	switch (source) {
+		case "creator":
+			return "크리에이터 정보를 불러오지 못했습니다.";
+		case "plans":
+			return "구독 요금제를 불러오지 못했습니다.";
+		case "status":
+			return "현재 구독 상태를 불러오지 못했습니다.";
+		default:
+			return "구독 정보를 불러오지 못했습니다.";
+	}
 }
