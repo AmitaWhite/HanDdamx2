@@ -14,8 +14,6 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
 
 	long countByMemberIdAndIsReadFalse(Long memberId);
 
-	boolean existsByDedupKey(String dedupKey);
-
 	/**
 	 * 본인 알림 전체 읽음 처리. 이미 읽은 알림은 건드리지 않는다.
 	 *

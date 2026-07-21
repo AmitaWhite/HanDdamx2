@@ -10,7 +10,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Slf4j
 @Component
@@ -30,12 +31,20 @@ public class SubscriptionExpiringSoonScheduler {
             zone = "${subscription.expiring-notification.zone}"
     )
     public void publishExpiringSoonEvents() {
-        Instant now = Instant.now();
-        Instant threshold = now.plus(properties.getDaysBefore(), ChronoUnit.DAYS);
+        ZoneId zoneId = ZoneId.of(properties.getZone());
+        LocalDate targetDate = LocalDate.now(zoneId)
+                .plusDays(properties.getDaysBefore());
+        Instant targetStart = targetDate
+                .atStartOfDay(zoneId)
+                .toInstant();
+        Instant targetEnd = targetDate
+                .plusDays(1)
+                .atStartOfDay(zoneId)
+                .toInstant();
         SubscriptionExpiringSoonResult result =
                 subscriptionExpiringSoonService.publishExpiringSoonEvents(
-                        now,
-                        threshold,
+                        targetStart,
+                        targetEnd,
                         properties.getBatchSize()
                 );
 

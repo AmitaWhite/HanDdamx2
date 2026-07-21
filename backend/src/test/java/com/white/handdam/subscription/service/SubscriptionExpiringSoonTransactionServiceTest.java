@@ -33,9 +33,9 @@ class SubscriptionExpiringSoonTransactionServiceTest {
     private static final Long SUBSCRIBER_ID = 1L;
     private static final Long CREATOR_ID = 2L;
     private static final Instant STARTED_AT = Instant.parse("2026-07-13T00:00:00Z");
-    private static final Instant NOW = Instant.parse("2026-08-10T00:00:00Z");
-    private static final Instant PERIOD_END_AT = Instant.parse("2026-08-13T00:00:00Z");
-    private static final Instant THRESHOLD = PERIOD_END_AT;
+    private static final Instant TARGET_START = Instant.parse("2026-08-13T00:00:00Z");
+    private static final Instant TARGET_END = Instant.parse("2026-08-14T00:00:00Z");
+    private static final Instant PERIOD_END_AT = Instant.parse("2026-08-13T12:00:00Z");
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
@@ -55,8 +55,8 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         boolean published = transactionService.publishExpiringSoonEvent(
                 SUBSCRIPTION_ID,
                 PERIOD_END_AT,
-                NOW,
-                THRESHOLD
+                TARGET_START,
+                TARGET_END
         );
 
         ArgumentCaptor<SubscriptionExpiringSoonEvent> eventCaptor =
@@ -76,7 +76,7 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         Subscription subscription = scheduledPaidSubscription(PERIOD_END_AT);
         when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
 
-        transactionService.publishExpiringSoonEvent(SUBSCRIPTION_ID, PERIOD_END_AT, NOW, THRESHOLD);
+        transactionService.publishExpiringSoonEvent(SUBSCRIPTION_ID, PERIOD_END_AT, TARGET_START, TARGET_END);
 
         assertThat(subscription.getSubscriptionLevel()).isEqualTo(SubscriptionLevel.PAID);
         assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.CANCEL_SCHEDULED);
@@ -96,7 +96,12 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         ReflectionTestUtils.setField(subscription, "currentPeriodEndAt", PERIOD_END_AT);
         when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
 
-        boolean published = transactionService.publishExpiringSoonEvent(SUBSCRIPTION_ID, PERIOD_END_AT, NOW, THRESHOLD);
+        boolean published = transactionService.publishExpiringSoonEvent(
+                SUBSCRIPTION_ID,
+                PERIOD_END_AT,
+                TARGET_START,
+                TARGET_END
+        );
 
         assertThat(published).isFalse();
         verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
@@ -109,7 +114,12 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         ReflectionTestUtils.setField(subscription, "id", SUBSCRIPTION_ID);
         when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
 
-        boolean published = transactionService.publishExpiringSoonEvent(SUBSCRIPTION_ID, PERIOD_END_AT, NOW, THRESHOLD);
+        boolean published = transactionService.publishExpiringSoonEvent(
+                SUBSCRIPTION_ID,
+                PERIOD_END_AT,
+                TARGET_START,
+                TARGET_END
+        );
 
         assertThat(published).isFalse();
         verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
@@ -121,19 +131,46 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         Subscription subscription = scheduledPaidSubscription(PERIOD_END_AT.plusSeconds(1));
         when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
 
-        boolean published = transactionService.publishExpiringSoonEvent(SUBSCRIPTION_ID, PERIOD_END_AT, NOW, THRESHOLD);
+        boolean published = transactionService.publishExpiringSoonEvent(
+                SUBSCRIPTION_ID,
+                PERIOD_END_AT,
+                TARGET_START,
+                TARGET_END
+        );
 
         assertThat(published).isFalse();
         verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    @DisplayName("publishExpiringSoonEvent skips already expired subscription")
-    void publishExpiringSoonEventSkipsExpired() {
-        Subscription subscription = scheduledPaidSubscription(NOW);
+    @DisplayName("publishExpiringSoonEvent includes targetStart")
+    void publishExpiringSoonEventIncludesTargetStart() {
+        Subscription subscription = scheduledPaidSubscription(TARGET_START);
         when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
 
-        boolean published = transactionService.publishExpiringSoonEvent(SUBSCRIPTION_ID, NOW, NOW, THRESHOLD);
+        boolean published = transactionService.publishExpiringSoonEvent(
+                SUBSCRIPTION_ID,
+                TARGET_START,
+                TARGET_START,
+                TARGET_END
+        );
+
+        assertThat(published).isTrue();
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(SubscriptionExpiringSoonEvent.class));
+    }
+
+    @Test
+    @DisplayName("publishExpiringSoonEvent excludes targetEnd")
+    void publishExpiringSoonEventExcludesTargetEnd() {
+        Subscription subscription = scheduledPaidSubscription(TARGET_END);
+        when(subscriptionRepository.findByIdForUpdate(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        boolean published = transactionService.publishExpiringSoonEvent(
+                SUBSCRIPTION_ID,
+                TARGET_END,
+                TARGET_START,
+                TARGET_END
+        );
 
         assertThat(published).isFalse();
         verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
@@ -148,8 +185,8 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         assertThatThrownBy(() -> transactionService.publishExpiringSoonEvent(
                 SUBSCRIPTION_ID,
                 PERIOD_END_AT,
-                NOW,
-                THRESHOLD
+                TARGET_START,
+                TARGET_END
         )).isInstanceOf(CannotAcquireLockException.class);
 
         verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
@@ -166,8 +203,8 @@ class SubscriptionExpiringSoonTransactionServiceTest {
         assertThatThrownBy(() -> transactionService.publishExpiringSoonEvent(
                 SUBSCRIPTION_ID,
                 PERIOD_END_AT,
-                NOW,
-                THRESHOLD
+                TARGET_START,
+                TARGET_END
         )).isInstanceOf(IllegalStateException.class);
     }
 

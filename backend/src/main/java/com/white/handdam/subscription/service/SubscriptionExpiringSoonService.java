@@ -23,30 +23,30 @@ public class SubscriptionExpiringSoonService {
 
     @Transactional(readOnly = true)
     public List<SubscriptionExpiringSoonTarget> findExpiringSoonTargets(
-            Instant now,
-            Instant threshold,
+            Instant targetStart,
+            Instant targetEnd,
             int batchSize,
             int pageNumber
     ) {
-        validateTimeRange(now, threshold);
+        validateTargetRange(targetStart, targetEnd);
         validateBatchSize(batchSize);
         validatePageNumber(pageNumber);
 
         return subscriptionRepository.findExpiringSoonSubscriptionTargets(
                 SubscriptionLevel.PAID,
                 SubscriptionStatus.CANCEL_SCHEDULED,
-                now,
-                threshold,
+                targetStart,
+                targetEnd,
                 PageRequest.of(pageNumber, batchSize)
         );
     }
 
     public SubscriptionExpiringSoonResult publishExpiringSoonEvents(
-            Instant now,
-            Instant threshold,
+            Instant targetStart,
+            Instant targetEnd,
             int batchSize
     ) {
-        validateTimeRange(now, threshold);
+        validateTargetRange(targetStart, targetEnd);
         validateBatchSize(batchSize);
 
         int candidateCount = 0;
@@ -57,7 +57,7 @@ public class SubscriptionExpiringSoonService {
 
         while (true) {
             List<SubscriptionExpiringSoonTarget> targets =
-                    findExpiringSoonTargets(now, threshold, batchSize, pageNumber);
+                    findExpiringSoonTargets(targetStart, targetEnd, batchSize, pageNumber);
             candidateCount += targets.size();
 
             for (SubscriptionExpiringSoonTarget target : targets) {
@@ -65,8 +65,8 @@ public class SubscriptionExpiringSoonService {
                     boolean published = transactionService.publishExpiringSoonEvent(
                             target.subscriptionId(),
                             target.currentPeriodEndAt(),
-                            now,
-                            threshold
+                            targetStart,
+                            targetEnd
                     );
                     if (published) {
                         publishedCount++;
@@ -94,11 +94,11 @@ public class SubscriptionExpiringSoonService {
         );
     }
 
-    private void validateTimeRange(Instant now, Instant threshold) {
-        validateRequired(now, "now");
-        validateRequired(threshold, "threshold");
-        if (threshold.isBefore(now)) {
-            throw new IllegalArgumentException("threshold must not be before now");
+    private void validateTargetRange(Instant targetStart, Instant targetEnd) {
+        validateRequired(targetStart, "targetStart");
+        validateRequired(targetEnd, "targetEnd");
+        if (!targetEnd.isAfter(targetStart)) {
+            throw new IllegalArgumentException("targetEnd must be after targetStart");
         }
     }
 

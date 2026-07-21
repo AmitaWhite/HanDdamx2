@@ -74,15 +74,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
             where subscription.subscriptionLevel = :subscriptionLevel
               and subscription.status = :status
               and subscription.currentPeriodEndAt is not null
-              and subscription.currentPeriodEndAt > :now
-              and subscription.currentPeriodEndAt <= :threshold
+              and subscription.currentPeriodEndAt >= :targetStart
+              and subscription.currentPeriodEndAt < :targetEnd
             order by subscription.currentPeriodEndAt asc, subscription.id asc
             """)
     List<SubscriptionExpiringSoonTarget> findExpiringSoonSubscriptionTargets(
             @Param("subscriptionLevel") SubscriptionLevel subscriptionLevel,
             @Param("status") SubscriptionStatus status,
-            @Param("now") Instant now,
-            @Param("threshold") Instant threshold,
+            @Param("targetStart") Instant targetStart,
+            @Param("targetEnd") Instant targetEnd,
             Pageable pageable
     );
 

@@ -39,9 +39,9 @@ class SubscriptionExpiringSoonNotificationIntegrationTest {
     private static final Long SUBSCRIBER_ID = 1L;
     private static final Long CREATOR_ID = 2L;
     private static final Instant STARTED_AT = Instant.parse("2026-07-13T00:00:00Z");
-    private static final Instant NOW = Instant.parse("2026-08-10T00:00:00Z");
-    private static final Instant PERIOD_END_AT = Instant.parse("2026-08-12T00:00:00Z");
-    private static final Instant THRESHOLD = Instant.parse("2026-08-13T00:00:00Z");
+    private static final Instant TARGET_START = Instant.parse("2026-08-12T15:00:00Z");
+    private static final Instant TARGET_END = Instant.parse("2026-08-13T15:00:00Z");
+    private static final Instant PERIOD_END_AT = Instant.parse("2026-08-13T00:00:00Z");
 
     @Autowired
     private SubscriptionExpiringSoonService expiringSoonService;
@@ -73,7 +73,7 @@ class SubscriptionExpiringSoonNotificationIntegrationTest {
         Subscription subscription = saveScheduledPaid(SUBSCRIBER_ID, CREATOR_ID, PERIOD_END_AT);
 
         SubscriptionExpiringSoonResult result =
-                expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
+                expiringSoonService.publishExpiringSoonEvents(TARGET_START, TARGET_END, 100);
 
         assertThat(result.candidateCount()).isEqualTo(1);
         assertThat(result.publishedCount()).isEqualTo(1);
@@ -84,43 +84,20 @@ class SubscriptionExpiringSoonNotificationIntegrationTest {
         assertThat(notification.getType()).isEqualTo(NotificationType.SUBSCRIPTION_EXPIRING);
         assertThat(notification.getReferenceId()).isEqualTo(subscription.getId());
         assertThat(notification.getReferenceType()).isEqualTo(NotificationReferenceType.SUBSCRIPTION.name());
-        assertThat(notification.getDedupKey())
-                .isEqualTo("SUBSCRIPTION_EXPIRING:%d:%s".formatted(subscription.getId(), PERIOD_END_AT));
     }
 
     @Test
-    @DisplayName("same schedule repeated does not create duplicate notification for same period")
-    void repeatedScheduleDoesNotCreateDuplicateNotification() throws InterruptedException {
-        saveScheduledPaid(SUBSCRIBER_ID, CREATOR_ID, PERIOD_END_AT);
-        expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
-        waitForNotificationCount(1);
+    @DisplayName("subscriptions expiring before or after target date range do not create notifications")
+    void outsideTargetDateRangeDoesNotCreateNotification() throws InterruptedException {
+        saveScheduledPaid(SUBSCRIBER_ID, CREATOR_ID, TARGET_START.minusSeconds(1));
+        saveScheduledPaid(SUBSCRIBER_ID + 1, CREATOR_ID + 1, TARGET_END);
 
-        expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
+        SubscriptionExpiringSoonResult result =
+                expiringSoonService.publishExpiringSoonEvents(TARGET_START, TARGET_END, 100);
 
+        assertThat(result.candidateCount()).isZero();
         Thread.sleep(300);
-        assertThat(notificationRepository.findAll()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("same subscription can receive new notification when currentPeriodEndAt changes")
-    void changedPeriodEndCreatesNewNotification() {
-        Subscription subscription = saveScheduledPaid(SUBSCRIBER_ID, CREATOR_ID, PERIOD_END_AT);
-        expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
-        waitForNotificationCount(1);
-
-        Instant nextPeriodEndAt = Instant.parse("2026-08-12T12:00:00Z");
-        ReflectionTestUtils.setField(subscription, "currentPeriodEndAt", nextPeriodEndAt);
-        subscriptionRepository.saveAndFlush(subscription);
-
-        expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
-
-        List<NotificationEntity> notifications = waitForNotificationCount(2);
-        assertThat(notifications)
-                .extracting(notification -> notification.getDedupKey())
-                .containsExactlyInAnyOrder(
-                        "SUBSCRIPTION_EXPIRING:%d:%s".formatted(subscription.getId(), PERIOD_END_AT),
-                        "SUBSCRIPTION_EXPIRING:%d:%s".formatted(subscription.getId(), nextPeriodEndAt)
-                );
+        assertThat(notificationRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -140,7 +117,7 @@ class SubscriptionExpiringSoonNotificationIntegrationTest {
         saveActivePaid(SUBSCRIBER_ID, CREATOR_ID, PERIOD_END_AT);
 
         SubscriptionExpiringSoonResult result =
-                expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
+                expiringSoonService.publishExpiringSoonEvents(TARGET_START, TARGET_END, 100);
 
         assertThat(result.candidateCount()).isZero();
         Thread.sleep(300);
@@ -153,7 +130,7 @@ class SubscriptionExpiringSoonNotificationIntegrationTest {
         subscriptionRepository.saveAndFlush(Subscription.createFree(SUBSCRIBER_ID, CREATOR_ID, STARTED_AT));
 
         SubscriptionExpiringSoonResult result =
-                expiringSoonService.publishExpiringSoonEvents(NOW, THRESHOLD, 100);
+                expiringSoonService.publishExpiringSoonEvents(TARGET_START, TARGET_END, 100);
 
         assertThat(result.candidateCount()).isZero();
         Thread.sleep(300);

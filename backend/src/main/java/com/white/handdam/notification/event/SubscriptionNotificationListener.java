@@ -26,26 +26,17 @@ public class SubscriptionNotificationListener {
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void handleSubscriptionExpiringSoon(SubscriptionExpiringSoonEvent event) {
 		try {
-			notificationService.createIfAbsent(
+			notificationService.create(
 				event.subscriberId(),
 				SYSTEM_SENDER,
 				NotificationType.SUBSCRIPTION_EXPIRING,
 				EXPIRING_MESSAGE,
 				event.subscriptionId(),
-				NotificationReferenceType.SUBSCRIPTION,
-				dedupKey(event)
+				NotificationReferenceType.SUBSCRIPTION
 			);
 		} catch (Exception e) {
 			log.error("Subscription expiring soon notification failed. subscriptionId={}, currentPeriodEndAt={}",
 				event.subscriptionId(), event.currentPeriodEndAt(), e);
 		}
-	}
-
-	static String dedupKey(SubscriptionExpiringSoonEvent event) {
-		return "%s:%d:%s".formatted(
-			NotificationType.SUBSCRIPTION_EXPIRING,
-			event.subscriptionId(),
-			event.currentPeriodEndAt()
-		);
 	}
 }

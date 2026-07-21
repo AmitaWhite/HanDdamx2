@@ -14,9 +14,9 @@ import java.time.Instant;
  * notification reference target. {@code creatorId} is included only as domain context for
  * consumers that need it; listeners must not load sensitive payment data from this event.
  *
- * <p>A SUBSCRIPTION_EXPIRING notification must be stored at most once for the same
- * {@code subscriptionId} and {@code currentPeriodEndAt}. If a later paid period changes
- * {@code currentPeriodEndAt}, a new notification may be created for that new period.
+ * <p>The scheduler publishes this event for subscriptions whose {@code currentPeriodEndAt}
+ * falls within the configured target date. For example, with {@code days-before=3}, a run on
+ * July 21 in the configured zone targets subscriptions expiring on July 24 in that zone.
  */
 public record SubscriptionExpiringSoonEvent(
         Long subscriptionId,

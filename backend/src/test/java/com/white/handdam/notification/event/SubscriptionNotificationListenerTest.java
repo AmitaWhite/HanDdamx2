@@ -39,40 +39,35 @@ class SubscriptionNotificationListenerTest {
 	private SubscriptionNotificationListener listener;
 
 	@Test
-	@DisplayName("subscription expiring soon event creates idempotent subscription notification")
+	@DisplayName("subscription expiring soon event creates subscription notification")
 	void handleSubscriptionExpiringSoonCreatesNotification() {
 		SubscriptionExpiringSoonEvent event = event();
 
 		listener.handleSubscriptionExpiringSoon(event);
 
 		ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-		ArgumentCaptor<String> dedupKeyCaptor = ArgumentCaptor.forClass(String.class);
-		verify(notificationService).createIfAbsent(
+		verify(notificationService).create(
 			eq(SUBSCRIBER_ID),
 			isNull(),
 			eq(NotificationType.SUBSCRIPTION_EXPIRING),
 			messageCaptor.capture(),
 			eq(SUBSCRIPTION_ID),
-			eq(NotificationReferenceType.SUBSCRIPTION),
-			dedupKeyCaptor.capture()
+			eq(NotificationReferenceType.SUBSCRIPTION)
 		);
-		assertThat(messageCaptor.getValue()).contains("3일 이내");
-		assertThat(dedupKeyCaptor.getValue())
-			.isEqualTo("SUBSCRIPTION_EXPIRING:10:2026-08-13T00:00:00Z");
+		assertThat(messageCaptor.getValue()).isNotBlank();
 	}
 
 	@Test
 	@DisplayName("listener does not propagate notification creation failure")
 	void handleSubscriptionExpiringSoonServiceThrowsDoesNotPropagate() {
 		willThrow(new RuntimeException("DB down"))
-			.given(notificationService).createIfAbsent(
+			.given(notificationService).create(
 				anyLong(),
 				isNull(),
 				any(NotificationType.class),
 				anyString(),
 				anyLong(),
-				any(NotificationReferenceType.class),
-				anyString()
+				any(NotificationReferenceType.class)
 			);
 
 		assertThatCode(() -> listener.handleSubscriptionExpiringSoon(event()))

@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SubscriptionRepositoryTest {
 
     private static final Instant NOW = Instant.parse("2026-08-13T00:00:00Z");
+    private static final Instant TARGET_START = Instant.parse("2026-08-12T15:00:00Z");
+    private static final Instant TARGET_END = Instant.parse("2026-08-13T15:00:00Z");
 
     @Autowired
     private SubscriptionRepository subscriptionRepository;
@@ -92,44 +94,42 @@ class SubscriptionRepositoryTest {
     }
 
     @Test
-    @DisplayName("findExpiringSoonSubscriptionTargets returns only cancel-scheduled paid subscriptions within threshold")
+    @DisplayName("findExpiringSoonSubscriptionTargets returns only cancel-scheduled paid subscriptions in target date range")
     void findExpiringSoonSubscriptionTargetsReturnsOnlyTargets() {
-        Instant threshold = NOW.plusSeconds(3 * 24 * 60 * 60);
-        Subscription firstTarget = saveScheduledPaid(1L, 101L, NOW.plusSeconds(60));
-        Subscription thresholdTarget = saveScheduledPaid(2L, 102L, threshold);
-        saveScheduledPaid(3L, 103L, threshold.plusSeconds(1));
-        saveScheduledPaid(4L, 104L, NOW);
-        saveScheduledPaid(5L, 105L, NOW.minusSeconds(1));
-        saveActivePaid(6L, 106L, NOW.plusSeconds(60));
+        Subscription startTarget = saveScheduledPaid(1L, 101L, TARGET_START);
+        Subscription insideTarget = saveScheduledPaid(2L, 102L, TARGET_START.plusSeconds(60));
+        saveScheduledPaid(3L, 103L, TARGET_START.minusSeconds(1));
+        saveScheduledPaid(4L, 104L, TARGET_END);
+        saveScheduledPaid(5L, 105L, TARGET_END.plusSeconds(1));
+        saveActivePaid(6L, 106L, TARGET_START.plusSeconds(60));
         saveFree(7L, 107L);
         saveScheduledPaidWithoutPeriodEnd(8L, 108L);
 
         List<SubscriptionExpiringSoonTarget> targets = subscriptionRepository.findExpiringSoonSubscriptionTargets(
                 SubscriptionLevel.PAID,
                 SubscriptionStatus.CANCEL_SCHEDULED,
-                NOW,
-                threshold,
+                TARGET_START,
+                TARGET_END,
                 PageRequest.of(0, 10)
         );
 
         assertThat(targets)
                 .extracting(target -> target.subscriptionId())
-                .containsExactly(firstTarget.getId(), thresholdTarget.getId());
+                .containsExactly(startTarget.getId(), insideTarget.getId());
     }
 
     @Test
     @DisplayName("findExpiringSoonSubscriptionTargets orders by period end and id")
     void findExpiringSoonSubscriptionTargetsOrdersByPeriodEndAndId() {
-        Instant threshold = NOW.plusSeconds(3 * 24 * 60 * 60);
-        Subscription secondByPeriod = saveScheduledPaid(1L, 101L, NOW.plusSeconds(20));
-        Subscription firstByPeriodAndId = saveScheduledPaid(2L, 102L, NOW.plusSeconds(10));
-        Subscription secondByPeriodAndId = saveScheduledPaid(3L, 103L, NOW.plusSeconds(10));
+        Subscription secondByPeriod = saveScheduledPaid(1L, 101L, TARGET_START.plusSeconds(20));
+        Subscription firstByPeriodAndId = saveScheduledPaid(2L, 102L, TARGET_START.plusSeconds(10));
+        Subscription secondByPeriodAndId = saveScheduledPaid(3L, 103L, TARGET_START.plusSeconds(10));
 
         List<SubscriptionExpiringSoonTarget> targets = subscriptionRepository.findExpiringSoonSubscriptionTargets(
                 SubscriptionLevel.PAID,
                 SubscriptionStatus.CANCEL_SCHEDULED,
-                NOW,
-                threshold,
+                TARGET_START,
+                TARGET_END,
                 PageRequest.of(0, 10)
         );
 
@@ -145,23 +145,22 @@ class SubscriptionRepositoryTest {
     @Test
     @DisplayName("findExpiringSoonSubscriptionTargets supports paging")
     void findExpiringSoonSubscriptionTargetsSupportsPaging() {
-        Instant threshold = NOW.plusSeconds(3 * 24 * 60 * 60);
-        Subscription firstTarget = saveScheduledPaid(1L, 101L, NOW.plusSeconds(10));
-        Subscription secondTarget = saveScheduledPaid(2L, 102L, NOW.plusSeconds(20));
-        Subscription thirdTarget = saveScheduledPaid(3L, 103L, NOW.plusSeconds(30));
+        Subscription firstTarget = saveScheduledPaid(1L, 101L, TARGET_START.plusSeconds(10));
+        Subscription secondTarget = saveScheduledPaid(2L, 102L, TARGET_START.plusSeconds(20));
+        Subscription thirdTarget = saveScheduledPaid(3L, 103L, TARGET_START.plusSeconds(30));
 
         List<SubscriptionExpiringSoonTarget> firstPage = subscriptionRepository.findExpiringSoonSubscriptionTargets(
                 SubscriptionLevel.PAID,
                 SubscriptionStatus.CANCEL_SCHEDULED,
-                NOW,
-                threshold,
+                TARGET_START,
+                TARGET_END,
                 PageRequest.of(0, 2)
         );
         List<SubscriptionExpiringSoonTarget> secondPage = subscriptionRepository.findExpiringSoonSubscriptionTargets(
                 SubscriptionLevel.PAID,
                 SubscriptionStatus.CANCEL_SCHEDULED,
-                NOW,
-                threshold,
+                TARGET_START,
+                TARGET_END,
                 PageRequest.of(1, 2)
         );
 

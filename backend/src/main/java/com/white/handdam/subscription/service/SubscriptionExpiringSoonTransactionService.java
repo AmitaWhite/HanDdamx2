@@ -24,12 +24,12 @@ public class SubscriptionExpiringSoonTransactionService {
     public boolean publishExpiringSoonEvent(
             Long subscriptionId,
             Instant expectedCurrentPeriodEndAt,
-            Instant now,
-            Instant threshold
+            Instant targetStart,
+            Instant targetEnd
     ) {
         validateRequired(subscriptionId, "subscriptionId");
         validateRequired(expectedCurrentPeriodEndAt, "expectedCurrentPeriodEndAt");
-        validateTimeRange(now, threshold);
+        validateTargetRange(targetStart, targetEnd);
 
         Subscription subscription = subscriptionRepository.findByIdForUpdate(subscriptionId)
                 .orElse(null);
@@ -37,7 +37,7 @@ public class SubscriptionExpiringSoonTransactionService {
             return false;
         }
 
-        if (!isTarget(subscription, expectedCurrentPeriodEndAt, now, threshold)) {
+        if (!isTarget(subscription, expectedCurrentPeriodEndAt, targetStart, targetEnd)) {
             return false;
         }
 
@@ -53,23 +53,23 @@ public class SubscriptionExpiringSoonTransactionService {
     private boolean isTarget(
             Subscription subscription,
             Instant expectedCurrentPeriodEndAt,
-            Instant now,
-            Instant threshold
+            Instant targetStart,
+            Instant targetEnd
     ) {
         Instant currentPeriodEndAt = subscription.getCurrentPeriodEndAt();
         return subscription.getSubscriptionLevel() == SubscriptionLevel.PAID
                 && subscription.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED
                 && currentPeriodEndAt != null
                 && Objects.equals(currentPeriodEndAt, expectedCurrentPeriodEndAt)
-                && currentPeriodEndAt.isAfter(now)
-                && !currentPeriodEndAt.isAfter(threshold);
+                && !currentPeriodEndAt.isBefore(targetStart)
+                && currentPeriodEndAt.isBefore(targetEnd);
     }
 
-    private void validateTimeRange(Instant now, Instant threshold) {
-        validateRequired(now, "now");
-        validateRequired(threshold, "threshold");
-        if (threshold.isBefore(now)) {
-            throw new IllegalArgumentException("threshold must not be before now");
+    private void validateTargetRange(Instant targetStart, Instant targetEnd) {
+        validateRequired(targetStart, "targetStart");
+        validateRequired(targetEnd, "targetEnd");
+        if (!targetEnd.isAfter(targetStart)) {
+            throw new IllegalArgumentException("targetEnd must be after targetStart");
         }
     }
 

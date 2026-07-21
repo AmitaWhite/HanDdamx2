@@ -9,8 +9,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.lang.reflect.Method;
-import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,12 +22,13 @@ import static org.mockito.Mockito.when;
 class SubscriptionExpiringSoonSchedulerTest {
 
     @Test
-    @DisplayName("publishExpiringSoonEvents delegates to service with days-before threshold and batch size")
+    @DisplayName("publishExpiringSoonEvents delegates to service with target date range and batch size")
     void publishExpiringSoonEventsDelegatesToService() {
         SubscriptionExpiringSoonService expiringSoonService = mock(SubscriptionExpiringSoonService.class);
         SubscriptionExpiringNotificationProperties properties = new SubscriptionExpiringNotificationProperties();
         properties.setDaysBefore(3);
         properties.setBatchSize(50);
+        properties.setZone("Asia/Seoul");
         SubscriptionExpiringSoonScheduler scheduler =
                 new SubscriptionExpiringSoonScheduler(expiringSoonService, properties);
         when(expiringSoonService.publishExpiringSoonEvents(
@@ -35,20 +37,21 @@ class SubscriptionExpiringSoonSchedulerTest {
                 org.mockito.Mockito.eq(50)
         )).thenReturn(new SubscriptionExpiringSoonResult(2, 1, 1, 0));
 
-        Instant before = Instant.now();
         scheduler.publishExpiringSoonEvents();
-        Instant after = Instant.now();
 
-        ArgumentCaptor<Instant> nowCaptor = ArgumentCaptor.forClass(Instant.class);
-        ArgumentCaptor<Instant> thresholdCaptor = ArgumentCaptor.forClass(Instant.class);
+        ZoneId zoneId = ZoneId.of("Asia/Seoul");
+        LocalDate targetDate = LocalDate.now(zoneId).plusDays(3);
+        Instant expectedTargetStart = targetDate.atStartOfDay(zoneId).toInstant();
+        Instant expectedTargetEnd = targetDate.plusDays(1).atStartOfDay(zoneId).toInstant();
+        ArgumentCaptor<Instant> targetStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> targetEndCaptor = ArgumentCaptor.forClass(Instant.class);
         verify(expiringSoonService).publishExpiringSoonEvents(
-                nowCaptor.capture(),
-                thresholdCaptor.capture(),
+                targetStartCaptor.capture(),
+                targetEndCaptor.capture(),
                 org.mockito.Mockito.eq(50)
         );
-        assertThat(nowCaptor.getValue()).isBetween(before, after);
-        Duration thresholdOffset = Duration.between(nowCaptor.getValue(), thresholdCaptor.getValue());
-        assertThat(thresholdOffset).isEqualTo(Duration.ofDays(3));
+        assertThat(targetStartCaptor.getValue()).isEqualTo(expectedTargetStart);
+        assertThat(targetEndCaptor.getValue()).isEqualTo(expectedTargetEnd);
     }
 
     @Test
