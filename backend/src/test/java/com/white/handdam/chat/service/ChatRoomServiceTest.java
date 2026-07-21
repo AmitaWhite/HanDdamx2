@@ -75,7 +75,7 @@ class ChatRoomServiceTest {
 	}
 
 	@Test
-	@DisplayName("이미 채팅방이 있으면 기존 방을 반환하고 새로 만들지 않는다")
+	@DisplayName("이미 활성(ACTIVE) 채팅방이 있으면 기존 방을 반환하고 새로 만들지 않는다")
 	void returnsExistingChatRoom() {
 		Long creatorId = 1L;
 		Long memberId = 99L;
@@ -92,6 +92,33 @@ class ChatRoomServiceTest {
 
 		assertThat(result.created()).isFalse();
 		assertThat(result.room().id()).isEqualTo(7L);
+		verify(chatRoomRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("종료(CLOSED)된 방이 있으면 reopen 하여 같은 방을 반환한다")
+	void reopensClosedRoomWhenExistingIsClosed() {
+		Long creatorId = 1L;
+		Long memberId = 99L;
+		ChatRoom closed = ChatRoom.builder().creatorId(creatorId).memberId(memberId).build();
+		ReflectionTestUtils.setField(closed, "id", 7L);
+		ReflectionTestUtils.setField(closed, "status", ChatRoomStatus.CLOSED);
+		ReflectionTestUtils.setField(closed, "closedBy", memberId);
+		ReflectionTestUtils.setField(closed, "closedAt", Instant.parse("2026-07-16T12:00:00Z"));
+		ReflectionTestUtils.setField(closed, "createdAt", Instant.parse("2026-07-16T00:00:00Z"));
+		ReflectionTestUtils.setField(closed, "updatedAt", Instant.parse("2026-07-16T12:00:00Z"));
+
+		given(paidSubscriptionChecker.hasActivePaidSubscription(memberId, creatorId)).willReturn(true);
+		given(chatRoomRepository.findByCreatorIdAndMemberId(creatorId, memberId))
+			.willReturn(Optional.of(closed));
+
+		CreateOrGetResult result = chatRoomService.createOrGetChatRoom(creatorId, memberId);
+
+		assertThat(result.created()).isTrue();
+		assertThat(result.room().id()).isEqualTo(7L);
+		assertThat(result.room().status()).isEqualTo(ChatRoomStatus.ACTIVE);
+		assertThat(result.room().closedBy()).isNull();
+		assertThat(result.room().closedAt()).isNull();
 		verify(chatRoomRepository, never()).save(any());
 	}
 

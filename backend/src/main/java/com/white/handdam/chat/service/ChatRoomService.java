@@ -6,6 +6,7 @@ import com.white.handdam.chat.dto.response.ChatRoomListItemResponse;
 import com.white.handdam.chat.dto.response.ChatRoomResponse;
 import com.white.handdam.chat.entity.ChatMessage;
 import com.white.handdam.chat.entity.ChatRoom;
+import com.white.handdam.chat.entity.ChatRoomStatus;
 import com.white.handdam.chat.exception.ChatErrorCode;
 import com.white.handdam.chat.repository.ChatMessageRepository;
 import com.white.handdam.chat.repository.ChatRoomRepository;
@@ -35,11 +36,14 @@ public class ChatRoomService {
 	 * 1. 로그인 확인
 	 * 2. 자기 자신과의 채팅 방지
 	 * 3. 활성 유료 구독자만 허용 (아니면 403)
-	 * 4. (creatorId, memberId) 기존 방 있으면 반환
-	 * 5. 없으면 ACTIVE 채팅방 생성
+	 * 4. (creatorId, memberId) 로 기존 방이 있으면:
+	 *    - ACTIVE → 재사용 (200)
+	 *    - CLOSED → reopen 후 반환 (201)
+	 * 5. 없으면 새 ACTIVE 채팅방 생성 (201)
+	 *    - DB uq_chat_room 제약으로 (creator_id, member_id) 조합은 1개만 허용
 	 * </pre>
 	 *
-	 * @return result.created() == true 이면 신규 생성
+	 * @return result.created() == true 이면 신규 생성 또는 재오픈
 	 */
 	@Transactional
 	public CreateOrGetResult createOrGetChatRoom(Long creatorId, Long requesterId) {
@@ -54,7 +58,10 @@ public class ChatRoomService {
 		}
 
 		return chatRoomRepository.findByCreatorIdAndMemberId(creatorId, requesterId)
-			.map(room -> new CreateOrGetResult(ChatRoomConverter.toResponse(room), false))
+			.map(room -> {
+				boolean reopened = room.reopen();
+				return new CreateOrGetResult(ChatRoomConverter.toResponse(room), reopened);
+			})
 			.orElseGet(() -> {
 				ChatRoom saved = chatRoomRepository.save(
 					ChatRoom.builder()

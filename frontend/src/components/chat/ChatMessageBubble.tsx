@@ -22,7 +22,7 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
 			<div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
 				<div
 					className={cn(
-						"max-w-[70%] rounded-2xl px-4 py-2.5 text-body-md",
+						"max-w-[80%] whitespace-pre-line break-keep rounded-2xl px-4 py-2.5 text-body-md [overflow-wrap:anywhere]",
 						isMe
 							? "bg-primary text-on-primary"
 							: "bg-surface-container-lowest text-on-surface",
