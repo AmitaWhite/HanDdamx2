@@ -26,9 +26,17 @@ export function ChatMessageList({
 	onLoadOlder,
 }: ChatMessageListProps) {
 	const endRef = useRef<HTMLDivElement>(null);
+	const lastMessageIdRef = useRef<string | null>(null);
 
+	// 마지막 메시지 id 가 바뀔 때만 하단으로 스크롤한다.
+	// - append(신규 수신·전송): 마지막 id 가 새로 생기므로 스크롤
+	// - prepend(이전 페이지 로드): 마지막 id 는 그대로라 스크롤하지 않음
 	useEffect(() => {
-		endRef.current?.scrollIntoView({ behavior: "smooth" });
+		const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
+		if (lastId !== lastMessageIdRef.current) {
+			lastMessageIdRef.current = lastId;
+			endRef.current?.scrollIntoView({ behavior: "smooth" });
+		}
 	}, [messages]);
 
 	return (

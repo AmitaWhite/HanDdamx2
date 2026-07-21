@@ -19,24 +19,22 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
 
 	return (
 		<div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-			<div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
-				<div
-					className={cn(
-						"max-w-[80%] whitespace-pre-line break-keep rounded-2xl px-4 py-2.5 text-body-md [overflow-wrap:anywhere]",
-						isMe
-							? "bg-primary text-on-primary"
-							: "bg-surface-container-lowest text-on-surface",
-					)}
-				>
-					{message.imageUrl && (
-						<img
-							src={message.imageUrl}
-							alt={message.imageAlt ?? message.text ?? "첨부 이미지"}
-							className="mb-2 max-h-64 rounded-lg"
-						/>
-					)}
-					{message.text}
-				</div>
+			<div
+				className={cn(
+					"w-fit max-w-[80%] whitespace-pre-line break-keep rounded-2xl px-4 py-2.5 text-body-md",
+					isMe
+						? "bg-primary text-on-primary"
+						: "bg-surface-container-lowest text-on-surface",
+				)}
+			>
+				{message.imageUrl && (
+					<img
+						src={message.imageUrl}
+						alt={message.imageAlt ?? message.text ?? "첨부 이미지"}
+						className="mb-2 max-h-64 rounded-lg"
+					/>
+				)}
+				{message.text}
 			</div>
 			{isMe && message.readAt && (
 				<span className="mt-1 px-1 text-caption font-caption text-secondary">

@@ -342,6 +342,7 @@ function ChatConversation({
 				displayName={displayName}
 				avatarSrc={avatarSrc}
 				opponentMemberId={opponentMemberId}
+				opponentIsCreator={opponent?.isCreator ?? false}
 				roomClosed={roomClosed}
 				closedAt={room.closedAt}
 				closeBusy={closeBusy}

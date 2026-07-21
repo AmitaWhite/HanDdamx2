@@ -8,6 +8,7 @@ interface ChatConversationHeaderProps {
 	displayName: string;
 	avatarSrc: string;
 	opponentMemberId: number;
+	opponentIsCreator: boolean;
 	roomClosed: boolean;
 	closedAt: string | null;
 	closeBusy: boolean;
@@ -18,37 +19,52 @@ interface ChatConversationHeaderProps {
  * 채팅 상세 상단 헤더. 뒤로가기, 상대 프로필 링크, ACTIVE 방의 종료 버튼.
  *
  * 종료·읽기 전용 여부는 부모(방 상태 관리 훅)에서 계산해 넘겨준다.
+ * 상대가 크리에이터일 때만 프로필 페이지 링크를 건다 — 구독자 상대는 링크가 없다.
  */
 export function ChatConversationHeader({
 	displayName,
 	avatarSrc,
 	opponentMemberId,
+	opponentIsCreator,
 	roomClosed,
 	closedAt,
 	closeBusy,
 	onClose,
 }: ChatConversationHeaderProps) {
-	const profileHref = paths.creator(opponentMemberId);
+	const profileContent = (
+		<>
+			<Avatar src={avatarSrc} size={36} />
+			<div className="min-w-0">
+				<span className="block truncate text-label-md font-label-md text-on-surface">
+					{displayName}
+				</span>
+				{roomClosed && (
+					<span className="text-caption font-caption text-secondary">
+						종료된 채팅방
+						{closedAt ? ` · ${formatRelativeTime(closedAt)}` : ""}
+					</span>
+				)}
+			</div>
+		</>
+	);
 
 	return (
 		<div className="container-page flex items-center gap-3 border-b border-outline-variant/50 py-4">
 			<Link to={paths.chat} aria-label="목록으로" className="text-on-surface">
 				<Icon name="arrow_back" />
 			</Link>
-			<Link to={profileHref} className="flex min-w-0 flex-1 items-center gap-3">
-				<Avatar src={avatarSrc} size={36} />
-				<div className="min-w-0">
-					<span className="block truncate text-label-md font-label-md text-on-surface">
-						{displayName}
-					</span>
-					{roomClosed && (
-						<span className="text-caption font-caption text-secondary">
-							종료된 채팅방
-							{closedAt ? ` · ${formatRelativeTime(closedAt)}` : ""}
-						</span>
-					)}
+			{opponentIsCreator ? (
+				<Link
+					to={paths.creator(opponentMemberId)}
+					className="flex min-w-0 flex-1 items-center gap-3"
+				>
+					{profileContent}
+				</Link>
+			) : (
+				<div className="flex min-w-0 flex-1 items-center gap-3">
+					{profileContent}
 				</div>
-			</Link>
+			)}
 			{!roomClosed && (
 				<button
 					type="button"
