@@ -8,12 +8,14 @@ import com.white.handdam.payment.dto.response.PaymentFailResponse;
 import com.white.handdam.payment.dto.toss.TossConfirmResponse;
 import com.white.handdam.payment.entity.Payment;
 import com.white.handdam.payment.entity.PaymentStatus;
+import com.white.handdam.payment.event.PaymentSucceededEvent;
 import com.white.handdam.payment.exception.PaymentErrorCode;
 import com.white.handdam.payment.repository.PaymentRepository;
 import com.white.handdam.subscription.entity.Subscription;
 import com.white.handdam.subscription.entity.SubscriptionLevel;
 import com.white.handdam.subscription.entity.SubscriptionStatus;
 import com.white.handdam.subscription.repository.SubscriptionRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,8 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +56,9 @@ class PaymentTransactionServiceTest {
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private PaymentTransactionService paymentTransactionService;
@@ -188,6 +195,31 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getPgTransactionId()).isEqualTo(PAYMENT_KEY);
         assertThat(payment.getSubscriptionId()).isEqualTo(SUBSCRIPTION_ID);
         assertThat(response.subscriptionId()).isEqualTo(SUBSCRIPTION_ID);
+
+        ArgumentCaptor<PaymentSucceededEvent> eventCaptor =
+                ArgumentCaptor.forClass(PaymentSucceededEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        PaymentSucceededEvent event = eventCaptor.getValue();
+        assertThat(event.paymentId()).isEqualTo(PAYMENT_ID);
+        assertThat(event.memberId()).isEqualTo(MEMBER_ID);
+        assertThat(event.amount()).isEqualTo(15000);
+        assertThat(event.orderId()).isEqualTo(ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("completeSuccess returns existing SUCCESS payment without publishing duplicate event")
+    void completeSuccessDoesNotPublishEventForAlreadySucceededPayment() {
+        Payment payment = successPayment(SUBSCRIPTION_ID);
+        Subscription subscription = paidSubscription(SUBSCRIPTION_ID);
+        when(paymentRepository.findByOrderIdForUpdate(ORDER_ID)).thenReturn(Optional.of(payment));
+        when(subscriptionRepository.findById(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+
+        PaymentConfirmResponse response =
+                paymentTransactionService.completeSuccess(command(), tossResponse());
+
+        assertThat(response.status()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.subscriptionId()).isEqualTo(SUBSCRIPTION_ID);
+        verify(eventPublisher, never()).publishEvent(any(PaymentSucceededEvent.class));
     }
 
     @Test
@@ -204,6 +236,20 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMING);
         assertThat(payment.getSubscriptionId()).isNull();
         verify(subscriptionRepository, never()).save(any(Subscription.class));
+        verify(eventPublisher, never()).publishEvent(any(PaymentSucceededEvent.class));
+    }
+
+    @Test
+    @DisplayName("completeSuccess does not publish event when payment lock acquisition fails")
+    void completeSuccessDoesNotPublishEventWhenPaymentLockAcquisitionFails() {
+        when(paymentRepository.findByOrderIdForUpdate(ORDER_ID))
+                .thenThrow(new CannotAcquireLockException("lock timeout"));
+
+        assertThatThrownBy(() -> paymentTransactionService.completeSuccess(command(), tossResponse()))
+                .isInstanceOf(CannotAcquireLockException.class);
+
+        verify(subscriptionRepository, never()).findBySubscriberIdAndCreatorIdForUpdate(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(PaymentSucceededEvent.class));
     }
 
     @Test
@@ -225,6 +271,7 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getSubscriptionId()).isEqualTo(SUBSCRIPTION_ID);
         assertThat(response.subscriptionId()).isEqualTo(SUBSCRIPTION_ID);
         verify(subscriptionRepository, never()).save(any(Subscription.class));
+        verify(eventPublisher).publishEvent(any(PaymentSucceededEvent.class));
     }
 
     @Test
@@ -241,6 +288,18 @@ class PaymentTransactionServiceTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(PaymentErrorCode.PAID_SUBSCRIPTION_ALREADY_EXISTS)
                 );
+    }
+
+    @Test
+    @DisplayName("PaymentSucceededEvent does not expose sensitive payment fields")
+    void paymentSucceededEventDoesNotExposeSensitivePaymentFields() {
+        List<String> fieldNames = Arrays.stream(PaymentSucceededEvent.class.getRecordComponents())
+                .map(component -> component.getName())
+                .toList();
+
+        assertThat(fieldNames).containsExactly("paymentId", "memberId", "amount", "orderId");
+        assertThat(fieldNames)
+                .doesNotContain("paymentKey", "customerKey", "idempotencyKey", "pgTransactionId");
     }
 
     @Test
