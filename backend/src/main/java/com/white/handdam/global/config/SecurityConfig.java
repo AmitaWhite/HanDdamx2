@@ -72,7 +72,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/projects/*/feeds").permitAll()   // 피드 목록만 공개
                 .requestMatchers(HttpMethod.GET, "/api/feeds/*/comments").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/feeds/{feedId:[0-9]+}").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/feeds/me").hasRole("CREATOR")    // 크리에이터만 접근가능
+                .requestMatchers(HttpMethod.GET, "/api/feeds/me").hasRole("CREATOR")
+                .requestMatchers(HttpMethod.GET, "/api/creators/*").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .exceptionHandling(ex -> ex
