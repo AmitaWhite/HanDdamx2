@@ -209,7 +209,6 @@ function RemoteQnaPostPage({ postId }: { postId: number }) {
 		run: runComment,
 	} = useSubmitState("댓글 처리에 실패했습니다. 다시 시도해 주세요.");
 
-	const [comments, setComments] = useState<BoardCommentResponse[]>([]);
 	const [commentsLoading, setCommentsLoading] = useState(true);
 
 	useEffect(() => {
