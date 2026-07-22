@@ -29,6 +29,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -50,6 +51,7 @@ class PollServiceTest {
     @Mock private PollVoteRepository pollVoteRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private SubscriptionLevelChecker subscriptionLevelChecker;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private PollService pollService;
 
     // ---------------------------------------------------------------

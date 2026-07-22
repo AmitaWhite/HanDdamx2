@@ -24,6 +24,7 @@ export function MyPage() {
   const [showModal, setShowModal] = useState(false);
   const [introduction, setIntroduction] = useState("");
   const [applying, setApplying] = useState(false);
+  const [representativeImage, setRepresentativeImage] = useState<File | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
 
   const isCreator = user?.role === "CREATOR";
@@ -97,10 +98,11 @@ export function MyPage() {
     setApplyError(null);
     setApplying(true);
     try {
-      const result = await applyCreator(trimmedIntroduction);
+      const result = await applyCreator(trimmedIntroduction, representativeImage);
       setApplication(result);
       setShowModal(false);
       setIntroduction("");
+      setRepresentativeImage(null);
     } catch (e: unknown) {
       setApplyError(e instanceof Error ? e.message : "신청에 실패했습니다.");
     } finally {
@@ -184,6 +186,12 @@ export function MyPage() {
               placeholder="크리에이터 소개글을 입력해 주세요 (선택)"
               value={introduction}
               onChange={(e) => setIntroduction(e.target.value)}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              className="mb-4 w-full text-body-sm text-on-surface"
+              onChange={(e) => setRepresentativeImage(e.target.files?.[0] ?? null)}
             />
             {applyError && <p className="mb-3 text-body-md text-error">{applyError}</p>}
             <div className="flex gap-2">

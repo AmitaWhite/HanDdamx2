@@ -14,6 +14,7 @@ import com.white.handdam.poll.dto.response.PollResultResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
 import com.white.handdam.poll.entity.PollVote;
+import com.white.handdam.poll.event.PollVotedEvent;
 import com.white.handdam.poll.exception.PollErrorCode;
 import com.white.handdam.poll.repository.PollOptionRepository;
 import com.white.handdam.poll.repository.PollRepository;
@@ -22,6 +23,7 @@ import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class PollService {
     private final PollVoteRepository pollVoteRepository;
     private final ProjectRepository projectRepository;
     private final SubscriptionLevelChecker subscriptionLevelChecker;
+    private final ApplicationEventPublisher eventPublisher;
 
     // [LYJ-022] 기존 피드에 투표 추가 (크리에이터만 가능)
     @Transactional
@@ -181,7 +184,15 @@ public class PollService {
 
         PollVote vote = PollVote.create(pollId, option.getId(), memberId, weight, snapshot);
         try {
-            return pollVoteRepository.save(vote).getId();
+            PollVote saved = pollVoteRepository.save(vote);
+            eventPublisher.publishEvent(new PollVotedEvent(
+                pollId,
+                poll.getFeedId(),
+                option.getId(),
+                memberId,
+                project.getCreatorId()
+            ));
+            return saved.getId();
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(PollErrorCode.POLL_ALREADY_VOTED);
         }

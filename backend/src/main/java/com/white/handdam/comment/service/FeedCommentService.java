@@ -4,6 +4,8 @@ import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
 import com.white.handdam.comment.dto.request.FeedCommentUpdateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.entity.FeedComment;
+import com.white.handdam.comment.event.FeedCommentCreatedEvent;
+import com.white.handdam.comment.event.FeedReplyCreatedEvent;
 import com.white.handdam.comment.exception.FeedCommentErrorCode;
 import com.white.handdam.comment.repository.FeedCommentRepository;
 import com.white.handdam.feed.entity.Feed;
@@ -18,6 +20,7 @@ import com.white.handdam.project.entity.Project;
 import com.white.handdam.project.exception.ProjectErrorCode;
 import com.white.handdam.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,7 @@ public class FeedCommentService {
     private final MemberRepository memberRepository;
     private final ProjectRepository projectRepository;
     private final SubscriptionLevelChecker subscriptionLevelChecker;
+    private final ApplicationEventPublisher eventPublisher;
 
     // [LYJ-015] 피드 댓글·대댓글 목록 조회
     public List<FeedCommentResponse> getComments(Long feedId, Long memberId) {
@@ -111,7 +115,16 @@ public class FeedCommentService {
         }
 
         FeedComment comment = FeedComment.create(feedId, memberId, null, (short) 0, request.content());
-        return feedCommentRepository.save(comment).getId();
+        FeedComment saved = feedCommentRepository.save(comment);
+        eventPublisher.publishEvent(new FeedCommentCreatedEvent(
+            feedId,
+            saved.getId(),
+            memberId,               // 댓글 작성자
+            project.getCreatorId(),
+            request.content()
+        ));
+        return saved.getId();
+
     }
 
     // [LYJ-017] 대댓글 작성
@@ -141,7 +154,17 @@ public class FeedCommentService {
         }
 
         FeedComment reply = FeedComment.create(feedId, memberId, parentCommentId, (short) 1, request.content());
-        return feedCommentRepository.save(reply).getId();
+        FeedComment saved = feedCommentRepository.save(reply);
+        eventPublisher.publishEvent(new FeedReplyCreatedEvent(
+            feedId,
+            parentCommentId,
+            saved.getId(),
+            memberId,              // 대댓글 작성자
+            parent.getMemberId(),  // 부모 댓글 작성자
+            request.content()
+        ));
+        return saved.getId();
+
     }
 
     // [LYJ-018] 댓글 수정

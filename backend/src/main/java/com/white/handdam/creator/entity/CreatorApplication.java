@@ -31,6 +31,12 @@ public class CreatorApplication {
     @Column(name = "reviewed_by")
     private Long reviewedBy;
 
+    @Column(name = "introduction", length = 1000)
+    private String introduction;
+
+    @Column(name = "representative_image_url", length = 500)
+    private String representativeImageUrl;
+
     /** 거절 사유 (거절 시에만 기록) */
     @Column(name = "reject_reason", length = 500)
     private String rejectReason;
@@ -49,9 +55,11 @@ public class CreatorApplication {
         this.status = CreatorApplicationStatus.PENDING;
     }
 
-    public static CreatorApplication create(Long memberId) {
+    public static CreatorApplication create(Long memberId, String introduction, String representativeImageUrl) {
         CreatorApplication application = new CreatorApplication();
         application.memberId = memberId;
+        application.introduction = introduction;
+        application.representativeImageUrl = representativeImageUrl;
         return application;
     }
 
