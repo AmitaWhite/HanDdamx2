@@ -616,6 +616,90 @@ class FeedServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // 첨부파일 목록 조회
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("PUBLIC 피드는 비로그인도 첨부파일 목록을 orderIndex 순으로 조회할 수 있다")
+    void getAttachments_publicFeed_anonymousOk() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L)));
+
+        StoredObject stored1 = new StoredObject("feeds/1/attachments/uuid_a.jpg", "https://...", "a.jpg");
+        StoredObject stored2 = new StoredObject("feeds/1/attachments/uuid_b.jpg", "https://...", "b.jpg");
+        FeedAttachment first = sampleUploadAttachment(AttachmentType.IMAGE, stored1, "image/jpeg");
+        FeedAttachment second = sampleUploadAttachment(AttachmentType.IMAGE, stored2, "image/jpeg");
+        given(feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(1L))
+            .willReturn(List.of(first, second));
+
+        List<AttachmentResponse> result = feedService.getAttachments(1L, null);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).originalName()).isEqualTo("a.jpg");
+        assertThat(result.get(1).originalName()).isEqualTo("b.jpg");
+    }
+
+    @Test
+    @DisplayName("첨부파일이 없는 피드는 빈 목록을 반환한다")
+    void getAttachments_noAttachments_returnsEmptyList() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L)));
+        given(feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(1L))
+            .willReturn(List.of());
+
+        List<AttachmentResponse> result = feedService.getAttachments(1L, null);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 피드의 첨부파일 조회 시 FEED_NOT_FOUND 예외 발생")
+    void getAttachments_feedNotFound_throws() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedService.getAttachments(999L, null))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("FREE_SUBSCRIBER 피드는 비구독자 조회 시 FREE_SUBSCRIPTION_REQUIRED 예외 발생")
+    void getAttachments_freeSubscriberFeed_nonSubscriber_throws() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L)));
+        given(subscriptionLevelChecker.getLevel(5L, 10L)).willReturn(null); // 비구독
+
+        assertThatThrownBy(() -> feedService.getAttachments(1L, 5L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FREE_SUBSCRIPTION_REQUIRED));
+        verify(feedAttachmentRepository, never()).findByFeedIdAndDeletedFalseOrderByOrderIndex(any());
+    }
+
+    @Test
+    @DisplayName("PAID_SUBSCRIBER 피드는 소유자면 구독 레벨 조회 없이 첨부파일 목록을 볼 수 있다")
+    void getAttachments_paidSubscriberFeed_owner_ok() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PAID_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L))); // creatorId=memberId=10L
+        given(feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(1L))
+            .willReturn(List.of());
+
+        List<AttachmentResponse> result = feedService.getAttachments(1L, 10L);
+
+        assertThat(result).isEmpty();
+        verify(subscriptionLevelChecker, never()).getLevel(any(), any());
+    }
+
+    // ---------------------------------------------------------------
     // LYJ-014 첨부파일 다운로드 URL 조회
     // ---------------------------------------------------------------
 
