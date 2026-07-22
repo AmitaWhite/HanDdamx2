@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
+import { CreatorOwnerActions } from "@/components/creator/CreatorOwnerActions";
 import { CreatorQnaList } from "@/components/creator/CreatorQnaList";
 import { PostCard } from "@/components/social/PostCard";
 import { SubscriptionPlanPanel } from "@/components/subscription/SubscriptionPlanPanel";
@@ -299,6 +300,9 @@ export function CreatorPage() {
               </LinkButton>
             </div>
           )}
+          {creator.isMine && (
+            <CreatorOwnerActions creator={creator} onCreatorUpdated={setCreator} />
+          )}
         </Card>
       </div>
 
@@ -377,27 +381,38 @@ export function CreatorPage() {
       )}
 
       <div className="container-page mt-10">
-        <div className="mb-4 flex items-center justify-center gap-6 border-b border-outline-variant">
-          <button
-            type="button"
-            onClick={() => setActiveTab("posts")}
-            className={cn(
-              "pb-3 text-label-md font-label-md transition-colors",
-              activeTab === "posts" ? "border-b-2 border-primary text-primary" : "text-secondary hover:text-primary",
+        <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-6 border-b border-outline-variant">
+          <div />
+          <div className="flex items-center justify-center gap-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab("posts")}
+              className={cn(
+                "pb-3 text-label-md font-label-md transition-colors",
+                activeTab === "posts" ? "border-b-2 border-primary text-primary" : "text-secondary hover:text-primary",
+              )}
+            >
+              게시물
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("qna")}
+              className={cn(
+                "pb-3 text-label-md font-label-md transition-colors",
+                activeTab === "qna" ? "border-b-2 border-primary text-primary" : "text-secondary hover:text-primary",
+              )}
+            >
+              유료 Q&A
+            </button>
+          </div>
+          <div className="mb-3 flex justify-end">
+            {creator.isMine && activeTab === "posts" && (
+              <LinkButton to={paths.dashboardPostNew} size="sm">
+                <Icon name="add" className="text-[18px]" />
+                새 게시물
+              </LinkButton>
             )}
-          >
-            게시물
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("qna")}
-            className={cn(
-              "pb-3 text-label-md font-label-md transition-colors",
-              activeTab === "qna" ? "border-b-2 border-primary text-primary" : "text-secondary hover:text-primary",
-            )}
-          >
-            유료 Q&A
-          </button>
+          </div>
         </div>
         <div className="overflow-hidden">
           <div

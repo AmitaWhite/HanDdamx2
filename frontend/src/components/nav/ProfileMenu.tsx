@@ -52,6 +52,16 @@ export function ProfileMenu() {
 
 			{open && (
 				<div className="absolute right-0 top-full z-50 mt-2 min-w-[180px] rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-2 shadow-card-hover">
+					{user?.role === "CREATOR" && (
+						<Link
+							to={paths.creator(user.memberId)}
+							onClick={() => setOpen(false)}
+							className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-label-md font-label-md text-on-surface hover:bg-surface-container-low"
+						>
+							<Icon name="storefront" className="text-[20px] text-secondary" />
+							내 홈
+						</Link>
+					)}
 					<Link
 						to={paths.mypage}
 						onClick={() => setOpen(false)}
