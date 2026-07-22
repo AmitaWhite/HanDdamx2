@@ -87,7 +87,11 @@ export function DashboardProjectsPage() {
         ) : error ? (
           <p className="py-12 text-center text-body-md text-secondary">{error}</p>
         ) : projects.length === 0 ? (
-          <p className="py-12 text-center text-body-md text-secondary">아직 프로젝트가 없어요. 첫 프로젝트를 만들어보세요!</p>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant py-12 text-center">
+            <Icon name="folder" className="text-[32px] text-secondary" />
+            <p className="text-body-md text-on-surface">아직 프로젝트가 없어요</p>
+            <p className="text-caption font-caption text-secondary">첫 프로젝트를 만들어보세요!</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-gutter sm:grid-cols-2">
             {projects.map((project) => (

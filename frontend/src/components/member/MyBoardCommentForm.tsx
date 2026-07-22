@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { getMyBoardComments } from "@/features/member/memberApi";
 import type { MyBoardCommentResponse } from "@/features/member/types";
 import { ApiError } from "@/lib/api";
@@ -96,9 +97,10 @@ export function MyBoardCommentForm() {
 				)}
 
 				{!loading && comments.length === 0 && !errorMessage && (
-					<p className="py-8 text-center text-body-md text-secondary">
-						아직 남긴 댓글이 없어요.
-					</p>
+					<div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant py-12 text-center">
+						<Icon name="chat_bubble_outline" className="text-[32px] text-secondary" />
+						<p className="text-body-md text-on-surface">아직 남긴 댓글이 없어요</p>
+					</div>
 				)}
 
 				{hasComments && (

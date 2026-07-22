@@ -44,27 +44,30 @@ export function NicknameForm({ initialNickname, onProfileUpdated }: NicknameForm
 	}
 
 	return (
-		<form className="mb-5 flex max-w-md flex-col gap-5" onSubmit={onSubmit}>
-			<Input
-				label="닉네임"
-				value={nickname}
-				disabled={saving}
-				onChange={(e) => {
-					setNickname(e.target.value);
-					setSaved(false);
-				}}
-				error={error ?? undefined}
-			/>
+		<form className="flex max-w-md flex-col gap-3" onSubmit={onSubmit}>
+			<div className="flex items-end gap-3">
+				<div className="flex-1">
+					<Input
+						label="닉네임"
+						value={nickname}
+						disabled={saving}
+						onChange={(e) => {
+							setNickname(e.target.value);
+							setSaved(false);
+						}}
+						error={error ?? undefined}
+					/>
+				</div>
+				<Button type="submit" disabled={saving}>
+					{saving ? "저장 중…" : "닉네임 변경"}
+				</Button>
+			</div>
 
 			{saved && (
 				<p role="status" className="rounded bg-primary/10 px-4 py-3 text-label-md font-label-md text-primary">
 					닉네임이 저장되었습니다.
 				</p>
 			)}
-
-			<Button type="submit" disabled={saving}>
-				{saving ? "저장 중…" : "닉네임 변경"}
-			</Button>
 		</form>
 	);
 }

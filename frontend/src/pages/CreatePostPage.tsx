@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { applyFormat, insertLink, prefixCurrentLine, wrapSelection } from "@/lib/textareaFormatting";
 import { useSubmitState } from "@/features/auth/useSubmitState";
 import { addFeedAttachment, createFeed, deleteFeed } from "@/features/feed/feedApi";
 import type { Visibility } from "@/features/feed/types";
@@ -31,8 +32,6 @@ const VISIBILITY_OPTIONS: { id: Visibility; label: string; description: string }
 	{ id: "PAID_SUBSCRIBER", label: "유료 구독자만", description: "유료 구독자에게만 공개" },
 ];
 
-const TOOLBAR_ICONS = ["format_bold", "format_italic", "format_list_bulleted", "image", "link"];
-
 export function CreatePostPage() {
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -55,6 +54,8 @@ export function CreatePostPage() {
 
 	const attachmentsRef = useRef<AttachmentItem[]>([]);
 	attachmentsRef.current = attachments;
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const bodyRef = useRef<HTMLTextAreaElement>(null);
 
 	const {
 		loading,
@@ -109,6 +110,37 @@ export function CreatePostPage() {
 			return prev.filter((a) => a.id !== id);
 		});
 	}
+
+	function onBold() {
+		const el = bodyRef.current;
+		if (!el) return;
+		applyFormat(el, setBody, wrapSelection(el.value, el.selectionStart, el.selectionEnd, "**", "**", "굵게 강조"));
+	}
+	function onItalic() {
+		const el = bodyRef.current;
+		if (!el) return;
+		applyFormat(el, setBody, wrapSelection(el.value, el.selectionStart, el.selectionEnd, "*", "*", "기울임"));
+	}
+	function onList() {
+		const el = bodyRef.current;
+		if (!el) return;
+		applyFormat(el, setBody, prefixCurrentLine(el.value, el.selectionStart, "- "));
+	}
+	function onLink() {
+		const el = bodyRef.current;
+		if (!el) return;
+		const url = window.prompt("링크 URL을 입력하세요 (https://...)");
+		if (!url) return;
+		applyFormat(el, setBody, insertLink(el.value, el.selectionStart, el.selectionEnd, url));
+	}
+
+	const toolbarButtons = [
+		{ icon: "format_bold", title: "굵게", onClick: onBold },
+		{ icon: "format_italic", title: "기울임", onClick: onItalic },
+		{ icon: "format_list_bulleted", title: "목록", onClick: onList },
+		{ icon: "image", title: "이미지·동영상 추가", onClick: () => fileInputRef.current?.click() },
+		{ icon: "link", title: "링크 추가", onClick: onLink },
+	];
 
 	function addPollOption() {
 		setPollOptions((prev) => [...prev, ""]);
@@ -220,70 +252,79 @@ export function CreatePostPage() {
 					className="mb-5"
 				/>
 
-				<div className="mb-5">
-					<label className="mb-2 block text-label-md font-label-md text-on-surface">첨부파일</label>
-					<label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low py-10 text-center hover:border-primary">
-						<Icon name="upload" className="text-[28px] text-secondary" />
-						<span className="text-body-md text-secondary">이미지·첨부파일(PDF 도안 등)</span>
-						<input
-							type="file"
-							multiple
-							className="hidden"
-							onChange={onFilesSelected}
-							accept="image/*,application/pdf"
-						/>
-					</label>
-					{attachments.length > 0 && (
-						<div className="mt-3 flex flex-wrap gap-3">
-							{attachments.map((a) => {
-								const isImage = a.file.type.startsWith("image/");
-								return (
-									<div key={a.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
-										{isImage ? (
-											<img src={a.previewUrl} alt="첨부 미리보기" className="h-full w-full object-cover" />
-										) : (
-											<div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-surface-container-low p-1.5 text-center">
-												<Icon name="description" className="text-[24px] text-secondary" />
-												<span className="line-clamp-2 break-all text-[10px] leading-tight text-secondary">
-													{a.file.name}
-												</span>
-											</div>
-										)}
-										<button
-											type="button"
-											onClick={() => removeAttachment(a.id)}
-											aria-label="첨부 삭제"
-											className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
-										>
-											<Icon name="close" className="text-[14px]" />
-										</button>
-									</div>
-								);
-							})}
-						</div>
-					)}
-				</div>
-
 				<div>
 					<label className="mb-2 block text-label-md font-label-md text-on-surface">본문</label>
-					<div className="flex gap-1 rounded-t-lg border border-b-0 border-outline-variant bg-surface-container-low p-2">
-						{TOOLBAR_ICONS.map((icon) => (
-							<button
-								key={icon}
-								type="button"
-								className="flex h-8 w-8 items-center justify-center rounded text-secondary hover:bg-surface-container"
-							>
-								<Icon name={icon} className="text-[18px]" />
-							</button>
-						))}
+					<div className="rounded-lg border border-outline-variant bg-surface-container-lowest">
+						<div className="flex gap-1 rounded-t-lg border-b border-outline-variant bg-surface-container-low p-2">
+							{toolbarButtons.map((btn) => (
+								<button
+									key={btn.icon}
+									type="button"
+									onClick={btn.onClick}
+									title={btn.title}
+									className="flex h-8 w-8 items-center justify-center rounded text-secondary hover:bg-surface-container"
+								>
+									<Icon name={btn.icon} className="text-[18px]" />
+								</button>
+							))}
+							<input
+								ref={fileInputRef}
+								type="file"
+								multiple
+								className="hidden"
+								onChange={onFilesSelected}
+								accept="image/*,video/*,application/pdf"
+							/>
+						</div>
+						<textarea
+							ref={bodyRef}
+							value={body}
+							onChange={(e) => setBody(e.target.value)}
+							rows={10}
+							placeholder="작업 과정을 자유롭게 기록해보세요. 툴바의 이미지 아이콘으로 사진·동영상을 첨부할 수 있어요."
+							className={cn(
+								"w-full border-0 bg-transparent p-4 text-body-md focus:outline-none focus:ring-0",
+								attachments.length === 0 && "rounded-b-lg",
+							)}
+						/>
+						{attachments.length > 0 && (
+							<div className="flex flex-wrap gap-3 rounded-b-lg border-t border-outline-variant p-3">
+								{attachments.map((a) => {
+									const isImage = a.file.type.startsWith("image/");
+									const isVideo = a.file.type.startsWith("video/");
+									return (
+										<div key={a.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
+											{isImage ? (
+												<img src={a.previewUrl} alt="첨부 미리보기" className="h-full w-full object-cover" />
+											) : isVideo ? (
+												<div className="relative h-full w-full bg-black">
+													<video src={a.previewUrl} className="h-full w-full object-cover" muted />
+													<div className="absolute inset-0 flex items-center justify-center bg-black/20">
+														<Icon name="play_circle" className="text-[28px] text-white" />
+													</div>
+												</div>
+											) : (
+												<div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-surface-container-low p-1.5 text-center">
+													<Icon name="description" className="text-[24px] text-secondary" />
+													<span className="line-clamp-2 break-all text-[10px] leading-tight text-secondary">
+														{a.file.name}
+													</span>
+												</div>
+											)}
+											<button
+												type="button"
+												onClick={() => removeAttachment(a.id)}
+												aria-label="첨부 삭제"
+												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
+											>
+												<Icon name="close" className="text-[14px]" />
+											</button>
+										</div>
+									);
+								})}
+							</div>
+						)}
 					</div>
-					<textarea
-						value={body}
-						onChange={(e) => setBody(e.target.value)}
-						rows={10}
-						placeholder="작업 과정을 자유롭게 기록해보세요"
-						className="w-full rounded-b-lg border border-outline-variant bg-surface-container-lowest p-4 text-body-md focus:border-on-surface focus:outline-none focus:ring-1 focus:ring-on-surface"
-					/>
 				</div>
 			</div>
 
