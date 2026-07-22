@@ -225,6 +225,9 @@ export function DashboardProjectPage() {
 
       {feedSlice?.hasNext && (
         <div className="mt-6 text-center">
+          {loadMoreError && (
+            <p className="mb-2 text-body-sm text-error">{loadMoreError}</p>
+          )}
           <Button variant="secondary" onClick={handleLoadMore} disabled={loadingMore}>
             {loadingMore ? "불러오는 중..." : "게시물 더보기"}
           </Button>
