@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { PostCard } from "@/components/social/PostCard";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
@@ -35,6 +36,7 @@ export function DashboardPostsPage() {
 	const [commentsPage, setCommentsPage] = useState(0);
 	const [commentsHasNext, setCommentsHasNext] = useState(false);
 	const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
+	const commentsInFlightRef = useRef(false);
 
 	useEffect(() => {
 		if (!isCreator) return;
@@ -71,7 +73,8 @@ export function DashboardPostsPage() {
 	}, [user]);
 
 	async function loadMoreComments() {
-		if (commentsLoadingMore || !commentsHasNext) return;
+		if (commentsInFlightRef.current || !commentsHasNext) return;
+		commentsInFlightRef.current = true;
 		setCommentsLoadingMore(true);
 		try {
 			const nextPage = commentsPage + 1;
@@ -82,6 +85,7 @@ export function DashboardPostsPage() {
 		} catch (err) {
 			setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
 		} finally {
+			commentsInFlightRef.current = false;
 			setCommentsLoadingMore(false);
 		}
 	}
@@ -127,7 +131,6 @@ export function DashboardPostsPage() {
 			: new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
 
-	const feedsSentinelRef = useInfiniteScroll(loadMoreFeeds, feedsHasNext);
 	const commentsSentinelRef = useInfiniteScroll(loadMoreComments, commentsHasNext);
 
 	return (
@@ -217,9 +220,12 @@ export function DashboardPostsPage() {
 							{!feedsLoading && sorted.length === 0 && !feedsError && (
 								<p className="py-8 text-center text-body-md text-secondary">작성한 게시물이 없어요.</p>
 							)}
-							{feedsHasNext && <div ref={feedsSentinelRef} className="h-1" />}
-							{feedsLoadingMore && (
-								<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
+							{!feedsLoading && feedsHasNext && (
+								<div className="mt-6 flex justify-center">
+									<Button variant="secondary" onClick={loadMoreFeeds} disabled={feedsLoadingMore}>
+										{feedsLoadingMore ? "불러오는 중…" : "더보기"}
+									</Button>
+								</div>
 							)}
 							{!feedsLoading && !feedsHasNext && sorted.length > 0 && (
 								<p className="py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>

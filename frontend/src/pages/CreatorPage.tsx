@@ -78,6 +78,7 @@ export function CreatorPage() {
   const [postsPage, setPostsPage] = useState(0);
   const [postsHasNext, setPostsHasNext] = useState(false);
   const [postsLoadingMore, setPostsLoadingMore] = useState(false);
+  const postsLoadMoreInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!numericCreatorId) return;
@@ -179,7 +180,8 @@ export function CreatorPage() {
   }, [numericCreatorId, selectedProjectId]);
 
   async function loadMorePosts() {
-    if (postsLoadingMore || !postsHasNext || numericCreatorId === null) return;
+    if (postsLoadMoreInFlightRef.current || !postsHasNext || numericCreatorId === null) return;
+    postsLoadMoreInFlightRef.current = true;
     setPostsLoadingMore(true);
     try {
       const nextPage = postsPage + 1;
@@ -193,6 +195,7 @@ export function CreatorPage() {
     } catch (err) {
       setPostsError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
     } finally {
+      postsLoadMoreInFlightRef.current = false;
       setPostsLoadingMore(false);
     }
   }

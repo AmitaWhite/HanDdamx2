@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Avatar } from "@/components/ui/Avatar";
@@ -23,6 +23,7 @@ export function SubscribeFeedPage() {
 	const [page, setPage] = useState(0);
 	const [hasNext, setHasNext] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
+	const loadMoreInFlightRef = useRef(false);
 
 	useEffect(() => {
 		getHomeFeed()
@@ -38,7 +39,8 @@ export function SubscribeFeedPage() {
 	}, []);
 
 	async function loadMore() {
-		if (loadingMore || !hasNext) return;
+		if (loadMoreInFlightRef.current || !hasNext) return;
+		loadMoreInFlightRef.current = true;
 		setLoadingMore(true);
 		try {
 			const nextPage = page + 1;
@@ -49,6 +51,7 @@ export function SubscribeFeedPage() {
 		} catch (err) {
 			setError(err instanceof ApiError ? err.message : "피드를 불러오지 못했습니다.");
 		} finally {
+			loadMoreInFlightRef.current = false;
 			setLoadingMore(false);
 		}
 	}
