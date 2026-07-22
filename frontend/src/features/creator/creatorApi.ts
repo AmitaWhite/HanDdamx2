@@ -1,5 +1,5 @@
-import { http, unwrap, unwrapVoid } from "@/lib/api";
-import type { CreatorProfile, FeedSummary, ProjectSummary, SliceResponse } from "./types";
+import { http, unwrap } from "@/lib/api";
+import type { CreatorProfile, ProjectSummary } from "./types";
 
 /** GET /api/creators/{creatorId} — 크리에이터 공개 프로필 조회 */
 export function getCreatorProfile(creatorId: number) {
@@ -11,28 +11,9 @@ export function getCreatorProjects(creatorId: number): Promise<ProjectSummary[]>
   return unwrap(http.get<{ success: boolean; data: ProjectSummary[]; error: null }>(`/creators/${creatorId}/projects`));
 }
 
-/** GET /api/creators/me/projects — 내 프로젝트 목록 (크리에이터 전용) */
-export function getMyProjects(): Promise<ProjectSummary[]> {
-  return unwrap(http.get<{ success: boolean; data: ProjectSummary[]; error: null }>("/creators/me/projects"));
-}
-
 /** GET /api/projects/{projectId} — 프로젝트 상세 */
 export function getProject(projectId: number): Promise<ProjectSummary> {
   return unwrap(http.get(`/projects/${projectId}`));
-}
-
-/**
- * GET /api/projects/{projectId}/feeds — 프로젝트 피드 목록
- * 백엔드가 SliceResponse를 ApiResponse 없이 직접 반환하므로 unwrap 불가, r.data 직접 사용
- */
-export function getProjectFeeds(
-  projectId: number,
-  page = 0,
-  size = 20,
-): Promise<SliceResponse<FeedSummary>> {
-  return http
-    .get<SliceResponse<FeedSummary>>(`/projects/${projectId}/feeds`, { params: { page, size } })
-    .then((r) => r.data);
 }
 
 /** POST /api/projects — 프로젝트 생성 (multipart/form-data) */
@@ -74,5 +55,5 @@ export function updateProject(
 
 /** DELETE /api/projects/{projectId} — 빈 프로젝트 삭제 */
 export function deleteProject(projectId: number): Promise<void> {
-  return unwrapVoid(http.delete(`/projects/${projectId}`));
+  return unwrap(http.delete(`/projects/${projectId}`));
 }

@@ -6,24 +6,22 @@ import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { getCategories, type CategorySummary } from "@/features/category/categoryApi";
-import {
-  deleteProject,
-  getProject,
-  getProjectFeeds,
-  updateProject,
-} from "@/features/creator/creatorApi";
-import type { FeedSummary, FeedVisibility, ProjectSummary, SliceResponse } from "@/features/creator/types";
+import { deleteProject, getProject, updateProject } from "@/features/creator/creatorApi";
+import type { FeedSummaryResponse, Visibility } from "@/features/feed/types";
+import { getProjectFeeds } from "@/features/project/projectApi";
+import type { ProjectResponse } from "@/features/project/types";
+import type { SliceResponse } from "@/lib/types";
 
-const VISIBILITY_LABEL: Record<FeedVisibility, string> = {
+const VISIBILITY_LABEL: Record<Visibility, string> = {
   PUBLIC: "전체 공개",
-  SUBSCRIBERS_ONLY: "구독자 공개",
-  PAID_ONLY: "유료",
+  FREE_SUBSCRIBER: "무료 구독자 공개",
+  PAID_SUBSCRIBER: "유료",
 };
 
-const VISIBILITY_COLOR: Record<FeedVisibility, string> = {
+const VISIBILITY_COLOR: Record<Visibility, string> = {
   PUBLIC: "text-secondary",
-  SUBSCRIBERS_ONLY: "text-primary",
-  PAID_ONLY: "bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-bold",
+  FREE_SUBSCRIBER: "text-primary",
+  PAID_SUBSCRIBER: "bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-bold",
 };
 
 function toRelativeLabel(iso: string): string {
@@ -44,8 +42,8 @@ export function DashboardProjectPage() {
   const numericId = Number(projectId);
   const navigate = useNavigate();
 
-  const [project, setProject] = useState<ProjectSummary | null>(null);
-  const [feedSlice, setFeedSlice] = useState<SliceResponse<FeedSummary> | null>(null);
+  const [project, setProject] = useState<ProjectResponse | null>(null);
+  const [feedSlice, setFeedSlice] = useState<SliceResponse<FeedSummaryResponse> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -61,21 +59,17 @@ export function DashboardProjectPage() {
   const [updating, setUpdating] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // 삭제
-  const [deleting, setDeleting] = useState(false);
+  // 삭제 확인 모달
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!numericId) {
-      setError("잘못된 프로젝트입니다.");
-      setLoading(false);
-      return;
-    }
+    if (!numericId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([getProject(numericId), getProjectFeeds(numericId, 0, 20)])
+    Promise.all([getProject(numericId), getProjectFeeds(numericId, 0)])
       .then(([proj, feeds]) => {
         if (cancelled) return;
         setProject(proj);
@@ -91,19 +85,17 @@ export function DashboardProjectPage() {
       cancelled = true;
     };
   }, [numericId]);
-  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const handleLoadMore = async () => {
     if (!feedSlice || !feedSlice.hasNext) return;
     setLoadingMore(true);
-    setLoadMoreError(null);
     try {
-      const next = await getProjectFeeds(numericId, feedSlice.page + 1, feedSlice.size);
+      const next = await getProjectFeeds(numericId, feedSlice.page + 1);
       setFeedSlice((prev) =>
         prev ? { ...next, content: [...prev.content, ...next.content] } : next,
       );
-    } catch (e) {
-      setLoadMoreError(e instanceof Error ? e.message : "게시물을 더 불러오지 못했습니다.");
+    } catch {
+      // 무시
     } finally {
       setLoadingMore(false);
     }
@@ -185,18 +177,20 @@ export function DashboardProjectPage() {
           )}
           <p className="mt-1 text-caption font-caption text-secondary">게시물 {project.feedCount}개</p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="secondary" size="sm" onClick={handleOpenEdit}>
-            수정
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}>
-            삭제
-          </Button>
-          <LinkButton to={paths.dashboardPostNew} state={{ projectId: project.projectId }}>
-            <Icon name="add" className="text-[18px]" />
-            새 포스트 작성
-          </LinkButton>
-        </div>
+        {project.isMine && (
+          <div className="flex shrink-0 gap-2">
+            <Button variant="secondary" size="sm" onClick={handleOpenEdit}>
+              수정
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+              삭제
+            </Button>
+            <LinkButton to={paths.dashboardPostNew} state={{ projectId: project.projectId }}>
+              <Icon name="add" className="text-[18px]" />
+              새 포스트 작성
+            </LinkButton>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-4">
@@ -225,9 +219,6 @@ export function DashboardProjectPage() {
 
       {feedSlice?.hasNext && (
         <div className="mt-6 text-center">
-          {loadMoreError && (
-            <p className="mb-2 text-body-sm text-error">{loadMoreError}</p>
-          )}
           <Button variant="secondary" onClick={handleLoadMore} disabled={loadingMore}>
             {loadingMore ? "불러오는 중..." : "게시물 더보기"}
           </Button>
@@ -277,11 +268,7 @@ export function DashboardProjectPage() {
               type="file"
               accept="image/*"
               className="mb-4 w-full text-body-sm text-on-surface"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                setEditCoverImage(file);
-                if (file) setRemoveCover(false);
-              }}
+              onChange={(e) => setEditCoverImage(e.target.files?.[0] ?? null)}
             />
             {editError && <p className="mb-3 text-body-sm text-error">{editError}</p>}
             <div className="flex gap-2">
