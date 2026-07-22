@@ -28,6 +28,7 @@ export function AdminCreatorApplicationsPage() {
   const [rejectId, setRejectId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const fetchList = () => {
     setLoading(true);
@@ -107,6 +108,14 @@ export function AdminCreatorApplicationsPage() {
                   {app.introduction && (
                     <p className="mt-2 text-body-md text-on-surface">{app.introduction}</p>
                   )}
+                  {app.representativeImageUrl && (
+                    <img
+                      src={app.representativeImageUrl}
+                      alt="대표 이미지"
+                      className="mt-3 h-40 w-40 cursor-pointer rounded-lg object-cover"
+                      onClick={() => setPreviewImage(app.representativeImageUrl!)}
+                    />
+                  )}
                   {app.rejectReason && (
                     <p className="mt-1 text-body-sm text-secondary">거절 사유: {app.rejectReason}</p>
                   )}
@@ -179,6 +188,18 @@ export function AdminCreatorApplicationsPage() {
               </Button>
             </div>
           </Card>
+        </div>
+      )}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setPreviewImage(null)}
+        >
+          <img
+            src={previewImage}
+            alt="대표 이미지 크게보기"
+            className="max-h-[80vh] max-w-[80vw] rounded-xl object-contain"
+          />
         </div>
       )}
     </div>
