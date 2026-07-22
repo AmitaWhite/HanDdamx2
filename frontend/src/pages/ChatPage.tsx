@@ -7,6 +7,7 @@ import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatRoomListItem } from "@/components/chat/ChatRoomListItem";
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
@@ -270,6 +271,7 @@ function ChatConversation({
 	const [sendError, setSendError] = useState<string | null>(null);
 	const [imageBusy, setImageBusy] = useState(false);
 	const [closeBusy, setCloseBusy] = useState(false);
+	const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
 	const roomClosed = room.status === "CLOSED";
 
@@ -313,15 +315,14 @@ function ChatConversation({
 		}
 	}
 
+	function openCloseConfirm() {
+		if (roomClosed || closeBusy) return;
+		setCloseConfirmOpen(true);
+	}
+
 	async function handleCloseRoom() {
 		if (roomClosed || closeBusy) return;
-		if (
-			!window.confirm(
-				"채팅방을 종료할까요? 종료 후에는 메시지를 보낼 수 없고, 대화 내용만 조회할 수 있습니다.",
-			)
-		) {
-			return;
-		}
+		setCloseConfirmOpen(false);
 		setSendError(null);
 		setCloseBusy(true);
 		try {
@@ -346,7 +347,16 @@ function ChatConversation({
 				roomClosed={roomClosed}
 				closedAt={room.closedAt}
 				closeBusy={closeBusy}
-				onClose={() => void handleCloseRoom()}
+				onClose={openCloseConfirm}
+			/>
+
+			<ConfirmDialog
+				open={closeConfirmOpen}
+				title="채팅방을 종료할까요?"
+				description="종료 후에는 메시지를 보낼 수 없고, 대화 내용만 조회할 수 있습니다."
+				confirmLabel="종료"
+				onConfirm={() => void handleCloseRoom()}
+				onCancel={() => setCloseConfirmOpen(false)}
 			/>
 
 			{roomClosed && (
