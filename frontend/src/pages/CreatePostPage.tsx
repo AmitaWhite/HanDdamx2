@@ -124,7 +124,7 @@ export function CreatePostPage() {
 	function onList() {
 		const el = bodyRef.current;
 		if (!el) return;
-		applyFormat(el, setBody, prefixCurrentLine(el.value, el.selectionStart, "- "));
+		applyFormat(el, setBody, prefixCurrentLine(el.value, el.selectionStart, el.selectionEnd, "- "));
 	}
 	function onLink() {
 		const el = bodyRef.current;
@@ -262,6 +262,7 @@ export function CreatePostPage() {
 									type="button"
 									onClick={btn.onClick}
 									title={btn.title}
+									aria-label={btn.title}
 									className="flex h-8 w-8 items-center justify-center rounded text-secondary hover:bg-surface-container"
 								>
 									<Icon name={btn.icon} className="text-[18px]" />

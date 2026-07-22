@@ -29,6 +29,16 @@ const VISIBILITY_OPTIONS: { id: Visibility; label: string; description: string }
 	{ id: "PAID_SUBSCRIBER", label: "유료 구독자만", description: "유료 구독자에게만 공개" },
 ];
 
+// 직접 재생 가능한 동영상 파일 URL인지 확인 — VIDEO_LINK엔 유튜브 시청 페이지 같은
+// <video>로 재생 불가능한 링크도 들어올 수 있어(예: 시나리오 시드 데이터), mimeType이나
+// 확장자로 실제 재생 가능한 파일인지 먼저 확인한다.
+const PLAYABLE_VIDEO_EXTENSION = /\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i;
+
+function isPlayableVideo(attachment: AttachmentResponse): boolean {
+	if (attachment.mimeType?.startsWith("video/")) return true;
+	return attachment.type === "VIDEO_LINK" && PLAYABLE_VIDEO_EXTENSION.test(attachment.url);
+}
+
 export function EditPostPage() {
 	const { feedId = "" } = useParams();
 	const navigate = useNavigate();
@@ -64,8 +74,8 @@ export function EditPostPage() {
 		let cancelled = false;
 		setLoading(true);
 		setLoadError(null);
-		Promise.all([getFeed(feedId), getMyProjects(), getFeedAttachments(feedId)])
-			.then(([feed, projectList, attachmentList]) => {
+		Promise.all([getFeed(feedId), getMyProjects()])
+			.then(([feed, projectList]) => {
 				if (cancelled) return;
 				setTitle(feed.title);
 				setContent(feed.content ?? "");
@@ -73,7 +83,6 @@ export function EditPostPage() {
 				setProjects(projectList);
 				setProjectId(String(feed.projectId));
 				setCurrentProjectId(feed.projectId);
-				setAttachments(attachmentList);
 			})
 			.catch((err) => {
 				if (cancelled) return;
@@ -85,6 +94,14 @@ export function EditPostPage() {
 		return () => {
 			cancelled = true;
 		};
+	}, [feedId]);
+
+	useEffect(() => {
+		getFeedAttachments(feedId)
+			.then(setAttachments)
+			.catch((err) => {
+				setAttachmentError(err instanceof ApiError ? err.message : "첨부파일을 불러오지 못했습니다.");
+			});
 	}, [feedId]);
 
 	async function onSubmit(e: FormEvent) {
@@ -106,11 +123,12 @@ export function EditPostPage() {
 	async function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
 		const files = e.target.files;
 		if (!files || files.length === 0) return;
+		const selectedFiles = Array.from(files);
 		e.target.value = "";
 		setAttachmentError(null);
 		setUploading(true);
 		try {
-			for (const file of Array.from(files)) {
+			for (const file of selectedFiles) {
 				const uploaded = await addFeedAttachment(Number(feedId), file);
 				setAttachments((prev) => [...prev, uploaded]);
 			}
@@ -145,7 +163,7 @@ export function EditPostPage() {
 	function onList() {
 		const el = contentRef.current;
 		if (!el) return;
-		applyFormat(el, setContent, prefixCurrentLine(el.value, el.selectionStart, "- "));
+		applyFormat(el, setContent, prefixCurrentLine(el.value, el.selectionStart, el.selectionEnd, "- "));
 	}
 	function onLink() {
 		const el = contentRef.current;
@@ -213,6 +231,7 @@ export function EditPostPage() {
 									onClick={btn.onClick}
 									disabled={btn.icon === "image" && uploading}
 									title={btn.title}
+									aria-label={btn.title}
 									className="flex h-8 w-8 items-center justify-center rounded text-secondary hover:bg-surface-container disabled:opacity-50"
 								>
 									<Icon name={btn.icon} className="text-[18px]" />
@@ -239,7 +258,7 @@ export function EditPostPage() {
 						{attachments.length > 0 && (
 							<div className="flex flex-wrap gap-3 rounded-b border-t border-outline-variant p-3">
 								{attachments.map((a) => {
-									const isVideo = a.type === "VIDEO_LINK" || (a.mimeType?.startsWith("video/") ?? false);
+									const isVideo = isPlayableVideo(a);
 									return (
 										<div key={a.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
 											{a.type === "IMAGE" ? (
