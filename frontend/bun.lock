@@ -6,6 +6,7 @@
 			"name": "handdam-frontend",
 			"dependencies": {
 				"@stomp/stompjs": "^7.3.0",
+				"@tosspayments/tosspayments-sdk": "^2.7.1",
 				"axios": "^1.7.7",
 				"react": "^18.3.1",
 				"react-dom": "^18.3.1",
@@ -685,6 +686,13 @@
 			"",
 			{},
 			"sha512-nKMLoFfJhrQAqkvvKd1vLq/cVBGCMwPRCD0LqW7UT1fecRx9C3GoKEIR2CYwVuErGeZu8w0kFkl2rlhPlqHVgQ=="
+		],
+
+		"@tosspayments/tosspayments-sdk": [
+			"@tosspayments/tosspayments-sdk@2.7.1",
+			"",
+			{},
+			"sha512-nHInxgFvFGm1VtaCS+IPLdtmE+B2a+MCYE9Meq0aR/0L0hAgoGllLS4ciQGb1RtLvp3mHcj3lL80XMi4BqQ7uw=="
 		],
 
 		"@types/babel__core": [

@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { CreatorQnaList } from "@/components/creator/CreatorQnaList";
 import { PostCard } from "@/components/social/PostCard";
+import { SubscriptionPlanPanel } from "@/components/subscription/SubscriptionPlanPanel";
 import { Avatar } from "@/components/ui/Avatar";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
-import { useAuth } from "@/features/auth/AuthContext";
 import { type BoardPostType, getPremiumBoardPosts } from "@/features/board/boardApi";
 import { getCreatorProfile, getCreatorProjects } from "@/features/creator/creatorApi";
 import type { CreatorProfile, ProjectSummary } from "@/features/creator/types";
@@ -54,10 +53,6 @@ function toRelativeLabel(iso: string): string {
 export function CreatorPage() {
   const { creatorId = "" } = useParams();
   const numericCreatorId = toNumericCreatorId(creatorId);
-
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  const { isFreeSubscribed, subscribeFree, unsubscribe } = useSubscription();
 
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -211,15 +206,8 @@ export function CreatorPage() {
 
   const creatorStringId = String(creator.memberId);
   const subscribed = isFreeSubscribed(creatorStringId);
-
-  function handleToggleSubscribe() {
-    if (!isAuthenticated) {
-      navigate(paths.login);
-      return;
-    }
-    if (subscribed) unsubscribe(creatorStringId);
-    else subscribeFree(creatorStringId);
-  }
+  // posts는 피드 API 연동 전까지 빈 배열
+  const posts: PlaceholderPost[] = [];
 
   function scrollProjects(direction: "left" | "right") {
     projectsRef.current?.scrollBy({
@@ -315,17 +303,17 @@ export function CreatorPage() {
               <LinkButton to={`${paths.chat}?creatorId=${creator.memberId}`} variant="secondary">
                 메시지
               </LinkButton>
-              <Button variant={subscribed ? "secondary" : "primary"} onClick={handleToggleSubscribe}>
-                {subscribed ? "구독 중" : "구독하기"}
-              </Button>
-              {subscribed && (
-                <LinkButton to={paths.subscribeSelect(creator.memberId)} state={{ mode: "support" }}>
-                  후원하기
-                </LinkButton>
-              )}
             </div>
           )}
         </Card>
+      </div>
+
+      <div className="container-page mt-6">
+        <SubscriptionPlanPanel
+          creatorId={creator.memberId}
+          creatorNickname={creator.nickname}
+          isOwnCreator={creator.isMine}
+        />
       </div>
 
       {projects.length > 0 && (

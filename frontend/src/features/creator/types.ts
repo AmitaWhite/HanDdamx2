@@ -62,3 +62,36 @@ export interface PageResponse<T> {
   size: number;
   last: boolean;
 }
+
+/** 백엔드 Visibility enum */
+export type FeedVisibility = "PUBLIC" | "SUBSCRIBERS_ONLY" | "PAID_ONLY";
+
+/** 백엔드 FeedSummaryResponse 대응 (프로젝트 내 피드 목록) */
+export interface FeedSummary {
+  id: number;
+  projectId: number;
+  title: string;
+  content: string;
+  visibility: FeedVisibility;
+  likeCount: number;
+  commentCount: number;
+  createdAt: string;
+  updatedAt: string;
+  creator: {
+    creatorId: number;
+    nickname: string;
+    profileImageUrl: string | null;
+  };
+  category: {
+    categoryId: number;
+    name: string;
+  };
+}
+
+/** 백엔드 SliceResponse<T> 대응 (무한 스크롤용, ApiResponse 미사용) */
+export interface SliceResponse<T> {
+  content: T[];
+  hasNext: boolean;
+  page: number;
+  size: number;
+}
