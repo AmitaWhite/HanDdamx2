@@ -19,6 +19,16 @@ import { SubscriptionStatusNotice } from "@/components/subscription/Subscription
 import { useAuth } from "@/features/auth/AuthContext";
 import { getCreatorProfile } from "@/features/creator/creatorApi";
 import type { CreatorProfile } from "@/features/creator/types";
+import { preparePayment } from "@/features/payment/paymentApi";
+import {
+	CheckoutFlowError,
+	buildTossRedirectUrls,
+	getConfiguredTossClientKey,
+	getTossPayments,
+	toTossCheckoutErrorInfo,
+	validatePreparedPayment,
+	type TossCheckoutStage,
+} from "@/features/payment/tossPayment";
 import {
 	getSubscriptionPlans,
 	getSubscriptionStatus,
@@ -67,8 +77,11 @@ export function SubscribeSelectPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
+	const [paymentStage, setPaymentStage] = useState<TossCheckoutStage>("idle");
+	const [paymentError, setPaymentError] = useState<string | null>(null);
 	const requestIdRef = useRef(0);
 	const mountedRef = useRef(false);
+	const paymentRequestInFlightRef = useRef(false);
 
 	const freePlan = useMemo(
 		() => plans.find((plan) => plan.subscriptionLevel === "FREE") ?? null,
@@ -89,6 +102,7 @@ export function SubscribeSelectPage() {
 		!isFreeActive &&
 		!isPaidActive &&
 		!isPaidCancelScheduled;
+	const isPaymentBusy = paymentStage !== "idle";
 	const paidAmountValid = paidPlan ? isValidPaidAmount(paidPlan) : false;
 	const canSelectPaid =
 		isAuthenticated &&
@@ -101,7 +115,8 @@ export function SubscribeSelectPage() {
 		!isPaidActive &&
 		!isPaidCancelScheduled &&
 		!isUnexpectedStatus;
-	const canProceedToPayment = selectedPlan === "PAID" && canSelectPaid;
+	const canProceedToPayment =
+		selectedPlan === "PAID" && canSelectPaid && !isPaymentBusy;
 
 	const loadData = useCallback(async () => {
 		if (numericCreatorId === null || !isAuthenticated) return;
@@ -111,6 +126,9 @@ export function SubscribeSelectPage() {
 		setLoading(true);
 		setError(null);
 		setNotice(null);
+		setPaymentError(null);
+		setPaymentStage("idle");
+		paymentRequestInFlightRef.current = false;
 		setCreator(null);
 		setPlans([]);
 		setSubscriptionStatus(null);
@@ -155,6 +173,9 @@ export function SubscribeSelectPage() {
 		setSelectedPlan(null);
 		setError(null);
 		setNotice(null);
+		setPaymentError(null);
+		setPaymentStage("idle");
+		paymentRequestInFlightRef.current = false;
 		setLoading(false);
 
 		if (numericCreatorId === null || !isAuthenticated) return;
@@ -162,11 +183,76 @@ export function SubscribeSelectPage() {
 		void loadData();
 	}, [isAuthenticated, loadData, numericCreatorId]);
 
-	function handlePaymentPreview() {
-		if (!canProceedToPayment) return;
-		setNotice(
-			"결제창 연동은 다음 단계에서 연결됩니다. 아직 결제 준비 요청은 생성하지 않았습니다.",
-		);
+	async function handlePaymentStart() {
+		if (
+			paymentRequestInFlightRef.current ||
+			!canProceedToPayment ||
+			numericCreatorId === null ||
+			!creator ||
+			!paidPlan
+		) {
+			return;
+		}
+
+		const clientKey = getConfiguredTossClientKey();
+		if (!clientKey) {
+			setNotice(null);
+			setPaymentError("결제 환경이 설정되지 않았습니다. 관리자에게 문의해 주세요.");
+			return;
+		}
+
+		paymentRequestInFlightRef.current = true;
+		let currentStage: TossCheckoutStage = "idle";
+
+		const moveToStage = (nextStage: TossCheckoutStage) => {
+			currentStage = nextStage;
+			setPaymentStage(nextStage);
+		};
+
+		setPaymentError(null);
+		setNotice(null);
+
+		try {
+			moveToStage("preparing");
+			const prepared = await preparePayment({ creatorId: numericCreatorId });
+			const validated = validatePreparedPayment(prepared, {
+				expectedAmount: getExpectedPaidAmount(paidPlan),
+				expectedCreatorId: numericCreatorId,
+				fallbackCreatorNickname: creator.nickname,
+			});
+			const { successUrl, failUrl } = buildTossRedirectUrls(
+				numericCreatorId,
+				validated.orderId,
+			);
+
+			moveToStage("loading-sdk");
+			const tossPayments = await getTossPayments(clientKey);
+			const payment = tossPayments.payment({
+				customerKey: validated.customerKey,
+			});
+
+			moveToStage("requesting-payment");
+			await payment.requestPayment({
+				method: "CARD",
+				amount: {
+					currency: "KRW",
+					value: validated.amount,
+				},
+				orderId: validated.orderId,
+				orderName: validated.orderName,
+				successUrl,
+				failUrl,
+			});
+		} catch (err) {
+			if (mountedRef.current) {
+				setPaymentError(toPaymentErrorMessage(err, currentStage));
+			}
+		} finally {
+			paymentRequestInFlightRef.current = false;
+			if (mountedRef.current) {
+				setPaymentStage("idle");
+			}
+		}
 	}
 
 	if (numericCreatorId === null) {
@@ -290,6 +376,10 @@ export function SubscribeSelectPage() {
 				isUnexpectedStatus,
 			})
 		: "";
+	const checkoutNotice = getPaymentStageNotice(paymentStage, notice);
+	const checkoutDisabledReason = isPaymentBusy
+		? "결제 요청을 처리하는 중입니다."
+		: paymentDisabledReason;
 
 	return (
 		<SubscribeSelectShell>
@@ -358,8 +448,12 @@ export function SubscribeSelectPage() {
 								type="button"
 								variant={selectedPlan === "PAID" ? "primary" : "outline"}
 								fullWidth
-								disabled={!canSelectPaid}
-								onClick={() => setSelectedPlan("PAID")}
+								disabled={!canSelectPaid || isPaymentBusy}
+								onClick={() => {
+									if (!isPaymentBusy) {
+										setSelectedPlan("PAID");
+									}
+								}}
 							>
 								{getPaidSelectButtonLabel({
 									canSelectPaid,
@@ -388,11 +482,19 @@ export function SubscribeSelectPage() {
 				<CheckoutSummary
 					creatorNickname={creator.nickname}
 					amountLabel={formatPrice(paidPlan)}
-					notice={notice}
+					notice={checkoutNotice}
 					disabled={!canProceedToPayment}
-					disabledReason={paymentDisabledReason}
-					onReadyClick={handlePaymentPreview}
+					disabledReason={checkoutDisabledReason}
+					buttonLabel={getPaymentButtonLabel(paymentStage)}
+					onReadyClick={() => {
+						void handlePaymentStart();
+					}}
 				/>
+			)}
+			{paymentError && (
+				<div className="mt-4">
+					<Alert>{paymentError}</Alert>
+				</div>
 			)}
 		</SubscribeSelectShell>
 	);
@@ -522,6 +624,91 @@ function formatDateTime(value: string): string {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return value;
 	return dateTimeFormatter.format(date);
+}
+
+function getExpectedPaidAmount(plan: SubscriptionPlanResponse): number | null {
+	if (!Number.isInteger(plan.price) || plan.price <= 0) {
+		return null;
+	}
+
+	return plan.price;
+}
+
+function getPaymentStageNotice(
+	paymentStage: TossCheckoutStage,
+	idleNotice: string | null,
+): string | null {
+	switch (paymentStage) {
+		case "preparing":
+			return "결제 준비 정보를 요청하고 있습니다.";
+		case "loading-sdk":
+			return "결제창을 열기 위한 환경을 확인하고 있습니다.";
+		case "requesting-payment":
+			return "Toss Payments 결제창을 여는 중입니다.";
+		default:
+			return idleNotice;
+	}
+}
+
+function getPaymentButtonLabel(paymentStage: TossCheckoutStage): string {
+	switch (paymentStage) {
+		case "preparing":
+			return "결제 준비 중...";
+		case "loading-sdk":
+		case "requesting-payment":
+			return "결제창 여는 중...";
+		default:
+			return "결제하기";
+	}
+}
+
+function toPaymentErrorMessage(
+	err: unknown,
+	paymentStage: TossCheckoutStage,
+): string {
+	if (err instanceof CheckoutFlowError) {
+		return toTossCheckoutErrorInfo(err).message;
+	}
+
+	if (paymentStage === "preparing") {
+		return toPreparePaymentErrorMessage(err);
+	}
+
+	return toTossCheckoutErrorInfo(err).message;
+}
+
+function toPreparePaymentErrorMessage(err: unknown): string {
+	if (!(err instanceof ApiError)) {
+		return "결제 준비 요청에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
+	}
+
+	switch (err.code) {
+		case "CREATOR_NOT_FOUND":
+		case "CREATOR_PROFILE_NOT_FOUND":
+			return "크리에이터 정보를 찾을 수 없습니다.";
+		case "SELF_SUBSCRIPTION_NOT_ALLOWED":
+			return "본인 크리에이터 계정은 구독할 수 없습니다.";
+		case "PAID_SUBSCRIPTION_ALREADY_EXISTS":
+			return "이미 유료 구독 중입니다.";
+		case "PAYMENT_CONFLICT":
+		case "LOCK_ACQUISITION_TIMEOUT":
+			return "이미 결제 준비 또는 처리 중입니다. 잠시 후 다시 시도해 주세요.";
+		case "PAID_PLAN_NOT_AVAILABLE":
+			return "현재 유료 구독 요금제를 사용할 수 없습니다.";
+		case "INVALID_REQUEST":
+			return "결제 요청 정보가 올바르지 않습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
+		case "MEMBER_NOT_FOUND":
+		case "UNAUTHORIZED":
+			return "로그인 상태를 확인한 뒤 다시 시도해 주세요.";
+		case "FORBIDDEN":
+			return "결제를 진행할 권한을 확인할 수 없습니다.";
+		case "INTERNAL_ERROR":
+			return "결제 정보를 생성할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+		case "UNKNOWN":
+			return "결제 준비 결과를 확인하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
+		default:
+			return "결제 준비 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+	}
 }
 
 function getPaidSelectButtonLabel({

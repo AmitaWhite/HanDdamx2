@@ -13,8 +13,18 @@ import type {
 } from "@/features/payment/types";
 import { asApiError, type ApiError } from "@/lib/api";
 
-interface ValidFailQuery {
+type ValidFailQuery = ApiFailQuery | CanceledWithoutOrderFailQuery;
+
+interface ApiFailQuery {
+	kind: "api";
 	params: PaymentFailRequest;
+	returnTarget: ReturnTarget;
+	retryTarget: ReturnTarget | null;
+	displayFailureMessage: string;
+}
+
+interface CanceledWithoutOrderFailQuery {
+	kind: "canceled-without-order";
 	returnTarget: ReturnTarget;
 	retryTarget: ReturnTarget | null;
 	displayFailureMessage: string;
@@ -58,7 +68,7 @@ export function PaymentFailPage() {
 	const [viewState, setViewState] = useState<FailViewState>({ kind: "idle" });
 
 	useEffect(() => {
-		if (!validation.ok) {
+		if (!validation.ok || validation.value.kind !== "api") {
 			setViewState({ kind: "idle" });
 			return;
 		}
@@ -92,6 +102,7 @@ export function PaymentFailPage() {
 	function handleRetry() {
 		if (
 			!validation.ok ||
+			validation.value.kind !== "api" ||
 			viewState.kind !== "error" ||
 			!viewState.error.retryable
 		) {
@@ -123,7 +134,46 @@ export function PaymentFailPage() {
 		);
 	}
 
-	const { returnTarget, retryTarget, displayFailureMessage } = validation.value;
+	const failQuery = validation.value;
+
+	if (failQuery.kind === "canceled-without-order") {
+		return (
+			<PaymentFailShell>
+				<Card className="p-6 md:p-8">
+					<div className="text-center">
+						<ResultIcon tone="error" name="cancel" />
+						<h1 className="mt-5 text-headline-lg font-display text-on-surface">
+							결제가 취소되었습니다
+						</h1>
+						<p className="mt-3 text-body-md text-secondary">
+							결제창이 닫혀 결제가 완료되지 않았습니다. 다시 결제를 시도할 수 있습니다.
+						</p>
+					</div>
+
+					<div className="mt-6">
+						<Alert>{failQuery.displayFailureMessage}</Alert>
+					</div>
+
+					<div className="mt-7 flex flex-col gap-3 sm:flex-row">
+						{failQuery.retryTarget && (
+							<LinkButton to={failQuery.retryTarget.to} fullWidth>
+								{failQuery.retryTarget.label}
+							</LinkButton>
+						)}
+						<LinkButton
+							to={failQuery.returnTarget.to}
+							variant={failQuery.retryTarget ? "outline" : "primary"}
+							fullWidth
+						>
+							{failQuery.returnTarget.label}
+						</LinkButton>
+					</div>
+				</Card>
+			</PaymentFailShell>
+		);
+	}
+
+	const { params, returnTarget, retryTarget, displayFailureMessage } = failQuery;
 
 	if (viewState.kind === "success") {
 		return (
@@ -180,7 +230,7 @@ export function PaymentFailPage() {
 					</div>
 
 					<FailureSummary
-						orderId={validation.value.params.orderId}
+						orderId={params.orderId}
 						failureMessage={displayFailureMessage}
 						statusLabel="실패 정보 처리 오류"
 					/>
@@ -294,7 +344,30 @@ function validateFailQuery(searchParams: URLSearchParams): FailQueryValidation {
 	const orderId = getRequiredQueryValue(searchParams, "orderId");
 	const code = getRequiredQueryValue(searchParams, "code");
 
-	if (!orderId || !code) {
+	if (!code) {
+		return {
+			ok: false,
+			message: "결제 실패 처리에 필요한 정보가 부족합니다.",
+			returnTarget,
+		};
+	}
+
+	if (!orderId) {
+		if (isPaymentProcessCanceled(code)) {
+			return {
+				ok: true,
+				value: {
+					kind: "canceled-without-order",
+					returnTarget,
+					retryTarget,
+					displayFailureMessage: getSafeFailureDisplayMessage(
+						code,
+						searchParams.get("message"),
+					),
+				},
+			};
+		}
+
 		return {
 			ok: false,
 			message: "결제 실패 처리에 필요한 정보가 부족합니다.",
@@ -315,6 +388,7 @@ function validateFailQuery(searchParams: URLSearchParams): FailQueryValidation {
 	return {
 		ok: true,
 		value: {
+			kind: "api",
 			params,
 			returnTarget,
 			retryTarget,
@@ -428,6 +502,10 @@ function getRequiredQueryValue(
 ): string | null {
 	const value = searchParams.get(name)?.trim();
 	return value ? value : null;
+}
+
+function isPaymentProcessCanceled(code: string): boolean {
+	return code.trim().toUpperCase() === "PAY_PROCESS_CANCELED";
 }
 
 function parseOptionalCreatorId(value: string | null): number | null {

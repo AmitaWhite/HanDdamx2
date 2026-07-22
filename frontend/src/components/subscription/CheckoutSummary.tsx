@@ -7,6 +7,7 @@ interface CheckoutSummaryProps {
 	notice: string | null;
 	disabled: boolean;
 	disabledReason: string;
+	buttonLabel?: string;
 	onReadyClick: () => void;
 }
 
@@ -16,6 +17,7 @@ export function CheckoutSummary({
 	notice,
 	disabled,
 	disabledReason,
+	buttonLabel = "결제하기",
 	onReadyClick,
 }: CheckoutSummaryProps) {
 	return (
@@ -29,7 +31,7 @@ export function CheckoutSummary({
 				<SummaryRow label="결제 금액" value={amountLabel} />
 			</div>
 			<p className="mt-5 text-body-md text-secondary">
-				다음 단계에서 결제 준비 요청과 Toss Payments 결제창을 한 흐름으로 연결합니다.
+				결제하기를 누르면 결제 준비 요청 후 Toss Payments 결제창으로 이동합니다.
 			</p>
 			{notice && (
 				<p
@@ -47,7 +49,7 @@ export function CheckoutSummary({
 				disabled={disabled}
 				onClick={onReadyClick}
 			>
-				결제 연동 준비 중
+				{buttonLabel}
 			</Button>
 			{disabled && (
 				<p className="mt-3 text-center text-caption font-caption text-secondary">
