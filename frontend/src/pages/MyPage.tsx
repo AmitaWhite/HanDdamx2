@@ -180,9 +180,14 @@ export function MyPage() {
       {isAdmin && (
         <div className="mt-6 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6">
           <h2 className="mb-3 text-headline-sm font-display text-on-surface">관리자 메뉴</h2>
-          <LinkButton to={paths.adminCreatorApplications} variant="secondary" size="sm">
-            크리에이터 신청 관리
-          </LinkButton>
+          <div className="flex flex-wrap gap-2">
+            <LinkButton to={paths.adminCreatorApplications} variant="secondary" size="sm">
+              크리에이터 신청 관리
+            </LinkButton>
+            <LinkButton to={paths.adminCategories} variant="secondary" size="sm">
+              카테고리 관리
+            </LinkButton>
+          </div>
         </div>
       )}
 
