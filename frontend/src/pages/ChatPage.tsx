@@ -23,7 +23,6 @@ import { useChatRoomList } from "@/features/chat/useChatRoomList";
 import { useChatSocket } from "@/features/chat/useChatSocket";
 import { ApiError } from "@/lib/api";
 import { findCreator } from "@/mocks/creators";
-import { mockImg } from "@/mocks/helpers";
 
 /** 쿼리스트링 → 양의 정수 id 파싱 헬퍼 */
 function toNumericId(value: string | null): number | null {
@@ -288,8 +287,7 @@ function ChatConversation({
 	const canSendText = !roomClosed && socketReady && !imageBusy;
 	const canSendImage = !roomClosed && !!user && !imageBusy;
 	const displayName = opponent?.nickname ?? mockCreator.name;
-	const avatarSrc =
-		opponent?.profileImageUrl ?? mockImg(mockCreator.avatarSeed, 80, 80);
+	const avatarSrc = opponent?.profileImageUrl ?? undefined;
 
 	function handleSendText(text: string) {
 		setSendError(null);

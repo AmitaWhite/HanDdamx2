@@ -413,7 +413,7 @@ class FeedServiceTest {
         given(memberRepository.findAllById(any())).willReturn(List.of(sampleMember(1L)));
         given(categoryRepository.findAllById(any())).willReturn(List.of(sampleCategory(1L)));
 
-        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, Pageable.unpaged());
+        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, null, Pageable.unpaged());
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).visibility()).isEqualTo(Visibility.PUBLIC);
@@ -425,7 +425,7 @@ class FeedServiceTest {
         given(feedRepository.findExploreFeeds(isNull(), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(List.of()));
 
-        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, Pageable.unpaged());
+        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(null, null, Pageable.unpaged());
 
         assertThat(result.getContent()).isEmpty();
     }

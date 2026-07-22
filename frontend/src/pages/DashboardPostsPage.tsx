@@ -5,13 +5,17 @@ import { MyPageShell } from "@/components/nav/MyPageShell";
 import { PostCard } from "@/components/social/PostCard";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
 import { deleteFeed, getMyFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { formatDateLabel } from "@/lib/date";
+import { VISIBILITY_BADGE_LABEL } from "@/lib/visibility";
 
 export function DashboardPostsPage() {
 	const { user } = useAuth();
@@ -25,6 +29,7 @@ export function DashboardPostsPage() {
 	const [feedsHasNext, setFeedsHasNext] = useState(false);
 	const [feedsLoadingMore, setFeedsLoadingMore] = useState(false);
 	const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
+	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
 	useEffect(() => {
 		if (!isCreator) return;
@@ -60,9 +65,15 @@ export function DashboardPostsPage() {
 		}
 	}
 
-	async function handleDeletePost(feedId: number) {
+	function handleDeletePost(feedId: number) {
 		if (pendingDeleteIds.has(feedId)) return;
-		if (!window.confirm("이 게시물을 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.")) return;
+		setConfirmDeleteId(feedId);
+	}
+
+	async function executeDeletePost() {
+		const feedId = confirmDeleteId;
+		setConfirmDeleteId(null);
+		if (feedId == null) return;
 		setFeedsError(null);
 		setPendingDeleteIds((prev) => new Set(prev).add(feedId));
 		try {
@@ -140,7 +151,20 @@ export function DashboardPostsPage() {
 												<Icon name="delete" className="text-[16px]" />
 											</button>
 										</div>
-										<PostCard href={paths.postDetail(post.id)} imageSeed={`feed-${post.id}`} imageAlt={post.title}>
+										<PostCard
+											href={paths.postDetail(post.id)}
+											imageSeed={`feed-${post.id}`}
+											imageAlt={post.title}
+											thumbnailUrl={post.thumbnailUrl}
+											thumbnailType={post.thumbnailType}
+											overlay={
+												<span className="absolute left-3 top-3">
+													<Chip active size="sm">
+														{VISIBILITY_BADGE_LABEL[post.visibility]}
+													</Chip>
+												</span>
+											}
+										>
 											<div className="p-4">
 												<span className="mb-2 inline-block rounded bg-surface-container px-2 py-0.5 text-caption font-caption text-secondary">
 													{post.category.name}
@@ -149,8 +173,8 @@ export function DashboardPostsPage() {
 												<p className="mb-2 truncate text-caption font-caption text-secondary">{post.content}</p>
 												<div className="flex items-center justify-between text-caption font-caption text-secondary">
 													<span className="flex items-center gap-3">
-														<span className="flex items-center gap-1">
-															<Icon name="favorite" className="text-[14px]" />
+														<span className={cn("flex items-center gap-1", post.liked && "text-primary")}>
+															<Icon name="favorite" filled={post.liked} className="text-[14px]" />
 															{post.likeCount}
 														</span>
 														<span className="flex items-center gap-1">
@@ -195,6 +219,14 @@ export function DashboardPostsPage() {
 					)}
 				</section>
 			</div>
+			<ConfirmDialog
+				open={confirmDeleteId != null}
+				title="이 게시물을 삭제하시겠어요?"
+				description="삭제하면 되돌릴 수 없습니다."
+				confirmLabel="삭제"
+				onConfirm={executeDeletePost}
+				onCancel={() => setConfirmDeleteId(null)}
+			/>
 		</MyPageShell>
 	);
 }

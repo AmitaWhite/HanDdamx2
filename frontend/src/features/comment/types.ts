@@ -3,6 +3,7 @@ export interface FeedCommentResponse {
 	id: number;
 	memberId: number;
 	nickname: string;
+	profileImageUrl: string | null;
 	content: string;
 	/** 0 = 최상위 댓글, 1 = 답글 (답글의 답글은 없음) */
 	depth: number;

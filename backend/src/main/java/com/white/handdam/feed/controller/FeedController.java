@@ -82,9 +82,11 @@ public class FeedController {
     // [LYJ-006] GET /api/feeds/public
     @GetMapping("/public")
     public ApiResponse<SliceResponse<FeedSummaryResponse>> getPublicFeeds(
+            @AuthenticationPrincipal AuthMember member,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
-        return ApiResponse.success(SliceResponse.from(feedService.getPublicFeeds(pageable)));
+        Long memberId = member != null ? member.id() : null;
+        return ApiResponse.success(SliceResponse.from(feedService.getPublicFeeds(memberId, pageable)));
     }
 
     // [LYJ-007] GET /api/feeds/home
@@ -100,10 +102,12 @@ public class FeedController {
     // [LYJ-008] GET /api/feeds/explore
     @GetMapping("/explore")
     public ApiResponse<SliceResponse<FeedSummaryResponse>> getExploreFeeds(
+            @AuthenticationPrincipal AuthMember member,
             @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ){
-        return ApiResponse.success(SliceResponse.from(feedService.getExploreFeeds(categoryId, pageable)));
+        Long memberId = member != null ? member.id() : null;
+        return ApiResponse.success(SliceResponse.from(feedService.getExploreFeeds(memberId, categoryId, pageable)));
     }
 
     // [LYJ-009] GET /api/feeds/creators/{creatorId}

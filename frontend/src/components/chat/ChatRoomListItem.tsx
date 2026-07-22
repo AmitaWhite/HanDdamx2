@@ -6,7 +6,6 @@ import {
 import type { OpponentProfile } from "@/features/chat/useChatOpponent";
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/relativeTime";
-import { mockImg } from "@/mocks/helpers";
 
 interface ChatRoomListItemProps {
 	room: ChatRoomListItemResponse;
@@ -40,7 +39,8 @@ export function ChatRoomListItem({
 			className="flex w-full items-center gap-3 p-5 text-left transition-colors hover:bg-surface-container-low"
 		>
 			<Avatar
-				src={opponent?.profileImageUrl ?? mockImg(`member-${opponentId}`, 80, 80)}
+				src={opponent?.profileImageUrl ?? undefined}
+				fallbackText={opponent?.nickname ?? `회원 #${opponentId}`}
 				size={48}
 			/>
 			<div className="min-w-0 flex-1">

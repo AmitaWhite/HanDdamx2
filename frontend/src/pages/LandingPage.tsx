@@ -14,6 +14,7 @@ import { getPublicFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 // 실험(lab): 히어로 물방울 글래스모피즘. 실험 종료 시 이 import 와 아래 사용처를 원복.
 import { WaterHero } from "@/lab/WaterHero";
+import { truncateText } from "@/lib/text";
 import { mockCreators } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
 
@@ -38,7 +39,7 @@ export function LandingPage() {
 		<>
 			{/* Hero */}
 			<section className="container-page flex flex-col items-center gap-12 py-section-gap lg:flex-row">
-				<div className="flex-1">
+				<div className="min-w-0 flex-1">
 					<span className="mb-4 block text-label-md font-label-md font-bold uppercase tracking-wider text-primary">
 						Craft Subscription
 					</span>
@@ -99,9 +100,9 @@ export function LandingPage() {
 					</div>
 					<div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
 						{featuredCreators.map((c) => (
-							<Card key={c.id} interactive className="p-8 text-center">
+							<Card key={c.id} interactive className="min-w-0 p-8 text-center">
 								<Avatar
-									src={mockImg(c.avatarSeed, 200, 200)}
+									fallbackText={c.name}
 									size={96}
 									className="mx-auto mb-6 border-4 border-surface-container-high"
 								/>
@@ -137,10 +138,8 @@ export function LandingPage() {
 							<div className="p-6">
 								<div className="mb-4 flex items-center gap-3">
 									<Avatar
-										src={
-											post.creator.profileImageUrl ??
-											mockImg(`creator-${post.creator.creatorId}`, 80, 80)
-										}
+										src={post.creator.profileImageUrl ?? undefined}
+										fallbackText={post.creator.nickname}
 										size={32}
 									/>
 									<span className="text-label-md font-label-md text-on-surface">
@@ -148,7 +147,7 @@ export function LandingPage() {
 									</span>
 								</div>
 								<h4 className="mb-2 text-headline-md font-display text-on-surface">
-									{post.title}
+									{truncateText(post.title, 13)}
 								</h4>
 								<span className="text-caption font-caption text-secondary">
 									#{post.category.name}

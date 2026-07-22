@@ -218,12 +218,19 @@ export function CreatorPage() {
       )}
       {!postsError &&
         posts.map((post) => (
-          <PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={`feed-${post.id}`} imageAlt={post.title}>
+          <PostCard
+            key={post.id}
+            href={paths.postDetail(post.id)}
+            imageSeed={`feed-${post.id}`}
+            imageAlt={post.title}
+            thumbnailUrl={post.thumbnailUrl}
+            thumbnailType={post.thumbnailType}
+          >
             <div className="p-4">
               <h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
               <div className="flex items-center gap-3 text-caption font-caption text-secondary">
-								<span className="flex items-center gap-1">
-									<Icon name="favorite" className="text-[14px]" />
+								<span className={cn("flex items-center gap-1", post.liked && "text-primary")}>
+									<Icon name="favorite" filled={post.liked} className="text-[14px]" />
                   {post.likeCount}
 								</span>
                 <span className="flex items-center gap-1">

@@ -8,6 +8,9 @@ interface PostCardProps {
 	href: string;
 	imageSeed: string;
 	imageAlt: string;
+	/** 첨부된 대표 이미지/동영상 URL. 없으면 mock 이미지로 대체. */
+	thumbnailUrl?: string | null;
+	thumbnailType?: "IMAGE" | "VIDEO" | null;
 	/** 이미지 위 절대 위치 뱃지(카테고리 칩·유료 칩 등). 위치 className은 호출부가 지정. */
 	overlay?: ReactNode;
 	children: ReactNode;
@@ -18,17 +21,36 @@ interface PostCardProps {
  * "정사각형 이미지(hover 확대) + 뱃지 오버레이" 카드 셸.
  * 이미지 아래 콘텐츠는 화면마다 조합이 달라 children으로 각자 구성한다.
  */
-export function PostCard({ href, imageSeed, imageAlt, overlay, children, className }: PostCardProps) {
+export function PostCard({
+	href,
+	imageSeed,
+	imageAlt,
+	thumbnailUrl,
+	thumbnailType,
+	overlay,
+	children,
+	className,
+}: PostCardProps) {
 	return (
-		<Link to={href}>
+		<Link to={href} className="min-w-0">
 			<Card interactive className={cn("group overflow-hidden", className)}>
 				<div className="relative aspect-square overflow-hidden">
 					{overlay && <div className="relative z-10">{overlay}</div>}
-					<img
-						src={mockImg(imageSeed)}
-						alt={imageAlt}
-						className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-					/>
+					{thumbnailUrl && thumbnailType === "VIDEO" ? (
+						<video
+							src={thumbnailUrl}
+							muted
+							playsInline
+							preload="metadata"
+							className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+						/>
+					) : (
+						<img
+							src={thumbnailUrl ?? mockImg(imageSeed)}
+							alt={imageAlt}
+							className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+						/>
+					)}
 				</div>
 				{children}
 			</Card>

@@ -6,7 +6,7 @@ import { formatRelativeTime } from "@/lib/relativeTime";
 
 interface ChatConversationHeaderProps {
 	displayName: string;
-	avatarSrc: string;
+	avatarSrc?: string;
 	opponentMemberId: number;
 	opponentIsCreator: boolean;
 	roomClosed: boolean;
@@ -33,7 +33,7 @@ export function ChatConversationHeader({
 }: ChatConversationHeaderProps) {
 	const profileContent = (
 		<>
-			<Avatar src={avatarSrc} size={36} />
+			<Avatar src={avatarSrc} fallbackText={displayName} size={36} />
 			<div className="min-w-0">
 				<span className="block truncate text-label-md font-label-md text-on-surface">
 					{displayName}

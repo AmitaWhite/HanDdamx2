@@ -21,6 +21,12 @@ export interface FeedSummaryResponse {
 	updatedAt: string;
 	creator: ProjectCreatorSummary;
 	category: ProjectCategorySummary;
+	/** 현재 로그인한 사용자가 이 피드에 좋아요를 눌렀는지 */
+	liked: boolean;
+	/** 대표 썸네일 — 첨부된 이미지/동영상이 없으면 null */
+	thumbnailUrl: string | null;
+	/** thumbnailUrl 이 있을 때만 유효: 이미지인지 동영상인지 */
+	thumbnailType: "IMAGE" | "VIDEO" | null;
 }
 
 /**
@@ -34,8 +40,6 @@ export interface FeedDetailResponse
 	requiredLevel: string | null;
 	/** 이 피드에 연결된 투표 id. 투표가 없으면 null */
 	pollId: number | null;
-	/** 현재 로그인한 사용자가 이미 좋아요했는지 */
-	liked: boolean;
 }
 
 /** 백엔드 AttachmentResponse (com.white.handdam.feed.dto.response.AttachmentResponse) */

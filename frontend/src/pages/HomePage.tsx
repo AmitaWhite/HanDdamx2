@@ -9,8 +9,10 @@ import type { CategoryResponse } from "@/features/category/types";
 import { getExploreFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
+import { cn } from "@/lib/cn";
+import { truncateText } from "@/lib/text";
 import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
-import { mockImg } from "@/mocks/helpers";
+import { VISIBILITY_BADGE_LABEL } from "@/lib/visibility";
 
 export function HomePage() {
 	const [categories, setCategories] = useState<CategoryResponse[]>([]);
@@ -116,30 +118,45 @@ export function HomePage() {
 						href={paths.postDetail(post.id)}
 						imageSeed={`feed-${post.id}`}
 						imageAlt={post.title}
+						thumbnailUrl={post.thumbnailUrl}
+						thumbnailType={post.thumbnailType}
 						overlay={
-							<span className="absolute left-3 top-3">
-								<Chip className="bg-surface-container-lowest/90">{post.category.name}</Chip>
-							</span>
+							<>
+								<span className="absolute left-3 top-3">
+									<Chip className="bg-surface-container-lowest/90">{post.category.name}</Chip>
+								</span>
+								<span className="absolute right-3 top-3">
+									<Chip active size="sm">
+										{VISIBILITY_BADGE_LABEL[post.visibility]}
+									</Chip>
+								</span>
+							</>
 						}
 					>
 						<div className="p-5">
-							<h3 className="mb-1 text-headline-md font-display text-on-surface">{post.title}</h3>
+							<h3 className="mb-1 text-headline-md font-display text-on-surface">
+								{truncateText(post.title, 13)}
+							</h3>
 							<div className="flex items-center justify-between">
 								<div className="flex items-center gap-2">
 									<Avatar
-										src={
-											post.creator.profileImageUrl ??
-											mockImg(`creator-${post.creator.creatorId}`, 80, 80)
-										}
+										src={post.creator.profileImageUrl ?? undefined}
+										fallbackText={post.creator.nickname}
 										size={24}
 									/>
 									<span className="text-caption font-caption text-secondary">
 										{post.creator.nickname}
 									</span>
 								</div>
-								<span className="flex items-center gap-1 text-caption font-caption text-primary">
-									<Icon name="favorite" className="text-[18px]" />
-									{post.likeCount}
+								<span className="flex items-center gap-3 text-caption font-caption text-secondary">
+									<span className={cn("flex items-center gap-1", post.liked && "text-primary")}>
+										<Icon name="favorite" filled={post.liked} className="text-[18px]" />
+										{post.likeCount}
+									</span>
+									<span className="flex items-center gap-1">
+										<Icon name="chat_bubble_outline" className="text-[18px]" />
+										{post.commentCount}
+									</span>
 								</span>
 							</div>
 						</div>
