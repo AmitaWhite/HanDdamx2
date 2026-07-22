@@ -102,7 +102,7 @@ export function MyPage() {
     return () => {
       ignore = true;
     };
-  }, [user]);
+  }, [user?.memberId, user?.role, logout]);
 
   const handleApply = async () => {
     const trimmedIntroduction = introduction.trim();
