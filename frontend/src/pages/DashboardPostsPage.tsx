@@ -89,8 +89,8 @@ export function DashboardPostsPage() {
 			<div>
 				<div className="mb-8 flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h1 className="text-headline-lg font-display text-on-surface">게시물 및 댓글 관리</h1>
-						<p className="mt-1 text-body-md text-secondary">작성한 게시물과 댓글을 관리하세요.</p>
+						<h1 className="text-headline-lg font-display text-on-surface">게시물 관리</h1>
+						<p className="mt-1 text-body-md text-secondary">작성한 게시물을 관리하세요.</p>
 					</div>
 					{isCreator && (
 						<LinkButton to={paths.dashboardPostNew}>
