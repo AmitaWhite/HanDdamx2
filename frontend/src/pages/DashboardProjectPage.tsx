@@ -65,7 +65,11 @@ export function DashboardProjectPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!numericId) return;
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      setError("유효하지 않은 프로젝트입니다.");
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -161,7 +165,7 @@ export function DashboardProjectPage() {
   return (
     <div className="container-page py-8">
       <Link
-        to={paths.dashboardProjects}
+        to={project.isMine ? paths.dashboardProjects : paths.creator(project.creator.creatorId)}
         className="mb-4 inline-flex items-center gap-1 text-label-md font-label-md text-secondary hover:text-primary"
       >
         <Icon name="arrow_back" className="text-[18px]" />
@@ -268,7 +272,11 @@ export function DashboardProjectPage() {
               type="file"
               accept="image/*"
               className="mb-4 w-full text-body-sm text-on-surface"
-              onChange={(e) => setEditCoverImage(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setEditCoverImage(file);
+                if (file) setRemoveCover(false);
+              }}
             />
             {editError && <p className="mb-3 text-body-sm text-error">{editError}</p>}
             <div className="flex gap-2">
