@@ -11,16 +11,12 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { deleteFeed, getMyFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
+import { formatDateLabel } from "@/lib/date";
 import { mockComments } from "@/mocks/comments";
 import { findCreator } from "@/mocks/creators";
 
 /** 댓글 관리 섹션은 아직 "내 댓글" 조회 API가 없어 임시로 고정한 값(mock 데모용). */
 const MOCK_CREATOR_ID = "suyeon";
-
-function formatDateLabel(iso: string): string {
-	const d = new Date(iso);
-	return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function DashboardPostsPage() {
 	const { user } = useAuth();

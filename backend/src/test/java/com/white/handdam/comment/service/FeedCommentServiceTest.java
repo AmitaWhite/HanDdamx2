@@ -4,6 +4,8 @@ import com.white.handdam.comment.dto.request.FeedCommentCreateRequest;
 import com.white.handdam.comment.dto.request.FeedCommentUpdateRequest;
 import com.white.handdam.comment.dto.response.FeedCommentResponse;
 import com.white.handdam.comment.entity.FeedComment;
+import com.white.handdam.comment.event.FeedCommentCreatedEvent;
+import com.white.handdam.comment.event.FeedReplyCreatedEvent;
 import com.white.handdam.comment.exception.FeedCommentErrorCode;
 import com.white.handdam.comment.repository.FeedCommentRepository;
 import com.white.handdam.feed.entity.Feed;
@@ -19,6 +21,7 @@ import com.white.handdam.project.repository.ProjectRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -130,6 +133,15 @@ class FeedCommentServiceTest {
 
         assertThat(commentId).isEqualTo(10L);
         verify(feedRepository).increaseCommentCount(1L);
+
+        ArgumentCaptor<FeedCommentCreatedEvent> captor = ArgumentCaptor.forClass(FeedCommentCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        FeedCommentCreatedEvent event = captor.getValue();
+        assertThat(event.feedId()).isEqualTo(1L);
+        assertThat(event.commentId()).isEqualTo(10L);
+        assertThat(event.actorId()).isEqualTo(1L);
+        assertThat(event.recipientId()).isEqualTo(99L);
+        assertThat(event.contentPreview()).isEqualTo("테스트 댓글");
     }
 
     @Test
@@ -177,6 +189,16 @@ class FeedCommentServiceTest {
 
         assertThat(commentId).isEqualTo(20L);
         verify(feedRepository).increaseCommentCount(1L);
+
+        ArgumentCaptor<FeedReplyCreatedEvent> captor = ArgumentCaptor.forClass(FeedReplyCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        FeedReplyCreatedEvent event = captor.getValue();
+        assertThat(event.feedId()).isEqualTo(1L);
+        assertThat(event.parentCommentId()).isEqualTo(10L);
+        assertThat(event.replyId()).isEqualTo(20L);
+        assertThat(event.actorId()).isEqualTo(2L);
+        assertThat(event.recipientId()).isEqualTo(1L);
+        assertThat(event.contentPreview()).isEqualTo("대댓글");
     }
 
     @Test

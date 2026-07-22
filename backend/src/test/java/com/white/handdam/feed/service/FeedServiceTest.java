@@ -18,6 +18,7 @@ import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.like.repository.FeedLikeRepository;
+import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.repository.PollRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
@@ -141,6 +142,26 @@ class FeedServiceTest {
         FeedDetailResponse result = feedService.getFeed(1L, null);
 
         assertThat(result.locked()).isFalse();
+        // 비로그인이면 poll 존재 여부와 무관하게 liked는 기본값 false, pollId는 조회되지 않은 기본값(null)이어야 한다
+        assertThat(result.pollId()).isNull();
+        assertThat(result.liked()).isFalse();
+    }
+
+    @Test
+    @DisplayName("[LYJ-002] 투표가 있고 좋아요를 누른 상태면 pollId·liked가 올바르게 채워진다")
+    void getFeed_withPollAndLiked_setsFieldsCorrectly() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
+        given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
+        given(pollRepository.findByFeedId(1L)).willReturn(Optional.of(samplePoll(1L, 7L)));
+        given(feedLikeRepository.existsByFeedIdAndMemberId(1L, 6L)).willReturn(true);
+
+        FeedDetailResponse result = feedService.getFeed(1L, 6L);
+
+        assertThat(result.pollId()).isEqualTo(7L);
+        assertThat(result.liked()).isTrue();
     }
 
     @Test
@@ -168,12 +189,17 @@ class FeedServiceTest {
         given(subscriptionLevelChecker.getLevel(6L, 99L)).willReturn(null); // 비구독자
         given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
         given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
+        given(pollRepository.findByFeedId(1L)).willReturn(Optional.of(samplePoll(1L, 7L)));
+        given(feedLikeRepository.existsByFeedIdAndMemberId(1L, 6L)).willReturn(true);
 
         FeedDetailResponse result = feedService.getFeed(1L, 6L);
 
         assertThat(result.locked()).isTrue();
         assertThat(result.content()).isNull();
         assertThat(result.requiredLevel()).isEqualTo("FREE_SUBSCRIBER");
+        // 잠긴 응답이어도 pollId·liked는 본문과 무관하게 그대로 채워진다
+        assertThat(result.pollId()).isEqualTo(7L);
+        assertThat(result.liked()).isTrue();
     }
 
     @Test
@@ -797,6 +823,12 @@ class FeedServiceTest {
         Category category = Category.builder().name("테스트카테고리").build();
         ReflectionTestUtils.setField(category, "id", id);
         return category;
+    }
+
+    private Poll samplePoll(Long feedId, Long id) {
+        Poll poll = Poll.create(feedId, "질문", Instant.now().plusSeconds(3600));
+        ReflectionTestUtils.setField(poll, "id", id);
+        return poll;
     }
 
     private FeedAttachment sampleUploadAttachment(AttachmentType type, StoredObject stored, String mimeType) {

@@ -8,13 +8,9 @@ import { Icon } from "@/components/ui/Icon";
 import { getHomeFeed } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
+import { formatDateLabel } from "@/lib/date";
 import { mockCreators } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
-
-function formatDateLabel(iso: string): string {
-	const d = new Date(iso);
-	return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function SubscribeFeedPage() {
 	// 사이드바 "구독 중인 작가"는 별도 구독 목록 API 영역 — 여기서는 그대로 mock 유지

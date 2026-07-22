@@ -30,17 +30,13 @@ import {
 import type { PollResponse, PollResultResponse } from "@/features/poll/types";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { formatDateLabel } from "@/lib/date";
 import { mockImg } from "@/mocks/helpers";
 
 const REQUIRED_LEVEL_LABEL: Record<string, string> = {
 	FREE_SUBSCRIBER: "무료 구독자",
 	PAID_SUBSCRIBER: "유료 구독자",
 };
-
-function formatDateLabel(iso: string): string {
-	const d = new Date(iso);
-	return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function totalCommentCount(comments: FeedCommentResponse[]): number {
 	return comments.reduce((sum, c) => sum + 1 + c.replies.length, 0);
