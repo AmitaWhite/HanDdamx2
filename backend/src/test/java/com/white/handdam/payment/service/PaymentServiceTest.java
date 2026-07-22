@@ -224,11 +224,11 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("getMyPayments reads only the current member payments and batches creator lookup")
+    @DisplayName("getMyPayments reads only current member SUCCESS payments and batches creator lookup")
     void getMyPaymentsReadsCurrentMemberPayments() {
         Payment payment = payment(MEMBER_ID, CREATOR_ID, PAYMENT_ID, APPROVED_AT);
         Pageable pageable = PageRequest.of(0, 20);
-        when(paymentRepository.findByMemberIdOrderByLatest(MEMBER_ID, pageable))
+        when(paymentRepository.findByMemberIdAndStatusOrderByLatest(MEMBER_ID, PaymentStatus.SUCCESS, pageable))
                 .thenReturn(new SliceImpl<>(List.of(payment), pageable, false));
         when(memberRepository.findAllById(any()))
                 .thenReturn(List.of(member(CREATOR_ID, Role.CREATOR, "creator", "https://image/creator.png")));
@@ -240,7 +240,7 @@ class PaymentServiceTest {
         assertThat(responses.getContent().get(0).creatorId()).isEqualTo(CREATOR_ID);
         assertThat(responses.getContent().get(0).creatorNickname()).isEqualTo("creator");
         assertThat(responses.getContent().get(0).creatorProfileImageUrl()).isEqualTo("https://image/creator.png");
-        verify(paymentRepository).findByMemberIdOrderByLatest(MEMBER_ID, pageable);
+        verify(paymentRepository).findByMemberIdAndStatusOrderByLatest(MEMBER_ID, PaymentStatus.SUCCESS, pageable);
         verify(memberRepository).findAllById(any());
     }
 
@@ -248,12 +248,13 @@ class PaymentServiceTest {
     @DisplayName("getMyPayments returns an empty slice without creator lookup")
     void getMyPaymentsReturnsEmptySlice() {
         Pageable pageable = PageRequest.of(0, 20);
-        when(paymentRepository.findByMemberIdOrderByLatest(MEMBER_ID, pageable))
+        when(paymentRepository.findByMemberIdAndStatusOrderByLatest(MEMBER_ID, PaymentStatus.SUCCESS, pageable))
                 .thenReturn(new SliceImpl<>(List.of(), pageable, false));
 
         Slice<PaymentSummaryResponse> responses = paymentService.getMyPayments(MEMBER_ID, pageable);
 
         assertThat(responses.getContent()).isEmpty();
+        verify(paymentRepository).findByMemberIdAndStatusOrderByLatest(MEMBER_ID, PaymentStatus.SUCCESS, pageable);
         verify(memberRepository, never()).findAllById(any());
     }
 

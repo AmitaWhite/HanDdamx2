@@ -57,3 +57,35 @@ export interface PaymentFailResponse {
 	status: PaymentStatus;
 	failureCode: string | null;
 }
+
+export interface PaymentSummaryResponse {
+	paymentId: number;
+	creatorId: number;
+	creatorNickname: string;
+	creatorProfileImageUrl: string | null;
+	amount: number;
+	status: PaymentStatus;
+	paymentMethod: string | null;
+	paidAt: string | null;
+	createdAt: string;
+}
+
+export interface PaymentDetailResponse {
+	paymentId: number;
+	subscriptionId: number | null;
+	creatorId: number;
+	creatorNickname: string;
+	creatorProfileImageUrl: string | null;
+	amount: number;
+	status: PaymentStatus;
+	paymentMethod: string | null;
+	failureCode: string | null;
+	paidAt: string | null;
+	createdAt: string;
+}
+
+export interface MyPaymentsQuery {
+	page?: number;
+	size?: number;
+	sort?: string;
+}

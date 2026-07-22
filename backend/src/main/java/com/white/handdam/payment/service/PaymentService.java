@@ -23,6 +23,7 @@ import com.white.handdam.payment.dto.response.PaymentSummaryResponse;
 import com.white.handdam.payment.dto.toss.TossConfirmRequest;
 import com.white.handdam.payment.dto.toss.TossConfirmResponse;
 import com.white.handdam.payment.entity.Payment;
+import com.white.handdam.payment.entity.PaymentStatus;
 import com.white.handdam.payment.exception.PaymentErrorCode;
 import com.white.handdam.payment.repository.PaymentRepository;
 import com.white.handdam.subscription.entity.Subscription;
@@ -127,7 +128,11 @@ public class PaymentService {
         validateRequired(memberId, "memberId");
         validateRequired(pageable, "pageable");
 
-        Slice<Payment> payments = paymentRepository.findByMemberIdOrderByLatest(memberId, pageable);
+        Slice<Payment> payments = paymentRepository.findByMemberIdAndStatusOrderByLatest(
+                memberId,
+                PaymentStatus.SUCCESS,
+                pageable
+        );
         if (!payments.hasContent()) {
             return payments.map(payment -> PaymentSummaryResponse.from(payment, null));
         }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 
 interface AvatarProps {
@@ -12,7 +13,15 @@ interface AvatarProps {
 
 /** 원형 아바타. src 없으면 fallbackText 첫 글자, 그것도 없으면 회색 플레이스홀더. */
 export function Avatar({ src, alt = "", size = 40, fallbackText, className }: AvatarProps) {
-	const initial = !src ? fallbackText?.trim().charAt(0).toUpperCase() : undefined;
+	const [loadFailed, setLoadFailed] = useState(false);
+	const displaySrc = src && !loadFailed ? src : undefined;
+	const initial = !displaySrc
+		? fallbackText?.trim().charAt(0).toUpperCase()
+		: undefined;
+
+	useEffect(() => {
+		setLoadFailed(false);
+	}, [src]);
 
 	return (
 		<span
@@ -23,8 +32,13 @@ export function Avatar({ src, alt = "", size = 40, fallbackText, className }: Av
 			)}
 			style={{ width: size, height: size }}
 		>
-			{src ? (
-				<img src={src} alt={alt} className="h-full w-full object-cover" />
+			{displaySrc ? (
+				<img
+					src={displaySrc}
+					alt={alt}
+					className="h-full w-full object-cover"
+					onError={() => setLoadFailed(true)}
+				/>
 			) : initial ? (
 				<span
 					className="font-display font-bold text-primary"

@@ -2,6 +2,7 @@ package com.white.handdam.payment.repository;
 
 import com.white.handdam.global.persistence.JpaLockHints;
 import com.white.handdam.payment.entity.Payment;
+import com.white.handdam.payment.entity.PaymentStatus;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Pageable;
@@ -22,10 +23,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             select payment
             from Payment payment
             where payment.memberId = :memberId
+              and payment.status = :status
             order by payment.createdAt desc, payment.id desc
             """)
-    Slice<Payment> findByMemberIdOrderByLatest(
+    Slice<Payment> findByMemberIdAndStatusOrderByLatest(
             @Param("memberId") Long memberId,
+            @Param("status") PaymentStatus status,
             Pageable pageable
     );
 

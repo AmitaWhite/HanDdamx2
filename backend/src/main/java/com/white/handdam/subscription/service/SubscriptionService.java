@@ -37,6 +37,11 @@ public class SubscriptionService {
     @Transactional
     public FreeSubscriptionResponse createFreeSubscription(Long subscriberId, Long creatorId) {
         validateRequiredIds(subscriberId, creatorId);
+        if (Objects.equals(subscriberId, creatorId)) {
+            throw new CustomException(SubscriptionErrorCode.SELF_SUBSCRIPTION_NOT_ALLOWED);
+        }
+
+        validateSubscribableCreator(creatorId);
 
         subscriptionRepository.findBySubscriberIdAndCreatorId(subscriberId, creatorId)
                 .ifPresent(existingSubscription -> {
@@ -195,6 +200,12 @@ public class SubscriptionService {
         }
 
         return creator;
+    }
+
+    private void validateSubscribableCreator(Long creatorId) {
+        validateCreator(creatorId);
+        creatorProfileRepository.findByMemberId(creatorId)
+                .orElseThrow(() -> new CustomException(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND));
     }
 
     private void validateOwner(Subscription subscription, Long subscriberId) {

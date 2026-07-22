@@ -18,6 +18,8 @@ import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MyPage } from "@/pages/MyPage";
 import { MyPageSettingsPage } from "@/pages/MyPageSettingsPage";
+import { MySubscriptionsPage } from "@/pages/MySubscriptionsPage";
+import { MyPaymentsPage } from "@/pages/MyPaymentsPage";
 import { MyQnaPage } from "@/pages/MyQnaPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
@@ -143,6 +145,22 @@ export const router = createBrowserRouter([
 				element: (
 					<AuthOnlyRoute>
 						<MyPageSettingsPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.mySubscriptions,
+				element: (
+					<AuthOnlyRoute>
+						<MySubscriptionsPage />
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.myPayments,
+				element: (
+					<AuthOnlyRoute>
+						<MyPaymentsPage />
 					</AuthOnlyRoute>
 				),
 			},
