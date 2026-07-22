@@ -97,11 +97,21 @@ export function EditPostPage() {
 	}, [feedId]);
 
 	useEffect(() => {
+		let cancelled = false;
+		setAttachments([]);
+		setAttachmentError(null);
 		getFeedAttachments(feedId)
-			.then(setAttachments)
+			.then((list) => {
+				if (cancelled) return;
+				setAttachments(list);
+			})
 			.catch((err) => {
+				if (cancelled) return;
 				setAttachmentError(err instanceof ApiError ? err.message : "첨부파일을 불러오지 못했습니다.");
 			});
+		return () => {
+			cancelled = true;
+		};
 	}, [feedId]);
 
 	async function onSubmit(e: FormEvent) {
