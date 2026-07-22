@@ -1,24 +1,19 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import {
   approveApplication,
   getAdminApplicationList,
   rejectApplication,
 } from "@/features/creator/creatorApplicationApi";
+import {
+  CREATOR_APPLICATION_STATUS_BG,
+  CREATOR_APPLICATION_STATUS_ICON,
+  CREATOR_APPLICATION_STATUS_LABEL,
+  CREATOR_APPLICATION_STATUS_TEXT_COLOR,
+} from "@/features/creator/creatorApplicationStatus";
 import type { CreatorApplication, CreatorApplicationStatus, PageResponse } from "@/features/creator/types";
-
-const STATUS_LABEL: Record<CreatorApplicationStatus, string> = {
-  PENDING: "심사 대기",
-  APPROVED: "승인",
-  REJECTED: "거절",
-};
-
-const STATUS_COLOR: Record<CreatorApplicationStatus, string> = {
-  PENDING: "bg-surface-container text-secondary",
-  APPROVED: "bg-primary/10 text-primary",
-  REJECTED: "bg-error/10 text-error",
-};
 
 export function AdminCreatorApplicationsPage() {
   const [statusFilter, setStatusFilter] = useState<CreatorApplicationStatus | undefined>(undefined);
@@ -28,6 +23,7 @@ export function AdminCreatorApplicationsPage() {
   const [rejectId, setRejectId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const fetchList = () => {
     setLoading(true);
@@ -82,7 +78,7 @@ export function AdminCreatorApplicationsPage() {
             size="sm"
             onClick={() => { setStatusFilter(s); setPage(0); }}
           >
-            {s === undefined ? "전체" : STATUS_LABEL[s]}
+            {s === undefined ? "전체" : CREATOR_APPLICATION_STATUS_LABEL[s]}
           </Button>
         ))}
       </div>
@@ -98,8 +94,11 @@ export function AdminCreatorApplicationsPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-caption font-caption ${STATUS_COLOR[app.status]}`}>
-                      {STATUS_LABEL[app.status]}
+                    <span
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-caption ${CREATOR_APPLICATION_STATUS_BG[app.status]} ${CREATOR_APPLICATION_STATUS_TEXT_COLOR[app.status]}`}
+                    >
+                      <Icon name={CREATOR_APPLICATION_STATUS_ICON[app.status]} className="text-[14px]" />
+                      {CREATOR_APPLICATION_STATUS_LABEL[app.status]}
                     </span>
                     <span className="text-label-md text-on-surface">신청 ID: {app.id}</span>
                     <span className="text-caption text-secondary">회원 ID: {app.memberId}</span>
@@ -107,8 +106,16 @@ export function AdminCreatorApplicationsPage() {
                   {app.introduction && (
                     <p className="mt-2 text-body-md text-on-surface">{app.introduction}</p>
                   )}
+                  {app.representativeImageUrl && (
+                    <img
+                      src={app.representativeImageUrl}
+                      alt="대표 이미지"
+                      className="mt-3 h-40 w-40 cursor-pointer rounded-lg object-cover"
+                      onClick={() => setPreviewImage(app.representativeImageUrl!)}
+                    />
+                  )}
                   {app.rejectReason && (
-                    <p className="mt-1 text-body-sm text-secondary">거절 사유: {app.rejectReason}</p>
+                    <p className="mt-1 text-body-md text-secondary">거절 사유: {app.rejectReason}</p>
                   )}
                   <p className="mt-2 text-caption text-secondary">
                     신청일: {new Date(app.appliedAt).toLocaleString("ko-KR")}
@@ -179,6 +186,18 @@ export function AdminCreatorApplicationsPage() {
               </Button>
             </div>
           </Card>
+        </div>
+      )}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setPreviewImage(null)}
+        >
+          <img
+            src={previewImage}
+            alt="대표 이미지 크게보기"
+            className="max-h-[80vh] max-w-[80vw] rounded-xl object-contain"
+          />
         </div>
       )}
     </div>

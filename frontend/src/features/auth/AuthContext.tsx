@@ -14,6 +14,8 @@ interface AuthContextValue {
 	/** 구글 OAuth 콜백에서 refresh 쿠키로 access token 확보 */
 	completeOAuth: () => Promise<void>;
 	logout: () => Promise<void>;
+	// 프로필 수정 등 accessToken 재발급 없이 user 표시 정보(닉네임/이미지)만 즉시 반영할 때 사용
+	updateUser: (patch: Partial<Pick<AuthUser, "nickname" | "profileImageUrl">>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -39,7 +41,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		return token ? userFromToken(token) : null;
 	});
 
-	// 닉네임(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
+	// tokenStore.set/clear를 구독해 401 인터셉터의 백그라운드 토큰 재발급도 반영
+	useEffect(() => {
+		return tokenStore.subscribe((token) => {
+			setAccessToken(token);
+			setUser((prev) => {
+				if (!token) return null;
+				const next = userFromToken(token);
+				if (!next) return null;
+				// 새 토큰엔 닉네임/프로필 이미지가 없으니 기존 값을 유지 — 단, 동일 회원일 때만
+				if (prev && prev.memberId === next.memberId) {
+					return { ...next, nickname: prev.nickname, profileImageUrl: prev.profileImageUrl };
+				}
+				return next;
+			});
+		});
+	}, []);
+
+	// 닉네임/프로필 이미지(표시용)만 비동기로 보강 — 실패해도 role 기반 판단엔 영향 없어 조용히 무시한다.
 	// cleanup 가드: 계정 전환 등으로 accessToken이 바뀌면 이전 요청의 결과는 무시한다(레이스 컨디션 방지).
 	useEffect(() => {
 		if (!accessToken) return;
@@ -47,7 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		getMyProfile()
 			.then((profile) => {
 				if (cancelled) return;
-				setUser((prev) => (prev ? { ...prev, nickname: profile.nickname } : prev));
+				setUser((prev) =>
+					prev
+						? { ...prev, nickname: profile.nickname, profileImageUrl: profile.profileImageUrl }
+						: prev,
+				);
 			})
 			.catch(() => {});
 		return () => {
@@ -80,6 +103,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	const updateUser = useCallback(
+		(patch: Partial<Pick<AuthUser, "nickname" | "profileImageUrl">>) => {
+			setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+		},
+		[],
+	);
+
 	const value: AuthContextValue = {
 		accessToken,
 		user,
@@ -87,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		login,
 		completeOAuth,
 		logout,
+		updateUser,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

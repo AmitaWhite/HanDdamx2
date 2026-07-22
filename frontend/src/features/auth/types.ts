@@ -46,5 +46,6 @@ export interface AvailabilityResponse {
 export interface AuthUser {
 	memberId: number;
 	nickname?: string;
+	profileImageUrl?: string | null;
 	role: Role;
 }
