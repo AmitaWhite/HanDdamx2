@@ -169,7 +169,11 @@ export function DashboardPostsPage() {
 								<p className="py-8 text-center text-body-md text-secondary">불러오는 중…</p>
 							)}
 							{!feedsLoading && sorted.length === 0 && !feedsError && (
-								<p className="py-8 text-center text-body-md text-secondary">작성한 게시물이 없어요.</p>
+								<div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant py-12 text-center">
+									<Icon name="draft" className="text-[32px] text-secondary" />
+									<p className="text-body-md text-on-surface">아직 작성한 게시물이 없어요</p>
+									<p className="text-caption font-caption text-secondary">새 게시물을 작성해보세요!</p>
+								</div>
 							)}
 							{!feedsLoading && feedsHasNext && (
 								<div className="mt-6 flex justify-center">
