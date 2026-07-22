@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class FeedCommentServiceTest {
@@ -127,7 +129,7 @@ class FeedCommentServiceTest {
         Long commentId = feedCommentService.createComment(1L, 1L, new FeedCommentCreateRequest("테스트 댓글"));
 
         assertThat(commentId).isEqualTo(10L);
-        assertThat(feed.getCommentCount()).isEqualTo(1L);
+        verify(feedRepository).increaseCommentCount(1L);
     }
 
     @Test
@@ -174,7 +176,7 @@ class FeedCommentServiceTest {
         Long commentId = feedCommentService.createReply(1L, 10L, 2L, new FeedCommentCreateRequest("대댓글"));
 
         assertThat(commentId).isEqualTo(20L);
-        assertThat(feed.getCommentCount()).isEqualTo(1L);
+        verify(feedRepository).increaseCommentCount(1L);
     }
 
     @Test
@@ -321,7 +323,7 @@ class FeedCommentServiceTest {
         feedCommentService.deleteComment(1L, 10L, 1L);
 
         assertThat(comment.isDeleted()).isTrue();
-        assertThat(feed.getCommentCount()).isEqualTo(0L);
+        verify(feedRepository).decreaseCommentCount(1L);
     }
 
     @Test
@@ -343,7 +345,7 @@ class FeedCommentServiceTest {
         assertThat(comment.isDeleted()).isTrue();
         assertThat(reply1.isDeleted()).isTrue();
         assertThat(reply2.isDeleted()).isTrue();
-        assertThat(feed.getCommentCount()).isEqualTo(0L);
+        verify(feedRepository, times(3)).decreaseCommentCount(1L);
     }
 
     @Test
@@ -359,7 +361,7 @@ class FeedCommentServiceTest {
         feedCommentService.deleteComment(1L, 20L, 1L);
 
         assertThat(reply.isDeleted()).isTrue();
-        assertThat(feed.getCommentCount()).isEqualTo(0L);
+        verify(feedRepository).decreaseCommentCount(1L);
     }
 
     @Test
