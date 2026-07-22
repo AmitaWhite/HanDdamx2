@@ -15,8 +15,8 @@ import {
 } from "@/features/comment/commentApi";
 import type { FeedCommentResponse } from "@/features/comment/types";
 import { useAuth } from "@/features/auth/AuthContext";
-import { getFeed } from "@/features/feed/feedApi";
-import type { FeedDetailResponse } from "@/features/feed/types";
+import { getFeed, getFeedAttachments } from "@/features/feed/feedApi";
+import type { AttachmentResponse, FeedDetailResponse } from "@/features/feed/types";
 import { likeFeed, unlikeFeed } from "@/features/like/likeApi";
 import {
 	changePollVote,
@@ -31,6 +31,7 @@ import type { PollResponse, PollResultResponse } from "@/features/poll/types";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatDateLabel } from "@/lib/date";
+import { renderFormattedContent } from "@/lib/richText";
 import { mockImg } from "@/mocks/helpers";
 
 const REQUIRED_LEVEL_LABEL: Record<string, string> = {
@@ -61,6 +62,8 @@ export function PostDetailPage() {
 	const [feed, setFeed] = useState<FeedDetailResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+
+	const [attachments, setAttachments] = useState<AttachmentResponse[]>([]);
 
 	const [likeCount, setLikeCount] = useState(0);
 	const [liked, setLiked] = useState(false);
@@ -102,6 +105,13 @@ export function PostDetailPage() {
 			})
 			.finally(() => setLoading(false));
 	}, [postId]);
+
+	useEffect(() => {
+		if (!feed || feed.locked) return;
+		getFeedAttachments(feed.id)
+			.then(setAttachments)
+			.catch(() => setAttachments([]));
+	}, [feed]);
 
 	useEffect(() => {
 		if (!feed?.pollId) return;
@@ -388,13 +398,41 @@ export function PostDetailPage() {
 					</div>
 				) : (
 					<>
-						<div className="mb-4 aspect-[4/3] overflow-hidden rounded-xl">
-							<img
-								src={mockImg(`feed-${feed.id}`, 900, 700)}
-								alt={feed.title}
-								className="h-full w-full object-cover"
-							/>
-						</div>
+						{attachments.length > 0 && (
+							<div className="mb-4 flex flex-col gap-3">
+								{attachments.map((a) => {
+									const isVideo = a.type === "VIDEO_LINK" || (a.mimeType?.startsWith("video/") ?? false);
+									if (a.type === "IMAGE") {
+										return (
+											<img
+												key={a.id}
+												src={a.url}
+												alt={feed.title}
+												className="max-h-[600px] w-full rounded-xl object-cover"
+											/>
+										);
+									}
+									if (isVideo) {
+										return (
+											// eslint-disable-next-line jsx-a11y/media-has-caption
+											<video key={a.id} src={a.url} controls className="w-full rounded-xl" />
+										);
+									}
+									return (
+										<a
+											key={a.id}
+											href={a.url}
+											target="_blank"
+											rel="noreferrer"
+											className="flex items-center gap-2 rounded-lg border border-outline-variant p-3 text-label-md font-label-md text-on-surface hover:border-primary"
+										>
+											<Icon name="description" className="text-[20px] text-secondary" />
+											{a.originalName ?? "첨부파일"}
+										</a>
+									);
+								})}
+							</div>
+						)}
 
 						{likeError && <p className="mb-2 text-caption font-caption text-error">{likeError}</p>}
 						<EngagementBar
@@ -406,7 +444,7 @@ export function PostDetailPage() {
 						/>
 
 						<h1 className="mb-2 text-headline-lg font-display text-on-surface">{feed.title}</h1>
-						<p className="text-body-md text-on-surface">{feed.content}</p>
+						<div className="text-body-md text-on-surface">{renderFormattedContent(feed.content ?? "")}</div>
 					</>
 				)}
 			</div>
