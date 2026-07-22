@@ -53,6 +53,10 @@ export function CreatorPriceModal({ open, creator, onClose, onSaved }: CreatorPr
 	}
 
 	async function handleSave() {
+		if (priceInput.trim() === "") {
+			setError("구독료를 입력해주세요.");
+			return;
+		}
 		const price = Number(priceInput);
 		if (!Number.isInteger(price) || price < 0) {
 			setError("0 이상의 정수를 입력해주세요.");
