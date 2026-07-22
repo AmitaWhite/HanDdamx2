@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 
 const BASE_NAV_ITEMS = [
   { label: "프로필", icon: "person", to: paths.mypage },
-  { label: "프로필 수정", icon: "settings", to: paths.mypageSettings },
+  { label: "프로필 설정", icon: "settings", to: paths.mypageSettings },
 ] as const;
 
 const COMING_SOON_ITEMS = [
