@@ -17,11 +17,22 @@ export function wrapSelection(
 	return { value: nextValue, cursor: selectionStart + before.length + selected.length + after.length };
 }
 
-/** 현재 커서가 있는 줄의 맨 앞에 prefix를 삽입한다(글머리 기호용). */
-export function prefixCurrentLine(value: string, selectionStart: number, prefix: string): FormatResult {
-	const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-	const nextValue = value.slice(0, lineStart) + prefix + value.slice(lineStart);
-	return { value: nextValue, cursor: selectionStart + prefix.length };
+/** 선택 영역이 걸쳐 있는 모든 줄의 맨 앞에 prefix를 삽입한다(글머리 기호용). 선택이 없으면 커서가 있는 한 줄에만 적용된다. */
+export function prefixCurrentLine(
+	value: string,
+	selectionStart: number,
+	selectionEnd: number,
+	prefix: string,
+): FormatResult {
+	const blockStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+	const nextNewline = value.indexOf("\n", selectionEnd);
+	const blockEnd = nextNewline === -1 ? value.length : nextNewline;
+
+	const lines = value.slice(blockStart, blockEnd).split("\n");
+	const nextBlock = lines.map((line) => prefix + line).join("\n");
+	const nextValue = value.slice(0, blockStart) + nextBlock + value.slice(blockEnd);
+
+	return { value: nextValue, cursor: selectionEnd + prefix.length * lines.length };
 }
 
 /** 선택 영역을 [텍스트](url) 링크로 감싼다. 선택이 없으면 placeholder 텍스트를 사용한다. */
