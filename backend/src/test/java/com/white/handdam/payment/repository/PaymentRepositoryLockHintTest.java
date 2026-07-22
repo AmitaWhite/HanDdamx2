@@ -1,6 +1,7 @@
 package com.white.handdam.payment.repository;
 
 import com.white.handdam.global.persistence.JpaLockHints;
+import com.white.handdam.payment.entity.PaymentStatus;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import org.junit.jupiter.api.DisplayName;
@@ -33,16 +34,17 @@ class PaymentRepositoryLockHintTest {
     @DisplayName("normal payment queries do not have lock timeout hint")
     void normalQueriesDoNotHaveLockTimeoutHint() throws NoSuchMethodException {
         Method findByOrderId = PaymentRepository.class.getMethod("findByOrderId", String.class);
-        Method findByMemberIdOrderByLatest = PaymentRepository.class.getMethod(
-                "findByMemberIdOrderByLatest",
+        Method findByMemberIdAndStatusOrderByLatest = PaymentRepository.class.getMethod(
+                "findByMemberIdAndStatusOrderByLatest",
                 Long.class,
+                PaymentStatus.class,
                 Pageable.class
         );
 
         assertThat(findByOrderId.getAnnotation(Lock.class)).isNull();
         assertThat(findByOrderId.getAnnotation(QueryHints.class)).isNull();
-        assertThat(findByMemberIdOrderByLatest.getAnnotation(Lock.class)).isNull();
-        assertThat(findByMemberIdOrderByLatest.getAnnotation(QueryHints.class)).isNull();
+        assertThat(findByMemberIdAndStatusOrderByLatest.getAnnotation(Lock.class)).isNull();
+        assertThat(findByMemberIdAndStatusOrderByLatest.getAnnotation(QueryHints.class)).isNull();
     }
 
     private QueryHint lockTimeoutHint(Method method) {
