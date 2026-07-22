@@ -64,6 +64,7 @@ export function EditPostPage() {
 	);
 	const [deleting, setDeleting] = useState(false);
 	const [confirmAttachmentId, setConfirmAttachmentId] = useState<number | null>(null);
+	const [deletingAttachmentIds, setDeletingAttachmentIds] = useState<Set<number>>(new Set());
 	const [confirmDeletePost, setConfirmDeletePost] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -153,6 +154,7 @@ export function EditPostPage() {
 	}
 
 	function onDeleteAttachment(attachmentId: number) {
+		if (deletingAttachmentIds.has(attachmentId)) return;
 		setConfirmAttachmentId(attachmentId);
 	}
 
@@ -161,11 +163,18 @@ export function EditPostPage() {
 		setConfirmAttachmentId(null);
 		if (attachmentId == null) return;
 		setAttachmentError(null);
+		setDeletingAttachmentIds((prev) => new Set(prev).add(attachmentId));
 		try {
 			await deleteFeedAttachment(feedId, attachmentId);
 			setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
 		} catch (err) {
 			setAttachmentError(err instanceof ApiError ? err.message : "첨부파일 삭제에 실패했습니다.");
+		} finally {
+			setDeletingAttachmentIds((prev) => {
+				const next = new Set(prev);
+				next.delete(attachmentId);
+				return next;
+			});
 		}
 	}
 
@@ -305,8 +314,9 @@ export function EditPostPage() {
 											<button
 												type="button"
 												onClick={() => onDeleteAttachment(a.id)}
+												disabled={deletingAttachmentIds.has(a.id)}
 												aria-label="첨부 삭제"
-												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
+												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface disabled:opacity-50"
 											>
 												<Icon name="close" className="text-[14px]" />
 											</button>

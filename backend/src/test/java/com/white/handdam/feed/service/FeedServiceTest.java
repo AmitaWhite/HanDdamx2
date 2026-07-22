@@ -17,6 +17,7 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
+import com.white.handdam.like.entity.FeedLike;
 import com.white.handdam.like.repository.FeedLikeRepository;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.repository.PollRepository;
@@ -417,6 +418,25 @@ class FeedServiceTest {
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).visibility()).isEqualTo(Visibility.PUBLIC);
+    }
+
+    @Test
+    @DisplayName("[LYJ-008] 로그인한 회원이 좋아요한 피드는 liked=true 로 반환된다")
+    void getExploreFeeds_authenticatedMember_returnsLikedStatus() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findExploreFeeds(isNull(), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(List.of(feed)));
+        given(projectRepository.findAllById(any())).willReturn(List.of(sampleProject(1L)));
+        given(memberRepository.findAllById(any())).willReturn(List.of(sampleMember(1L)));
+        given(categoryRepository.findAllById(any())).willReturn(List.of(sampleCategory(1L)));
+        given(feedLikeRepository.findByMemberIdAndFeedIdIn(6L, List.of(1L)))
+                .willReturn(List.of(FeedLike.create(1L, 6L)));
+
+        Slice<FeedSummaryResponse> result = feedService.getExploreFeeds(6L, null, Pageable.unpaged());
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).liked()).isTrue();
+        verify(feedLikeRepository).findByMemberIdAndFeedIdIn(6L, List.of(1L));
     }
 
     @Test

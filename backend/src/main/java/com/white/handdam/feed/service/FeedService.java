@@ -239,12 +239,12 @@ public class FeedService {
             .collect(Collectors.toMap(Category::getId, c -> c));
 
         List<Long> feedIds = feeds.getContent().stream().map(Feed::getId).toList();
-        Set<Long> likedFeedIds = memberId == null
+        Set<Long> likedFeedIds = (memberId == null || feedIds.isEmpty())
             ? Set.of()
             : feedLikeRepository.findByMemberIdAndFeedIdIn(memberId, feedIds).stream()
                 .map(FeedLike::getFeedId)
                 .collect(Collectors.toSet());
-        Map<Long, FeedAttachment> thumbnailByFeedId = thumbnailsByFeedId(feedIds);
+        Map<Long, FeedAttachment> thumbnailByFeedId = loadThumbnailsByFeedId(feedIds);
 
         return feeds.map(f -> {
             Project p = projectMap.get(f.getProjectId());
@@ -260,28 +260,36 @@ public class FeedService {
         });
     }
 
-    // 피드별 대표 썸네일(첫 이미지, 없으면 첫 업로드 동영상) 배치 조회 — N+1 방지
-    private Map<Long, FeedAttachment> thumbnailsByFeedId(List<Long> feedIds) {
-        if (feedIds.isEmpty()) return Map.of();
-        List<FeedAttachment> attachments =
-            feedAttachmentRepository.findByFeedIdInAndDeletedFalseOrderByOrderIndex(feedIds);
-        Map<Long, FeedAttachment> thumbnailByFeedId = new HashMap<>();
+    // 피드별 대표 썸네일(첫 이미지 우선, 이미지가 없을 때만 첫 업로드 동영상) 배치 조회 — N+1 방지
+    // ProjectService.getProjectFeeds 에서도 동일 로직을 재사용한다.
+    public static Map<Long, FeedAttachment> thumbnailsByFeedId(List<FeedAttachment> attachments) {
+        Map<Long, FeedAttachment> imageByFeedId = new HashMap<>();
+        Map<Long, FeedAttachment> videoByFeedId = new HashMap<>();
         for (FeedAttachment a : attachments) {
-            if (!isThumbnailCandidate(a)) continue;
-            thumbnailByFeedId.putIfAbsent(a.getFeedId(), a);
+            if (a.getType() == AttachmentType.IMAGE) {
+                imageByFeedId.putIfAbsent(a.getFeedId(), a);
+            } else if (isEligibleVideo(a)) {
+                videoByFeedId.putIfAbsent(a.getFeedId(), a);
+            }
         }
+        Map<Long, FeedAttachment> thumbnailByFeedId = new HashMap<>(videoByFeedId);
+        thumbnailByFeedId.putAll(imageByFeedId); // 이미지가 있으면 동영상보다 우선
         return thumbnailByFeedId;
     }
 
-    // 대표 썸네일 후보: 업로드 이미지, 또는 업로드 동영상 파일 (외부 VIDEO_LINK는 미리보기를 만들 수 없어 제외)
-    private static boolean isThumbnailCandidate(FeedAttachment a) {
-        if (a.getType() == AttachmentType.IMAGE) return true;
+    private Map<Long, FeedAttachment> loadThumbnailsByFeedId(List<Long> feedIds) {
+        if (feedIds.isEmpty()) return Map.of();
+        return thumbnailsByFeedId(feedAttachmentRepository.findByFeedIdInAndDeletedFalseOrderByOrderIndex(feedIds));
+    }
+
+    // 썸네일 후보가 될 수 있는 업로드 동영상 파일 (외부 VIDEO_LINK는 미리보기를 만들 수 없어 제외)
+    public static boolean isEligibleVideo(FeedAttachment a) {
         return a.getType() == AttachmentType.FILE
             && a.getMimeType() != null
             && a.getMimeType().startsWith("video/");
     }
 
-    private static String thumbnailType(FeedAttachment a) {
+    public static String thumbnailType(FeedAttachment a) {
         return a.getType() == AttachmentType.IMAGE ? "IMAGE" : "VIDEO";
     }
 

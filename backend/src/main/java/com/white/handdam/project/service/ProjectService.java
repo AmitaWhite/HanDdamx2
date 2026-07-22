@@ -4,7 +4,6 @@ import com.white.handdam.category.entity.Category;
 import com.white.handdam.category.exception.CategoryErrorCode;
 import com.white.handdam.category.repository.CategoryRepository;
 import com.white.handdam.creator.exception.CreatorErrorCode;
-import com.white.handdam.feed.entity.AttachmentType;
 import com.white.handdam.feed.entity.Feed;
 import com.white.handdam.feed.entity.FeedAttachment;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
@@ -31,11 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.white.handdam.feed.dto.response.FeedSummaryResponse;
 import com.white.handdam.feed.entity.Visibility;
+import com.white.handdam.feed.service.FeedService;
 import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -239,46 +238,24 @@ public class ProjectService {
             projectId, resolveVisibilities(requesterId, project.getCreatorId()), pageable);
 
         List<Long> feedIds = feeds.getContent().stream().map(Feed::getId).toList();
-        Set<Long> likedFeedIds = requesterId == null
+        Set<Long> likedFeedIds = (requesterId == null || feedIds.isEmpty())
             ? Set.of()
             : feedLikeRepository.findByMemberIdAndFeedIdIn(requesterId, feedIds).stream()
                 .map(FeedLike::getFeedId)
                 .collect(Collectors.toSet());
-        Map<Long, FeedAttachment> thumbnailByFeedId = thumbnailsByFeedId(feedIds);
+        Map<Long, FeedAttachment> thumbnailByFeedId = feedIds.isEmpty()
+            ? Map.of()
+            : FeedService.thumbnailsByFeedId(
+                feedAttachmentRepository.findByFeedIdInAndDeletedFalseOrderByOrderIndex(feedIds));
 
         return feeds.map(f -> {
             FeedAttachment thumbnail = thumbnailByFeedId.get(f.getId());
             return FeedSummaryResponse.from(
                 f, creator, category, likedFeedIds.contains(f.getId()),
                 thumbnail == null ? null : thumbnail.getUrl(),
-                thumbnail == null ? null : thumbnailType(thumbnail)
+                thumbnail == null ? null : FeedService.thumbnailType(thumbnail)
             );
         });
-    }
-
-    // 피드별 대표 썸네일(첫 이미지, 없으면 첫 업로드 동영상) 배치 조회 — N+1 방지
-    private Map<Long, FeedAttachment> thumbnailsByFeedId(List<Long> feedIds) {
-        if (feedIds.isEmpty()) return Map.of();
-        List<FeedAttachment> attachments =
-            feedAttachmentRepository.findByFeedIdInAndDeletedFalseOrderByOrderIndex(feedIds);
-        Map<Long, FeedAttachment> thumbnailByFeedId = new HashMap<>();
-        for (FeedAttachment a : attachments) {
-            if (!isThumbnailCandidate(a)) continue;
-            thumbnailByFeedId.putIfAbsent(a.getFeedId(), a);
-        }
-        return thumbnailByFeedId;
-    }
-
-    // 대표 썸네일 후보: 업로드 이미지, 또는 업로드 동영상 파일 (외부 VIDEO_LINK는 미리보기를 만들 수 없어 제외)
-    private static boolean isThumbnailCandidate(FeedAttachment a) {
-        if (a.getType() == AttachmentType.IMAGE) return true;
-        return a.getType() == AttachmentType.FILE
-            && a.getMimeType() != null
-            && a.getMimeType().startsWith("video/");
-    }
-
-    private static String thumbnailType(FeedAttachment a) {
-        return a.getType() == AttachmentType.IMAGE ? "IMAGE" : "VIDEO";
     }
 
     // CANCEL_SCHEDULED 구독 만료 여부 체크 후 활성여부 판단

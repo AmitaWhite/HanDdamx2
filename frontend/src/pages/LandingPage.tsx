@@ -134,6 +134,8 @@ export function LandingPage() {
 							href={paths.postDetail(post.id)}
 							imageSeed={`feed-${post.id}`}
 							imageAlt={post.title}
+							thumbnailUrl={post.thumbnailUrl}
+							thumbnailType={post.thumbnailType}
 						>
 							<div className="p-6">
 								<div className="mb-4 flex items-center gap-3">

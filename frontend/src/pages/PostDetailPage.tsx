@@ -44,6 +44,10 @@ function totalCommentCount(comments: FeedCommentResponse[]): number {
 	return comments.reduce((sum, c) => sum + 1 + c.replies.length, 0);
 }
 
+function isVideoAttachment(a: AttachmentResponse): boolean {
+	return a.type === "VIDEO_LINK" || (a.mimeType?.startsWith("video/") ?? false);
+}
+
 export function PostDetailPage() {
 	const { postId = "" } = useParams();
 	const { user } = useAuth();
@@ -438,7 +442,7 @@ export function PostDetailPage() {
 									style={{ transform: `translateX(-${slideIndex * 100}%)` }}
 								>
 									{mediaAttachments.map((a) => {
-										const isVideo = a.type === "VIDEO_LINK" || (a.mimeType?.startsWith("video/") ?? false);
+										const isVideo = isVideoAttachment(a);
 										return (
 											<div key={a.id} className="aspect-[4/3] w-full shrink-0">
 												{isVideo ? (
@@ -462,7 +466,7 @@ export function PostDetailPage() {
 											type="button"
 											onClick={() => setSlideIndex((i) => Math.max(0, i - 1))}
 											disabled={slideIndex === 0}
-											aria-label="이전 이미지"
+											aria-label={isVideoAttachment(mediaAttachments[slideIndex]) ? "이전 동영상" : "이전 이미지"}
 											className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface shadow-sm disabled:opacity-40"
 										>
 											<Icon name="chevron_left" className="text-[20px]" />
@@ -473,7 +477,7 @@ export function PostDetailPage() {
 												setSlideIndex((i) => Math.min(mediaAttachments.length - 1, i + 1))
 											}
 											disabled={slideIndex === mediaAttachments.length - 1}
-											aria-label="다음 이미지"
+											aria-label={isVideoAttachment(mediaAttachments[slideIndex]) ? "다음 동영상" : "다음 이미지"}
 											className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface shadow-sm disabled:opacity-40"
 										>
 											<Icon name="chevron_right" className="text-[20px]" />
@@ -484,7 +488,7 @@ export function PostDetailPage() {
 													key={a.id}
 													type="button"
 													onClick={() => setSlideIndex(i)}
-													aria-label={`${i + 1}번째 이미지로 이동`}
+													aria-label={`${i + 1}번째 ${isVideoAttachment(a) ? "동영상" : "이미지"}로 이동`}
 													className={cn(
 														"h-1.5 w-1.5 rounded-full transition-colors",
 														i === slideIndex ? "bg-on-primary" : "bg-on-primary/50",
