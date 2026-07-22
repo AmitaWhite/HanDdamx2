@@ -116,6 +116,7 @@ public class FeedCommentService {
 
         FeedComment comment = FeedComment.create(feedId, memberId, null, (short) 0, request.content());
         FeedComment saved = feedCommentRepository.save(comment);
+        feedRepository.increaseCommentCount(feedId);
         eventPublisher.publishEvent(new FeedCommentCreatedEvent(
             feedId,
             saved.getId(),
@@ -155,6 +156,7 @@ public class FeedCommentService {
 
         FeedComment reply = FeedComment.create(feedId, memberId, parentCommentId, (short) 1, request.content());
         FeedComment saved = feedCommentRepository.save(reply);
+        feedRepository.increaseCommentCount(feedId);
         eventPublisher.publishEvent(new FeedReplyCreatedEvent(
             feedId,
             parentCommentId,
@@ -204,9 +206,13 @@ public class FeedCommentService {
         }
 
         comment.delete();
+        feedRepository.decreaseCommentCount(feedId);
         if(comment.getDepth() == 0){
-            feedCommentRepository.findByParentCommentIdAndDeletedFalse(commentId)
-                    .forEach(reply -> reply.delete());
+            List<FeedComment> replies = feedCommentRepository.findByParentCommentIdAndDeletedFalse(commentId);
+            replies.forEach(reply -> {
+                reply.delete();
+                feedRepository.decreaseCommentCount(feedId);
+            });
         }
     }
 

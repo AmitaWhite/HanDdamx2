@@ -5,6 +5,7 @@ import com.white.handdam.feed.entity.Visibility;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
@@ -12,6 +13,15 @@ import java.util.List;
 
 public interface FeedRepository extends JpaRepository<Feed, Long> {
     Optional<Feed> findByIdAndDeletedFalse(Long id);
+
+    // 댓글 수 원자적 증감 — JPA dirty-checking 방식(read-modify-write)의 동시성 유실 방지
+    @Modifying
+    @Query("UPDATE Feed f SET f.commentCount = f.commentCount + 1 WHERE f.id = :feedId")
+    void increaseCommentCount(@Param("feedId") Long feedId);
+
+    @Modifying
+    @Query("UPDATE Feed f SET f.commentCount = CASE WHEN f.commentCount > 0 THEN f.commentCount - 1 ELSE 0 END WHERE f.id = :feedId")
+    void decreaseCommentCount(@Param("feedId") Long feedId);
     // [LYJ-006]
     Slice<Feed> findByVisibilityAndDeletedFalse(Visibility visibility, Pageable pageable);
 

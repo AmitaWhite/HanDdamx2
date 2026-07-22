@@ -1,41 +1,53 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { PostCard } from "@/components/social/PostCard";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
 import { deleteFeed, getMyFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
+import { getMyFeedComments } from "@/features/member/memberApi";
+import type { MyFeedCommentResponse } from "@/features/member/types";
 import { ApiError } from "@/lib/api";
-import { mockComments } from "@/mocks/comments";
-import { findCreator } from "@/mocks/creators";
-
-/** 댓글 관리 섹션은 아직 "내 댓글" 조회 API가 없어 임시로 고정한 값(mock 데모용). */
-const MOCK_CREATOR_ID = "suyeon";
-
-function formatDateLabel(iso: string): string {
-	const d = new Date(iso);
-	return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
+import { formatDateLabel } from "@/lib/date";
+import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
 
 export function DashboardPostsPage() {
 	const { user } = useAuth();
 	const isCreator = user?.role === "CREATOR";
-	const creator = findCreator(MOCK_CREATOR_ID);
 	const [sort, setSort] = useState<"recent" | "popular">("recent");
 
 	const [feeds, setFeeds] = useState<FeedSummaryResponse[]>([]);
 	const [feedsLoading, setFeedsLoading] = useState(isCreator);
 	const [feedsError, setFeedsError] = useState<string | null>(null);
+	const [feedsPage, setFeedsPage] = useState(0);
+	const [feedsHasNext, setFeedsHasNext] = useState(false);
+	const [feedsLoadingMore, setFeedsLoadingMore] = useState(false);
+	const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
+
+	const [comments, setComments] = useState<MyFeedCommentResponse[]>([]);
+	const [commentsLoading, setCommentsLoading] = useState(!!user);
+	const [commentsError, setCommentsError] = useState<string | null>(null);
+	const [commentsPage, setCommentsPage] = useState(0);
+	const [commentsHasNext, setCommentsHasNext] = useState(false);
+	const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
+	const commentsInFlightRef = useRef(false);
 
 	useEffect(() => {
 		if (!isCreator) return;
-		getMyFeeds()
-			.then((res) => setFeeds(res.content))
+		setFeedsLoading(true);
+		setFeedsError(null);
+		getMyFeeds(0)
+			.then((res) => {
+				setFeeds(res.content);
+				setFeedsHasNext(res.hasNext);
+				setFeedsPage(0);
+			})
 			.catch((err) => {
 				setFeedsError(
 					err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.",
@@ -44,13 +56,72 @@ export function DashboardPostsPage() {
 			.finally(() => setFeedsLoading(false));
 	}, [isCreator]);
 
+	useEffect(() => {
+		if (!user) return;
+		setCommentsLoading(true);
+		setCommentsError(null);
+		getMyFeedComments(0)
+			.then((res) => {
+				setComments(res.content);
+				setCommentsHasNext(res.hasNext);
+				setCommentsPage(0);
+			})
+			.catch((err) => {
+				setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
+			})
+			.finally(() => setCommentsLoading(false));
+	}, [user]);
+
+	async function loadMoreComments() {
+		if (commentsInFlightRef.current || !commentsHasNext) return;
+		commentsInFlightRef.current = true;
+		setCommentsLoadingMore(true);
+		try {
+			const nextPage = commentsPage + 1;
+			const res = await getMyFeedComments(nextPage);
+			setComments((prev) => [...prev, ...res.content]);
+			setCommentsHasNext(res.hasNext);
+			setCommentsPage(nextPage);
+		} catch (err) {
+			setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
+		} finally {
+			commentsInFlightRef.current = false;
+			setCommentsLoadingMore(false);
+		}
+	}
+
+	async function loadMoreFeeds() {
+		if (feedsLoadingMore || !feedsHasNext) return;
+		setFeedsLoadingMore(true);
+		try {
+			const nextPage = feedsPage + 1;
+			const res = await getMyFeeds(nextPage);
+			setFeeds((prev) => [...prev, ...res.content]);
+			setFeedsHasNext(res.hasNext);
+			setFeedsPage(nextPage);
+		} catch (err) {
+			setFeedsError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
+		} finally {
+			setFeedsLoadingMore(false);
+		}
+	}
+
 	async function handleDeletePost(feedId: number) {
+		if (pendingDeleteIds.has(feedId)) return;
 		if (!window.confirm("이 게시물을 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.")) return;
+		setFeedsError(null);
+		setPendingDeleteIds((prev) => new Set(prev).add(feedId));
 		try {
 			await deleteFeed(feedId);
 			setFeeds((prev) => prev.filter((f) => f.id !== feedId));
 		} catch (err) {
 			setFeedsError(err instanceof ApiError ? err.message : "삭제에 실패했습니다.");
+		} finally {
+			setPendingDeleteIds((prev) => {
+				const next = new Set(prev);
+				next.delete(feedId);
+				return next;
+			});
 		}
 	}
 
@@ -59,8 +130,8 @@ export function DashboardPostsPage() {
 			? b.likeCount - a.likeCount
 			: new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
-	// mock 데이터엔 실제 로그인 사용자별 댓글 매핑이 없어, 데모용으로 "이수연" 명의 댓글을 그대로 보여준다.
-	const myComments = mockComments.filter((c) => c.authorName === creator.name);
+
+	const commentsSentinelRef = useInfiniteScroll(loadMoreComments, commentsHasNext);
 
 	return (
 		<MyPageShell>
@@ -112,7 +183,8 @@ export function DashboardPostsPage() {
 												type="button"
 												aria-label="게시물 삭제"
 												onClick={() => handleDeletePost(post.id)}
-												className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-lowest/90 text-error shadow-sm hover:bg-surface-container-low"
+												disabled={pendingDeleteIds.has(post.id)}
+												className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-lowest/90 text-error shadow-sm hover:bg-surface-container-low disabled:opacity-50"
 											>
 												<Icon name="delete" className="text-[16px]" />
 											</button>
@@ -148,6 +220,16 @@ export function DashboardPostsPage() {
 							{!feedsLoading && sorted.length === 0 && !feedsError && (
 								<p className="py-8 text-center text-body-md text-secondary">작성한 게시물이 없어요.</p>
 							)}
+							{!feedsLoading && feedsHasNext && (
+								<div className="mt-6 flex justify-center">
+									<Button variant="secondary" onClick={loadMoreFeeds} disabled={feedsLoadingMore}>
+										{feedsLoadingMore ? "불러오는 중…" : "더보기"}
+									</Button>
+								</div>
+							)}
+							{!feedsLoading && !feedsHasNext && sorted.length > 0 && (
+								<p className="py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>
+							)}
 						</>
 					) : (
 						<div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant py-12 text-center">
@@ -160,22 +242,29 @@ export function DashboardPostsPage() {
 
 				<section>
 					<h2 className="mb-4 text-headline-md font-display text-on-surface">작성한 댓글</h2>
+					{commentsError && <Alert className="mb-4">{commentsError}</Alert>}
 					<div className="flex flex-col gap-3">
-						{myComments.map((c) => {
-							const targetHref = c.postId.startsWith("qna-") ? paths.qnaPost(c.postId) : paths.postDetail(c.postId);
-							return (
-								<Card key={c.id} className="p-5">
-									<p className="mb-2 text-body-md text-on-surface">&ldquo;{c.body}&rdquo;</p>
-									<div className="flex items-center justify-between text-caption font-caption text-secondary">
-										<span>{c.createdAtLabel}</span>
-										<Link to={targetHref} className="text-primary hover:underline">
-											원문 보기
-										</Link>
-									</div>
-								</Card>
-							);
-						})}
-						{myComments.length === 0 && <p className="text-body-md text-secondary">아직 댓글이 없어요.</p>}
+						{comments.map((c) => (
+							<Card key={c.commentId} className="p-5">
+								<p className="mb-2 text-body-md text-on-surface">&ldquo;{c.content}&rdquo;</p>
+								<div className="flex items-center justify-between text-caption font-caption text-secondary">
+									<span>{formatDateLabel(c.createdAt)}</span>
+									<Link to={paths.postDetail(c.feedId)} className="text-primary hover:underline">
+										{c.feedTitle} 원문 보기
+									</Link>
+								</div>
+							</Card>
+						))}
+						{commentsLoading && (
+							<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
+						)}
+						{!commentsLoading && !commentsError && comments.length === 0 && (
+							<p className="text-body-md text-secondary">아직 댓글이 없어요.</p>
+						)}
+						{commentsHasNext && <div ref={commentsSentinelRef} className="h-1" />}
+						{commentsLoadingMore && (
+							<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
+						)}
 					</div>
 				</section>
 			</div>

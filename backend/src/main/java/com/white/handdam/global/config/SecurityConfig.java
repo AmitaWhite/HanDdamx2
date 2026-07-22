@@ -71,6 +71,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/projects/*").permitAll()         // 상세 조회만 공개
                 .requestMatchers(HttpMethod.GET, "/api/projects/*/feeds").permitAll()   // 피드 목록만 공개
                 .requestMatchers(HttpMethod.GET, "/api/feeds/*/comments").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/feeds/*/attachments").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/feeds/*/attachments/*/download").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/feeds/{feedId:[0-9]+}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/feeds/me").hasRole("CREATOR")
                 .requestMatchers(HttpMethod.GET, "/api/creators/*").permitAll()

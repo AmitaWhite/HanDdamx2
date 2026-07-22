@@ -1,5 +1,12 @@
-import { http, unwrap } from "@/lib/api";
+import { http, unwrap, unwrapVoid } from "@/lib/api";
 import type { PollResponse, PollResultResponse } from "./types";
+
+export interface UpdatePollParams {
+	/** question, endAt 중 최소 하나는 필요 */
+	question?: string;
+	/** ISO 8601 문자열 (Instant) */
+	endAt?: string;
+}
 
 export interface CreatePollParams {
 	/** ISO 8601 문자열 (Instant) */
@@ -28,6 +35,24 @@ export function getPoll(pollId: number) {
 }
 
 /**
+ * 투표 질문·종료일 수정 (LYJ-024).
+ * 백엔드: PATCH /api/polls/{pollId}
+ * 권한: 투표를 만든 피드 작성자
+ */
+export function updatePoll(pollId: number, params: UpdatePollParams) {
+	return unwrap<number>(http.patch(`/polls/${pollId}`, params));
+}
+
+/**
+ * 투표 삭제 (LYJ-025).
+ * 백엔드: DELETE /api/polls/{pollId}
+ * 권한: 투표를 만든 피드 작성자
+ */
+export function deletePoll(pollId: number) {
+	return unwrapVoid(http.delete(`/polls/${pollId}`));
+}
+
+/**
  * 투표 참여 (LYJ-026).
  * 백엔드: POST /api/polls/{pollId}/votes
  */
@@ -50,4 +75,13 @@ export function changePollVote(pollId: number, optionId: number) {
  */
 export function getPollResults(pollId: number) {
 	return unwrap<PollResultResponse>(http.get(`/polls/${pollId}/results`));
+}
+
+/**
+ * 투표 조기 종료 (LYJ-029).
+ * 백엔드: PATCH /api/polls/{pollId}/close
+ * 권한: 투표를 만든 피드 작성자
+ */
+export function closePoll(pollId: number) {
+	return unwrap<number>(http.patch(`/polls/${pollId}/close`, {}));
 }

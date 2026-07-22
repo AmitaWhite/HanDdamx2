@@ -18,6 +18,7 @@ import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
 import com.white.handdam.like.repository.FeedLikeRepository;
+import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.repository.PollRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
@@ -137,10 +138,31 @@ class FeedServiceTest {
         given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
         given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
+        given(pollRepository.findByFeedId(1L)).willReturn(Optional.of(samplePoll(1L, 7L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, null);
 
         assertThat(result.locked()).isFalse();
+        // pollId 조회는 memberId와 무관하므로 비로그인이어도 투표가 있으면 채워진다. liked만 memberId=null이라 기본값 false.
+        assertThat(result.pollId()).isEqualTo(7L);
+        assertThat(result.liked()).isFalse();
+    }
+
+    @Test
+    @DisplayName("[LYJ-002] 투표가 있고 좋아요를 누른 상태면 pollId·liked가 올바르게 채워진다")
+    void getFeed_withPollAndLiked_setsFieldsCorrectly() {
+        Feed feed = sampleFeed(Visibility.PUBLIC);
+        given(feedRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(feed));
+        given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
+        given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
+        given(pollRepository.findByFeedId(1L)).willReturn(Optional.of(samplePoll(1L, 7L)));
+        given(feedLikeRepository.existsByFeedIdAndMemberId(1L, 6L)).willReturn(true);
+
+        FeedDetailResponse result = feedService.getFeed(1L, 6L);
+
+        assertThat(result.pollId()).isEqualTo(7L);
+        assertThat(result.liked()).isTrue();
     }
 
     @Test
@@ -168,12 +190,17 @@ class FeedServiceTest {
         given(subscriptionLevelChecker.getLevel(6L, 99L)).willReturn(null); // 비구독자
         given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
         given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
+        given(pollRepository.findByFeedId(1L)).willReturn(Optional.of(samplePoll(1L, 7L)));
+        given(feedLikeRepository.existsByFeedIdAndMemberId(1L, 6L)).willReturn(true);
 
         FeedDetailResponse result = feedService.getFeed(1L, 6L);
 
         assertThat(result.locked()).isTrue();
         assertThat(result.content()).isNull();
         assertThat(result.requiredLevel()).isEqualTo("FREE_SUBSCRIBER");
+        // 잠긴 응답이어도 pollId·liked는 본문과 무관하게 그대로 채워진다
+        assertThat(result.pollId()).isEqualTo(7L);
+        assertThat(result.liked()).isTrue();
     }
 
     @Test
@@ -589,6 +616,90 @@ class FeedServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // 첨부파일 목록 조회
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("PUBLIC 피드는 비로그인도 첨부파일 목록을 orderIndex 순으로 조회할 수 있다")
+    void getAttachments_publicFeed_anonymousOk() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L)));
+
+        StoredObject stored1 = new StoredObject("feeds/1/attachments/uuid_a.jpg", "https://...", "a.jpg");
+        StoredObject stored2 = new StoredObject("feeds/1/attachments/uuid_b.jpg", "https://...", "b.jpg");
+        FeedAttachment first = sampleUploadAttachment(AttachmentType.IMAGE, stored1, "image/jpeg");
+        FeedAttachment second = sampleUploadAttachment(AttachmentType.IMAGE, stored2, "image/jpeg");
+        given(feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(1L))
+            .willReturn(List.of(first, second));
+
+        List<AttachmentResponse> result = feedService.getAttachments(1L, null);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).originalName()).isEqualTo("a.jpg");
+        assertThat(result.get(1).originalName()).isEqualTo("b.jpg");
+    }
+
+    @Test
+    @DisplayName("첨부파일이 없는 피드는 빈 목록을 반환한다")
+    void getAttachments_noAttachments_returnsEmptyList() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PUBLIC)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L)));
+        given(feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(1L))
+            .willReturn(List.of());
+
+        List<AttachmentResponse> result = feedService.getAttachments(1L, null);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 피드의 첨부파일 조회 시 FEED_NOT_FOUND 예외 발생")
+    void getAttachments_feedNotFound_throws() {
+        given(feedRepository.findByIdAndDeletedFalse(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> feedService.getAttachments(999L, null))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FEED_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("FREE_SUBSCRIBER 피드는 비구독자 조회 시 FREE_SUBSCRIPTION_REQUIRED 예외 발생")
+    void getAttachments_freeSubscriberFeed_nonSubscriber_throws() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.FREE_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L)));
+        given(subscriptionLevelChecker.getLevel(5L, 10L)).willReturn(null); // 비구독
+
+        assertThatThrownBy(() -> feedService.getAttachments(1L, 5L))
+            .isInstanceOf(CustomException.class)
+            .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                .isEqualTo(FeedErrorCode.FREE_SUBSCRIPTION_REQUIRED));
+        verify(feedAttachmentRepository, never()).findByFeedIdAndDeletedFalseOrderByOrderIndex(any());
+    }
+
+    @Test
+    @DisplayName("PAID_SUBSCRIBER 피드는 소유자면 구독 레벨 조회 없이 첨부파일 목록을 볼 수 있다")
+    void getAttachments_paidSubscriberFeed_owner_ok() {
+        given(feedRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleFeed(Visibility.PAID_SUBSCRIBER)));
+        given(projectRepository.findByIdAndDeletedFalse(1L))
+            .willReturn(Optional.of(sampleProject(10L))); // creatorId=memberId=10L
+        given(feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(1L))
+            .willReturn(List.of());
+
+        List<AttachmentResponse> result = feedService.getAttachments(1L, 10L);
+
+        assertThat(result).isEmpty();
+        verify(subscriptionLevelChecker, never()).getLevel(any(), any());
+    }
+
+    // ---------------------------------------------------------------
     // LYJ-014 첨부파일 다운로드 URL 조회
     // ---------------------------------------------------------------
 
@@ -797,6 +908,12 @@ class FeedServiceTest {
         Category category = Category.builder().name("테스트카테고리").build();
         ReflectionTestUtils.setField(category, "id", id);
         return category;
+    }
+
+    private Poll samplePoll(Long feedId, Long id) {
+        Poll poll = Poll.create(feedId, "질문", Instant.now().plusSeconds(3600));
+        ReflectionTestUtils.setField(poll, "id", id);
+        return poll;
     }
 
     private FeedAttachment sampleUploadAttachment(AttachmentType type, StoredObject stored, String mimeType) {

@@ -16,6 +16,8 @@ export function EngagementBar({ likeCount, commentCount, liked, onToggleLike, cl
 			<button
 				type="button"
 				onClick={onToggleLike}
+				aria-label={liked ? "좋아요 취소" : "좋아요"}
+				aria-pressed={liked}
 				className={cn(
 					"flex items-center gap-1.5 text-label-md font-label-md transition-colors",
 					liked ? "text-primary" : "text-secondary hover:text-on-surface",

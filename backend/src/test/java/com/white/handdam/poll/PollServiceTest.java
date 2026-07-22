@@ -14,6 +14,7 @@ import com.white.handdam.poll.dto.response.PollResultResponse;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.entity.PollOption;
 import com.white.handdam.poll.entity.PollVote;
+import com.white.handdam.poll.event.PollVotedEvent;
 import com.white.handdam.poll.exception.PollErrorCode;
 import com.white.handdam.poll.repository.PollOptionRepository;
 import com.white.handdam.poll.repository.PollRepository;
@@ -433,6 +434,15 @@ class PollServiceTest {
         verify(pollVoteRepository).save(captor.capture());
         assertThat(captor.getValue().getWeight()).isEqualTo((short) 1);
         assertThat(captor.getValue().getSubscriptionLevelSnapshot()).isEqualTo("FREE");
+
+        ArgumentCaptor<PollVotedEvent> eventCaptor = ArgumentCaptor.forClass(PollVotedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        PollVotedEvent event = eventCaptor.getValue();
+        assertThat(event.pollId()).isEqualTo(1L);
+        assertThat(event.feedId()).isEqualTo(1L);
+        assertThat(event.optionId()).isEqualTo(2L);
+        assertThat(event.actorId()).isEqualTo(1L);
+        assertThat(event.recipientId()).isEqualTo(99L);
     }
 
     @Test
