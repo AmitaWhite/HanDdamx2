@@ -68,6 +68,7 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("createFreeSubscription saves a free subscription when no subscription exists")
     void createFreeSubscriptionSavesFreeSubscriptionWhenNotExists() {
+        mockSubscribableCreator(CREATOR_ID);
         when(subscriptionRepository.findBySubscriberIdAndCreatorId(SUBSCRIBER_ID, CREATOR_ID))
                 .thenReturn(Optional.empty());
         when(subscriptionRepository.save(any(Subscription.class)))
@@ -122,9 +123,67 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    @DisplayName("createFreeSubscription rejects self subscription before creator lookup")
+    void createFreeSubscriptionRejectsSelfSubscription() {
+        assertThatThrownBy(() -> subscriptionService.createFreeSubscription(SUBSCRIBER_ID, SUBSCRIBER_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(SubscriptionErrorCode.SELF_SUBSCRIPTION_NOT_ALLOWED)
+                );
+
+        verifyNoInteractions(memberRepository, creatorProfileRepository, subscriptionRepository);
+    }
+
+    @Test
+    @DisplayName("createFreeSubscription rejects missing creator member")
+    void createFreeSubscriptionRejectsMissingCreatorMember() {
+        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.createFreeSubscription(SUBSCRIBER_ID, CREATOR_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND)
+                );
+
+        verifyNoInteractions(creatorProfileRepository, subscriptionRepository);
+    }
+
+    @Test
+    @DisplayName("createFreeSubscription rejects a USER member target")
+    void createFreeSubscriptionRejectsUserMemberTarget() {
+        assertCreateFreeSubscriptionRejectsNonCreator(Role.USER);
+    }
+
+    @Test
+    @DisplayName("createFreeSubscription rejects an ADMIN member target")
+    void createFreeSubscriptionRejectsAdminMemberTarget() {
+        assertCreateFreeSubscriptionRejectsNonCreator(Role.ADMIN);
+    }
+
+    @Test
+    @DisplayName("createFreeSubscription rejects missing creator profile")
+    void createFreeSubscriptionRejectsMissingCreatorProfile() {
+        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, Role.CREATOR)));
+        when(creatorProfileRepository.findByMemberId(CREATOR_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.createFreeSubscription(SUBSCRIBER_ID, CREATOR_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CreatorErrorCode.CREATOR_PROFILE_NOT_FOUND)
+                );
+
+        verify(subscriptionRepository, never()).findBySubscriberIdAndCreatorId(any(), any());
+        verify(subscriptionRepository, never()).save(any(Subscription.class));
+    }
+
+    @Test
     @DisplayName("createFreeSubscription rejects an existing free subscription")
     void createFreeSubscriptionRejectsExistingFreeSubscription() {
         Subscription existingSubscription = Subscription.createFree(SUBSCRIBER_ID, CREATOR_ID, STARTED_AT);
+        mockSubscribableCreator(CREATOR_ID);
         when(subscriptionRepository.findBySubscriberIdAndCreatorId(SUBSCRIBER_ID, CREATOR_ID))
                 .thenReturn(Optional.of(existingSubscription));
 
@@ -141,6 +200,7 @@ class SubscriptionServiceTest {
     @DisplayName("createFreeSubscription rejects an existing paid subscription")
     void createFreeSubscriptionRejectsExistingPaidSubscription() {
         Subscription existingPaidSubscription = mock(Subscription.class);
+        mockSubscribableCreator(CREATOR_ID);
         when(subscriptionRepository.findBySubscriberIdAndCreatorId(SUBSCRIBER_ID, CREATOR_ID))
                 .thenReturn(Optional.of(existingPaidSubscription));
 
@@ -647,6 +707,25 @@ class SubscriptionServiceTest {
                 .subscriptionPrice(subscriptionPrice)
                 .benefitsDescription(benefitsDescription)
                 .build();
+    }
+
+    private void mockSubscribableCreator(Long creatorId) {
+        when(memberRepository.findById(creatorId)).thenReturn(Optional.of(member(creatorId, Role.CREATOR)));
+        when(creatorProfileRepository.findByMemberId(creatorId))
+                .thenReturn(Optional.of(creatorProfile(creatorId, 10000, "monthly benefits")));
+    }
+
+    private void assertCreateFreeSubscriptionRejectsNonCreator(Role role) {
+        when(memberRepository.findById(CREATOR_ID)).thenReturn(Optional.of(member(CREATOR_ID, role)));
+
+        assertThatThrownBy(() -> subscriptionService.createFreeSubscription(SUBSCRIBER_ID, CREATOR_ID))
+                .isInstanceOfSatisfying(
+                        CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND)
+                );
+
+        verifyNoInteractions(creatorProfileRepository, subscriptionRepository);
     }
 
     private Subscription freeSubscription(Long subscriptionId, Long creatorId, Instant startedAt) {
