@@ -32,6 +32,8 @@ export const paths = {
 	subscribeSelect: (id: string | number = ":creatorId") =>
 		`/creators/${id}/subscribe`,
 	subscribeComplete: "/subscribe/complete",
+	paymentSuccess: "/payments/success",
+	paymentFail: "/payments/fail",
 
 	// --- Dashboard (크리에이터) ---
 	dashboardProjects: "/dashboard/projects",

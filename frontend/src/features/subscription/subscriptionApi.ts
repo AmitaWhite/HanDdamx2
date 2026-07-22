@@ -1,4 +1,4 @@
-import { http, unwrap } from "@/lib/api";
+import { http, unwrap, unwrapVoid } from "@/lib/api";
 
 /**
  * 백엔드 SubscriptionLevel / SubscriptionStatus
@@ -6,6 +6,15 @@ import { http, unwrap } from "@/lib/api";
  */
 export type SubscriptionLevel = "FREE" | "PAID";
 export type SubscriptionStatus = "ACTIVE" | "CANCEL_SCHEDULED";
+
+/** Backend FreeSubscriptionResponse */
+export interface FreeSubscriptionResponse {
+	subscriptionId: number;
+	creatorId: number;
+	subscriptionLevel: SubscriptionLevel;
+	status: SubscriptionStatus;
+	startedAt: string;
+}
 
 /**
  * 백엔드 SubscriptionStatusResponse 와 1:1.
@@ -21,15 +30,49 @@ export interface SubscriptionStatusResponse {
 	currentPeriodEndAt: string | null;
 }
 
+/** Backend SubscriptionPlanResponse */
+export interface SubscriptionPlanResponse {
+	creatorId: number;
+	subscriptionLevel: SubscriptionLevel;
+	price: number;
+	available: boolean;
+	benefitsDescription: string | null;
+}
+
 /**
  * 구독 상태 조회.
  * 백엔드: GET /api/creators/{creatorId}/subscription-status
  * 크리에이터 본인이 자기 게시판을 조회하면 항상 notSubscribed로 응답한다(백엔드 사양).
  */
-export function getSubscriptionStatus(creatorId: number) {
+export function getSubscriptionStatus(
+	creatorId: number,
+): Promise<SubscriptionStatusResponse> {
 	return unwrap<SubscriptionStatusResponse>(
 		http.get(`/creators/${creatorId}/subscription-status`),
 	);
+}
+
+/** Backend: GET /api/creators/{creatorId}/subscription-plans */
+export function getSubscriptionPlans(
+	creatorId: number,
+): Promise<SubscriptionPlanResponse[]> {
+	return unwrap<SubscriptionPlanResponse[]>(
+		http.get(`/creators/${creatorId}/subscription-plans`),
+	);
+}
+
+/** Backend: POST /api/creators/{creatorId}/free-subscriptions */
+export function createFreeSubscription(
+	creatorId: number,
+): Promise<FreeSubscriptionResponse> {
+	return unwrap<FreeSubscriptionResponse>(
+		http.post(`/creators/${creatorId}/free-subscriptions`),
+	);
+}
+
+/** Backend: DELETE /api/creators/{creatorId}/free-subscriptions */
+export async function cancelFreeSubscription(creatorId: number): Promise<void> {
+	await unwrapVoid(http.delete(`/creators/${creatorId}/free-subscriptions`));
 }
 
 /**
