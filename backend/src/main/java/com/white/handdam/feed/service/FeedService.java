@@ -194,8 +194,14 @@ public class FeedService {
 
     // [LYJ-009] 특정 크리에이터의 피드 목록 조회
     public Slice<FeedSummaryResponse> getCreatorFeeds(Long creatorId, Long memberId, Pageable pageable) {
-        String level = (memberId != null) ? subscriptionLevelChecker.getLevel(memberId, creatorId) : null;
-        List<Visibility> visibilities = resolveVisibilites(level);
+        boolean isOwner = memberId != null && memberId.equals(creatorId);
+        List<Visibility> visibilities;
+        if (isOwner) {
+            visibilities = List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER, Visibility.PAID_SUBSCRIBER);
+        } else {
+            String level = (memberId != null) ? subscriptionLevelChecker.getLevel(memberId, creatorId) : null;
+            visibilities = resolveVisibilites(level);
+        }
 
         return toSummarySlice(
             feedRepository.findByCreatorIdAndVisibilityIn(creatorId, visibilities, pageable)

@@ -50,6 +50,23 @@ export function getFeed(feedId: number | string) {
 }
 
 /**
+ * 피드 첨부파일 목록 조회 — 공개범위 접근 규칙은 피드 상세 조회와 동일.
+ * 백엔드: GET /api/feeds/{feedId}/attachments
+ */
+export function getFeedAttachments(feedId: number | string) {
+	return unwrap<AttachmentResponse[]>(http.get(`/feeds/${feedId}/attachments`));
+}
+
+/**
+ * 피드 첨부파일 삭제 (LYJ-013).
+ * 백엔드: DELETE /api/feeds/{feedId}/attachments/{attachmentId}
+ * 권한: 프로젝트 소유 크리에이터
+ */
+export async function deleteFeedAttachment(feedId: number | string, attachmentId: number) {
+	await unwrapVoid(http.delete(`/feeds/${feedId}/attachments/${attachmentId}`));
+}
+
+/**
  * 내가 작성한 피드 목록 (LYJ-010).
  * 백엔드: GET /api/feeds/me
  * 권한: 크리에이터 본인

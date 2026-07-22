@@ -1,17 +1,27 @@
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { useSubmitState } from "@/features/auth/useSubmitState";
-import { deleteFeed, getFeed, moveFeedProject, updateFeed } from "@/features/feed/feedApi";
-import type { Visibility } from "@/features/feed/types";
+import {
+	addFeedAttachment,
+	deleteFeed,
+	deleteFeedAttachment,
+	getFeed,
+	getFeedAttachments,
+	moveFeedProject,
+	updateFeed,
+} from "@/features/feed/feedApi";
+import type { AttachmentResponse, Visibility } from "@/features/feed/types";
 import { getMyProjects } from "@/features/project/projectApi";
 import type { ProjectResponse } from "@/features/project/types";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { applyFormat, insertLink, prefixCurrentLine, wrapSelection } from "@/lib/textareaFormatting";
 
 const VISIBILITY_OPTIONS: { id: Visibility; label: string; description: string }[] = [
 	{ id: "PUBLIC", label: "전체공개", description: "누구나 볼 수 있어요" },
@@ -44,12 +54,18 @@ export function EditPostPage() {
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 
+	const [attachments, setAttachments] = useState<AttachmentResponse[]>([]);
+	const [attachmentError, setAttachmentError] = useState<string | null>(null);
+	const [uploading, setUploading] = useState(false);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const contentRef = useRef<HTMLTextAreaElement>(null);
+
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setLoadError(null);
-		Promise.all([getFeed(feedId), getMyProjects()])
-			.then(([feed, projectList]) => {
+		Promise.all([getFeed(feedId), getMyProjects(), getFeedAttachments(feedId)])
+			.then(([feed, projectList, attachmentList]) => {
 				if (cancelled) return;
 				setTitle(feed.title);
 				setContent(feed.content ?? "");
@@ -57,6 +73,7 @@ export function EditPostPage() {
 				setProjects(projectList);
 				setProjectId(String(feed.projectId));
 				setCurrentProjectId(feed.projectId);
+				setAttachments(attachmentList);
 			})
 			.catch((err) => {
 				if (cancelled) return;
@@ -85,6 +102,66 @@ export function EditPostPage() {
 		);
 		if (result) navigate(paths.postDetail(feedId));
 	}
+
+	async function onFilesSelected(e: ChangeEvent<HTMLInputElement>) {
+		const files = e.target.files;
+		if (!files || files.length === 0) return;
+		e.target.value = "";
+		setAttachmentError(null);
+		setUploading(true);
+		try {
+			for (const file of Array.from(files)) {
+				const uploaded = await addFeedAttachment(Number(feedId), file);
+				setAttachments((prev) => [...prev, uploaded]);
+			}
+		} catch (err) {
+			setAttachmentError(err instanceof ApiError ? err.message : "첨부파일 업로드에 실패했습니다.");
+		} finally {
+			setUploading(false);
+		}
+	}
+
+	async function onDeleteAttachment(attachmentId: number) {
+		if (!window.confirm("이 첨부파일을 삭제하시겠어요?")) return;
+		setAttachmentError(null);
+		try {
+			await deleteFeedAttachment(feedId, attachmentId);
+			setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+		} catch (err) {
+			setAttachmentError(err instanceof ApiError ? err.message : "첨부파일 삭제에 실패했습니다.");
+		}
+	}
+
+	function onBold() {
+		const el = contentRef.current;
+		if (!el) return;
+		applyFormat(el, setContent, wrapSelection(el.value, el.selectionStart, el.selectionEnd, "**", "**", "굵게 강조"));
+	}
+	function onItalic() {
+		const el = contentRef.current;
+		if (!el) return;
+		applyFormat(el, setContent, wrapSelection(el.value, el.selectionStart, el.selectionEnd, "*", "*", "기울임"));
+	}
+	function onList() {
+		const el = contentRef.current;
+		if (!el) return;
+		applyFormat(el, setContent, prefixCurrentLine(el.value, el.selectionStart, "- "));
+	}
+	function onLink() {
+		const el = contentRef.current;
+		if (!el) return;
+		const url = window.prompt("링크 URL을 입력하세요 (https://...)");
+		if (!url) return;
+		applyFormat(el, setContent, insertLink(el.value, el.selectionStart, el.selectionEnd, url));
+	}
+
+	const toolbarButtons = [
+		{ icon: "format_bold", title: "굵게", onClick: onBold },
+		{ icon: "format_italic", title: "기울임", onClick: onItalic },
+		{ icon: "format_list_bulleted", title: "목록", onClick: onList },
+		{ icon: "image", title: "이미지·동영상 추가", onClick: () => fileInputRef.current?.click() },
+		{ icon: "link", title: "링크 추가", onClick: onLink },
+	];
 
 	async function onMoveProject() {
 		if (!projectId || Number(projectId) === currentProjectId) return;
@@ -126,13 +203,76 @@ export function EditPostPage() {
 					<label className="text-label-md font-label-md text-on-surface" htmlFor="edit-content">
 						본문
 					</label>
-					<textarea
-						id="edit-content"
-						value={content}
-						onChange={(e) => setContent(e.target.value)}
-						rows={10}
-						className="w-full resize-y rounded border border-outline-variant bg-surface-container-lowest p-4 text-body-md focus:border-on-surface focus:outline-none focus:ring-1 focus:ring-on-surface"
-					/>
+					{attachmentError && <Alert>{attachmentError}</Alert>}
+					<div className="rounded border border-outline-variant bg-surface-container-lowest">
+						<div className="flex items-center gap-1 rounded-t border-b border-outline-variant bg-surface-container-low p-2">
+							{toolbarButtons.map((btn) => (
+								<button
+									key={btn.icon}
+									type="button"
+									onClick={btn.onClick}
+									disabled={btn.icon === "image" && uploading}
+									title={btn.title}
+									className="flex h-8 w-8 items-center justify-center rounded text-secondary hover:bg-surface-container disabled:opacity-50"
+								>
+									<Icon name={btn.icon} className="text-[18px]" />
+								</button>
+							))}
+							{uploading && <span className="text-caption font-caption text-secondary">업로드 중…</span>}
+							<input
+								ref={fileInputRef}
+								type="file"
+								multiple
+								className="hidden"
+								onChange={onFilesSelected}
+								accept="image/*,video/*,application/pdf"
+							/>
+						</div>
+						<textarea
+							ref={contentRef}
+							id="edit-content"
+							value={content}
+							onChange={(e) => setContent(e.target.value)}
+							rows={10}
+							className="w-full resize-y border-0 bg-transparent p-4 text-body-md focus:outline-none focus:ring-0"
+						/>
+						{attachments.length > 0 && (
+							<div className="flex flex-wrap gap-3 rounded-b border-t border-outline-variant p-3">
+								{attachments.map((a) => {
+									const isVideo = a.type === "VIDEO_LINK" || (a.mimeType?.startsWith("video/") ?? false);
+									return (
+										<div key={a.id} className="relative h-20 w-20 overflow-hidden rounded-lg">
+											{a.type === "IMAGE" ? (
+												<img src={a.url} alt="첨부 미리보기" className="h-full w-full object-cover" />
+											) : isVideo ? (
+												<div className="relative h-full w-full bg-black">
+													<video src={a.url} className="h-full w-full object-cover" muted />
+													<div className="absolute inset-0 flex items-center justify-center bg-black/20">
+														<Icon name="play_circle" className="text-[28px] text-white" />
+													</div>
+												</div>
+											) : (
+												<div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-surface-container-low p-1.5 text-center">
+													<Icon name="description" className="text-[24px] text-secondary" />
+													<span className="line-clamp-2 break-all text-[10px] leading-tight text-secondary">
+														{a.originalName ?? "첨부파일"}
+													</span>
+												</div>
+											)}
+											<button
+												type="button"
+												onClick={() => onDeleteAttachment(a.id)}
+												aria-label="첨부 삭제"
+												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
+											>
+												<Icon name="close" className="text-[14px]" />
+											</button>
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</div>
 				</div>
 
 				<div>
