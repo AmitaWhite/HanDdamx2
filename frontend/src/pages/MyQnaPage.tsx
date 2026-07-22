@@ -140,7 +140,7 @@ export function MyQnaPage() {
 			<div>
 				<div className="mb-8">
 					<h1 className="text-headline-lg font-display text-on-surface">
-						작가와의 Q&A
+						Q&A 활동 내역
 					</h1>
 					<p className="mt-1 text-body-md text-secondary">
 						내가 남긴 유료 Q&A 글을 모아봤어요.

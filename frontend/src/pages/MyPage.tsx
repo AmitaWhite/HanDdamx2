@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { CreatorApplicationStatus } from "@/components/creator/CreatorApplicationStatus";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
+import { refreshAccessToken } from "@/lib/api";
 import { getMySummary } from "@/features/member/memberApi";
 import type { MemberSummaryResponse } from "@/features/member/types";
 import { applyCreator, getMyLatestApplication } from "@/features/creator/creatorApplicationApi";
@@ -18,7 +19,7 @@ export function MyPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [application, setApplication] = useState<CreatorApplication | null>(null);
   const [applicationLoading, setApplicationLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -45,6 +46,8 @@ export function MyPage() {
 		let ignore = false;
 
 		const fetchSummary = async () => {
+			setLoading(true);
+			setError(false);
 			try {
 				const data = await getMySummary();
 
@@ -68,7 +71,8 @@ export function MyPage() {
 			ignore = true;
 		};
 
-	}, [])
+	// user.role이 바뀌면(예: 크리에이터 승인 반영) 자기소개 등 role 종속 데이터를 다시 받아온다.
+	}, [user?.role])
 
   useEffect(() => {
     if (!user || user.role !== "USER") {
@@ -80,7 +84,14 @@ export function MyPage() {
     setApplicationLoading(true);
     getMyLatestApplication()
       .then((data) => {
-        if (!ignore) setApplication(data);
+        if (ignore) return;
+        setApplication(data);
+        // 신청은 승인됐는데 토큰의 role이 아직 USER면, 토큰을 갱신해 role 동기화
+        if (data?.status === "APPROVED") {
+          refreshAccessToken().catch(() => {
+            if (!ignore) logout();
+          });
+        }
       })
       .catch(() => {
         if (!ignore) setApplication(null);
@@ -91,7 +102,7 @@ export function MyPage() {
     return () => {
       ignore = true;
     };
-  }, [user]);
+  }, [user?.memberId, user?.role, logout]);
 
   const handleApply = async () => {
     const trimmedIntroduction = introduction.trim();

@@ -1,21 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { MyPageShell } from "@/components/nav/MyPageShell";
 import { PostCard } from "@/components/social/PostCard";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
 import { deleteFeed, getMyFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
-import { getMyFeedComments } from "@/features/member/memberApi";
-import type { MyFeedCommentResponse } from "@/features/member/types";
 import { ApiError } from "@/lib/api";
 import { formatDateLabel } from "@/lib/date";
-import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
 
 export function DashboardPostsPage() {
 	const { user } = useAuth();
@@ -29,14 +25,6 @@ export function DashboardPostsPage() {
 	const [feedsHasNext, setFeedsHasNext] = useState(false);
 	const [feedsLoadingMore, setFeedsLoadingMore] = useState(false);
 	const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<number>>(new Set());
-
-	const [comments, setComments] = useState<MyFeedCommentResponse[]>([]);
-	const [commentsLoading, setCommentsLoading] = useState(!!user);
-	const [commentsError, setCommentsError] = useState<string | null>(null);
-	const [commentsPage, setCommentsPage] = useState(0);
-	const [commentsHasNext, setCommentsHasNext] = useState(false);
-	const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
-	const commentsInFlightRef = useRef(false);
 
 	useEffect(() => {
 		if (!isCreator) return;
@@ -55,40 +43,6 @@ export function DashboardPostsPage() {
 			})
 			.finally(() => setFeedsLoading(false));
 	}, [isCreator]);
-
-	useEffect(() => {
-		if (!user) return;
-		setCommentsLoading(true);
-		setCommentsError(null);
-		getMyFeedComments(0)
-			.then((res) => {
-				setComments(res.content);
-				setCommentsHasNext(res.hasNext);
-				setCommentsPage(0);
-			})
-			.catch((err) => {
-				setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
-			})
-			.finally(() => setCommentsLoading(false));
-	}, [user]);
-
-	async function loadMoreComments() {
-		if (commentsInFlightRef.current || !commentsHasNext) return;
-		commentsInFlightRef.current = true;
-		setCommentsLoadingMore(true);
-		try {
-			const nextPage = commentsPage + 1;
-			const res = await getMyFeedComments(nextPage);
-			setComments((prev) => [...prev, ...res.content]);
-			setCommentsHasNext(res.hasNext);
-			setCommentsPage(nextPage);
-		} catch (err) {
-			setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
-		} finally {
-			commentsInFlightRef.current = false;
-			setCommentsLoadingMore(false);
-		}
-	}
 
 	async function loadMoreFeeds() {
 		if (feedsLoadingMore || !feedsHasNext) return;
@@ -130,16 +84,13 @@ export function DashboardPostsPage() {
 			? b.likeCount - a.likeCount
 			: new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
-
-	const commentsSentinelRef = useInfiniteScroll(loadMoreComments, commentsHasNext);
-
 	return (
 		<MyPageShell>
 			<div>
 				<div className="mb-8 flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h1 className="text-headline-lg font-display text-on-surface">게시물 및 댓글 관리</h1>
-						<p className="mt-1 text-body-md text-secondary">작성한 게시물과 댓글을 관리하세요.</p>
+						<h1 className="text-headline-lg font-display text-on-surface">게시물 관리</h1>
+						<p className="mt-1 text-body-md text-secondary">작성한 게시물을 관리하세요.</p>
 					</div>
 					{isCreator && (
 						<LinkButton to={paths.dashboardPostNew}>
@@ -238,34 +189,6 @@ export function DashboardPostsPage() {
 							<p className="text-caption font-caption text-secondary">크리에이터가 되어 나만의 작품을 나누어 보세요!</p>
 						</div>
 					)}
-				</section>
-
-				<section>
-					<h2 className="mb-4 text-headline-md font-display text-on-surface">작성한 댓글</h2>
-					{commentsError && <Alert className="mb-4">{commentsError}</Alert>}
-					<div className="flex flex-col gap-3">
-						{comments.map((c) => (
-							<Card key={c.commentId} className="p-5">
-								<p className="mb-2 text-body-md text-on-surface">&ldquo;{c.content}&rdquo;</p>
-								<div className="flex items-center justify-between text-caption font-caption text-secondary">
-									<span>{formatDateLabel(c.createdAt)}</span>
-									<Link to={paths.postDetail(c.feedId)} className="text-primary hover:underline">
-										{c.feedTitle} 원문 보기
-									</Link>
-								</div>
-							</Card>
-						))}
-						{commentsLoading && (
-							<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
-						)}
-						{!commentsLoading && !commentsError && comments.length === 0 && (
-							<p className="text-body-md text-secondary">아직 댓글이 없어요.</p>
-						)}
-						{commentsHasNext && <div ref={commentsSentinelRef} className="h-1" />}
-						{commentsLoadingMore && (
-							<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
-						)}
-					</div>
 				</section>
 			</div>
 		</MyPageShell>
