@@ -103,6 +103,8 @@ jobs:
         env:
           # 백엔드와 같은 도메인 + /api. Caddy가 /api·/ws 를 백엔드로 라우팅한다.
           VITE_API_BASE_URL: ${{ vars.SITE_DOMAIN != '' && format('https://{0}/api', vars.SITE_DOMAIN) || '/api' }}
+          # Toss 결제 위젯용 퍼블리셔블(공개) 키. 빌드 시점에 정적 파일에 구워짐 — 서버 .env.deploy와 무관.
+          VITE_TOSS_CLIENT_KEY: ${{ vars.TOSS_CLIENT_KEY }}
         run: bun run build
 
       - name: Set up QEMU (arm64 emulation)
