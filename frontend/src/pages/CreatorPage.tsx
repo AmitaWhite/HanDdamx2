@@ -14,7 +14,6 @@ import type { CreatorProfile, ProjectSummary } from "@/features/creator/types";
 import { getCreatorFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { getProjectFeeds } from "@/features/project/projectApi";
-import { useSubscription } from "@/features/subscription/SubscriptionContext";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
@@ -203,11 +202,6 @@ export function CreatorPage() {
   if (creatorError || !creator) {
     return <div className="flex min-h-[60vh] items-center justify-center text-secondary">{creatorError ?? "크리에이터를 찾을 수 없습니다."}</div>;
   }
-
-  const creatorStringId = String(creator.memberId);
-  const subscribed = isFreeSubscribed(creatorStringId);
-  // posts는 피드 API 연동 전까지 빈 배열
-  const posts: PlaceholderPost[] = [];
 
   function scrollProjects(direction: "left" | "right") {
     projectsRef.current?.scrollBy({
