@@ -44,4 +44,5 @@ export const paths = {
 	dashboardPostEdit: (id: string | number = ":feedId") =>
 		`/dashboard/posts/${id}/edit`,
   adminCreatorApplications: "/admin/creator-applications",
+  adminCategories: "/admin/categories",
 } as const;
