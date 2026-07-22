@@ -177,7 +177,7 @@ export function EditPostPage() {
 		{ icon: "format_bold", title: "굵게", onClick: onBold },
 		{ icon: "format_italic", title: "기울임", onClick: onItalic },
 		{ icon: "format_list_bulleted", title: "목록", onClick: onList },
-		{ icon: "image", title: "이미지·동영상 추가", onClick: () => fileInputRef.current?.click() },
+		{ icon: "image", title: "이미지·동영상·PDF 추가", onClick: () => fileInputRef.current?.click() },
 		{ icon: "link", title: "링크 추가", onClick: onLink },
 	];
 
