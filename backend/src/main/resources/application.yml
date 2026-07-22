@@ -94,6 +94,8 @@ cloud:
     region: ${AWS_REGION:ap-northeast-2}
     s3:
       endpoint: ${AWS_S3_ENDPOINT:http://localhost:4566}
+      # 브라우저가 열 공개 URL. 비어 있으면(로컬 개발) endpoint를 그대로 쓴다.
+      public-url: ${AWS_S3_PUBLIC_URL:}
       bucket: ${AWS_S3_BUCKET:handdam-local}
     credentials:
       access-key: ${AWS_ACCESS_KEY_ID:test}

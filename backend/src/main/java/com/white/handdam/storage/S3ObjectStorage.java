@@ -154,9 +154,16 @@ public class S3ObjectStorage implements ObjectStorage {
 	 * 접근 URL 생성.
 	 * LocalStack: http://localhost:4566/{bucket}/{key}
 	 * AWS: https://{bucket}.s3.{region}.amazonaws.com/{key}
+	 *
+	 * <p>브라우저가 열어야 하는 URL은 "공개 주소"(publicUrl) 기준이다. publicUrl이 비어 있으면
+	 * endpoint를 그대로 쓴다(로컬 개발처럼 endpoint 자체가 이미 외부에서도 접근 가능한 경우의 하위호환).
+	 * 배포 환경에서는 endpoint(컨테이너 내부 전용 주소, 예: http://localstack:4566)와
+	 * publicUrl(리버스 프록시가 실제로 노출하는 주소)이 서로 다르다.
 	 */
 	private String buildUrl(String bucket, String storageKey) {
-		String endpoint = awsProperties.getS3().getEndpoint();
+		String endpoint = StringUtils.hasText(awsProperties.getS3().getPublicUrl())
+			? awsProperties.getS3().getPublicUrl()
+			: awsProperties.getS3().getEndpoint();
 		String encodedKey = encodeStorageKey(storageKey);
 		if (endpoint != null && !endpoint.isBlank()) {
 			String normalized = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;

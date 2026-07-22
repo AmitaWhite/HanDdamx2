@@ -76,6 +76,8 @@ services:
       # S3는 LocalStack 컨테이너로
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_S3_ENDPOINT: http://localstack:4566
+      # 브라우저가 실제로 열 공개 주소. Caddy의 /storage 라우팅(handle_path)과 짝을 이룸.
+      AWS_S3_PUBLIC_URL: https://${SITE_DOMAIN}/storage
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-handdam-local}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
