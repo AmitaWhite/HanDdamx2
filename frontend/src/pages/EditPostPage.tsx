@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { useSubmitState } from "@/features/auth/useSubmitState";
@@ -62,6 +63,9 @@ export function EditPostPage() {
 		"프로젝트 이동에 실패했습니다. 다시 시도해 주세요.",
 	);
 	const [deleting, setDeleting] = useState(false);
+	const [confirmAttachmentId, setConfirmAttachmentId] = useState<number | null>(null);
+	const [deletingAttachmentIds, setDeletingAttachmentIds] = useState<Set<number>>(new Set());
+	const [confirmDeletePost, setConfirmDeletePost] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	const [attachments, setAttachments] = useState<AttachmentResponse[]>([]);
@@ -149,14 +153,28 @@ export function EditPostPage() {
 		}
 	}
 
-	async function onDeleteAttachment(attachmentId: number) {
-		if (!window.confirm("이 첨부파일을 삭제하시겠어요?")) return;
+	function onDeleteAttachment(attachmentId: number) {
+		if (deletingAttachmentIds.has(attachmentId)) return;
+		setConfirmAttachmentId(attachmentId);
+	}
+
+	async function executeDeleteAttachment() {
+		const attachmentId = confirmAttachmentId;
+		setConfirmAttachmentId(null);
+		if (attachmentId == null) return;
 		setAttachmentError(null);
+		setDeletingAttachmentIds((prev) => new Set(prev).add(attachmentId));
 		try {
 			await deleteFeedAttachment(feedId, attachmentId);
 			setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
 		} catch (err) {
 			setAttachmentError(err instanceof ApiError ? err.message : "첨부파일 삭제에 실패했습니다.");
+		} finally {
+			setDeletingAttachmentIds((prev) => {
+				const next = new Set(prev);
+				next.delete(attachmentId);
+				return next;
+			});
 		}
 	}
 
@@ -197,8 +215,12 @@ export function EditPostPage() {
 		if (result) setCurrentProjectId(Number(projectId));
 	}
 
-	async function onDelete() {
-		if (!window.confirm("이 게시물을 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.")) return;
+	function onDelete() {
+		setConfirmDeletePost(true);
+	}
+
+	async function executeDeletePost() {
+		setConfirmDeletePost(false);
 		setDeleteError(null);
 		setDeleting(true);
 		try {
@@ -218,6 +240,7 @@ export function EditPostPage() {
 	}
 
 	return (
+		<>
 		<div className="container-page max-w-2xl py-8">
 			<h1 className="mb-6 text-headline-lg font-display text-on-surface">게시물 수정</h1>
 
@@ -291,8 +314,9 @@ export function EditPostPage() {
 											<button
 												type="button"
 												onClick={() => onDeleteAttachment(a.id)}
+												disabled={deletingAttachmentIds.has(a.id)}
 												aria-label="첨부 삭제"
-												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface"
+												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-inverse-surface/80 text-inverse-on-surface disabled:opacity-50"
 											>
 												<Icon name="close" className="text-[14px]" />
 											</button>
@@ -375,5 +399,21 @@ export function EditPostPage() {
 				</Button>
 			</div>
 		</div>
+		<ConfirmDialog
+			open={confirmAttachmentId != null}
+			title="이 첨부파일을 삭제하시겠어요?"
+			confirmLabel="삭제"
+			onConfirm={executeDeleteAttachment}
+			onCancel={() => setConfirmAttachmentId(null)}
+		/>
+		<ConfirmDialog
+			open={confirmDeletePost}
+			title="이 게시물을 삭제하시겠어요?"
+			description="삭제하면 되돌릴 수 없습니다."
+			confirmLabel="삭제"
+			onConfirm={executeDeletePost}
+			onCancel={() => setConfirmDeletePost(false)}
+		/>
+		</>
 	);
 }

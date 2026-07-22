@@ -5,7 +5,11 @@ import com.white.handdam.category.exception.CategoryErrorCode;
 import com.white.handdam.category.repository.CategoryRepository;
 import com.white.handdam.creator.exception.CreatorErrorCode;
 import com.white.handdam.feed.entity.Feed;
+import com.white.handdam.feed.entity.FeedAttachment;
+import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
+import com.white.handdam.like.entity.FeedLike;
+import com.white.handdam.like.repository.FeedLikeRepository;
 import com.white.handdam.global.exception.CommonErrorCode;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
@@ -26,9 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.white.handdam.feed.dto.response.FeedSummaryResponse;
 import com.white.handdam.feed.entity.Visibility;
-import com.white.handdam.subscription.entity.SubscriptionLevel;
-import com.white.handdam.subscription.entity.SubscriptionStatus;
-import com.white.handdam.subscription.repository.SubscriptionRepository;
+import com.white.handdam.feed.service.FeedService;
 import com.white.handdam.feed.service.SubscriptionLevelChecker;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -53,6 +55,8 @@ public class ProjectService {
     private final FeedRepository feedRepository;
     private final ObjectStorage objectStorage;
     private final SubscriptionLevelChecker subscriptionLevelChecker;
+    private final FeedLikeRepository feedLikeRepository;
+    private final FeedAttachmentRepository feedAttachmentRepository;
 
 
     /**
@@ -232,7 +236,26 @@ public class ProjectService {
             ? feedRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(projectId, pageable)
             : feedRepository.findByProjectIdAndVisibilityInAndDeletedFalseOrderByCreatedAtDesc(
             projectId, resolveVisibilities(requesterId, project.getCreatorId()), pageable);
-        return feeds.map(f -> FeedSummaryResponse.from(f, creator, category));
+
+        List<Long> feedIds = feeds.getContent().stream().map(Feed::getId).toList();
+        Set<Long> likedFeedIds = (requesterId == null || feedIds.isEmpty())
+            ? Set.of()
+            : feedLikeRepository.findByMemberIdAndFeedIdIn(requesterId, feedIds).stream()
+                .map(FeedLike::getFeedId)
+                .collect(Collectors.toSet());
+        Map<Long, FeedAttachment> thumbnailByFeedId = feedIds.isEmpty()
+            ? Map.of()
+            : FeedService.thumbnailsByFeedId(
+                feedAttachmentRepository.findByFeedIdInAndDeletedFalseOrderByOrderIndex(feedIds));
+
+        return feeds.map(f -> {
+            FeedAttachment thumbnail = thumbnailByFeedId.get(f.getId());
+            return FeedSummaryResponse.from(
+                f, creator, category, likedFeedIds.contains(f.getId()),
+                thumbnail == null ? null : thumbnail.getUrl(),
+                thumbnail == null ? null : FeedService.thumbnailType(thumbnail)
+            );
+        });
     }
 
     // CANCEL_SCHEDULED 구독 만료 여부 체크 후 활성여부 판단

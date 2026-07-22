@@ -19,6 +19,7 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
+import com.white.handdam.like.entity.FeedLike;
 import com.white.handdam.like.repository.FeedLikeRepository;
 import com.white.handdam.poll.entity.Poll;
 import com.white.handdam.poll.repository.PollRepository;
@@ -38,8 +39,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -152,9 +155,10 @@ public class FeedService {
     }
 
     // [LYJ-006] 최근 PUBLIC 피드 목록
-    public Slice<FeedSummaryResponse> getPublicFeeds(Pageable pageable) {
+    public Slice<FeedSummaryResponse> getPublicFeeds(Long memberId, Pageable pageable) {
         return toSummarySlice(
-            feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable)
+            feedRepository.findByVisibilityAndDeletedFalse(Visibility.PUBLIC, pageable),
+            memberId
         );
     }
 
@@ -181,14 +185,16 @@ public class FeedService {
                 memberId, safePaid, safeFree, categoryId,
                 List.of(Visibility.PUBLIC, Visibility.FREE_SUBSCRIBER),
                 pageable
-            )
+            ),
+            memberId
         );
     }
 
     // [LYJ-008] 전체 공개 탐색 피드 (비회원도 접근 가능)
-    public Slice<FeedSummaryResponse> getExploreFeeds(Long categoryId, Pageable pageable) {
+    public Slice<FeedSummaryResponse> getExploreFeeds(Long memberId, Long categoryId, Pageable pageable) {
         return toSummarySlice(
-            feedRepository.findExploreFeeds(categoryId, pageable)
+            feedRepository.findExploreFeeds(categoryId, pageable),
+            memberId
         );
     }
 
@@ -204,19 +210,21 @@ public class FeedService {
         }
 
         return toSummarySlice(
-            feedRepository.findByCreatorIdAndVisibilityIn(creatorId, visibilities, pageable)
+            feedRepository.findByCreatorIdAndVisibilityIn(creatorId, visibilities, pageable),
+            memberId
         );
     }
 
     // [LYJ-010] 내 작성 피드 목록 (크리에이터 본인 전용 — 공개범위 무관 전체 조회)
     public Slice<FeedSummaryResponse> getMyFeeds(Long creatorId, Pageable pageable) {
         return toSummarySlice(
-            feedRepository.findByCreatorId(creatorId, pageable)
+            feedRepository.findByCreatorId(creatorId, pageable),
+            creatorId
         );
     }
 
-    // 리스트 공통 변환 헬퍼 — N+1 방지 배치 조회
-    private Slice<FeedSummaryResponse> toSummarySlice(Slice<Feed> feeds) {
+    // 리스트 공통 변환 헬퍼 — N+1 방지 배치 조회. memberId가 null이면(비로그인) liked는 전부 false.
+    private Slice<FeedSummaryResponse> toSummarySlice(Slice<Feed> feeds, Long memberId) {
         List<Long> projectIds = feeds.getContent().stream()
             .map(Feed::getProjectId).distinct().toList();
         Map<Long, Project> projectMap = projectRepository.findAllById(projectIds).stream()
@@ -229,14 +237,60 @@ public class FeedService {
             .collect(Collectors.toMap(Member::getId, m -> m));
         Map<Long, Category> categoryMap = categoryRepository.findAllById(categoryIds).stream()
             .collect(Collectors.toMap(Category::getId, c -> c));
+
+        List<Long> feedIds = feeds.getContent().stream().map(Feed::getId).toList();
+        Set<Long> likedFeedIds = (memberId == null || feedIds.isEmpty())
+            ? Set.of()
+            : feedLikeRepository.findByMemberIdAndFeedIdIn(memberId, feedIds).stream()
+                .map(FeedLike::getFeedId)
+                .collect(Collectors.toSet());
+        Map<Long, FeedAttachment> thumbnailByFeedId = loadThumbnailsByFeedId(feedIds);
+
         return feeds.map(f -> {
             Project p = projectMap.get(f.getProjectId());
+            FeedAttachment thumbnail = thumbnailByFeedId.get(f.getId());
             return FeedSummaryResponse.from(
                 f,
                 memberMap.get(p.getCreatorId()),
-                categoryMap.get(p.getCategoryId())
+                categoryMap.get(p.getCategoryId()),
+                likedFeedIds.contains(f.getId()),
+                thumbnail == null ? null : thumbnail.getUrl(),
+                thumbnail == null ? null : thumbnailType(thumbnail)
             );
         });
+    }
+
+    // 피드별 대표 썸네일(첫 이미지 우선, 이미지가 없을 때만 첫 업로드 동영상) 배치 조회 — N+1 방지
+    // ProjectService.getProjectFeeds 에서도 동일 로직을 재사용한다.
+    public static Map<Long, FeedAttachment> thumbnailsByFeedId(List<FeedAttachment> attachments) {
+        Map<Long, FeedAttachment> imageByFeedId = new HashMap<>();
+        Map<Long, FeedAttachment> videoByFeedId = new HashMap<>();
+        for (FeedAttachment a : attachments) {
+            if (a.getType() == AttachmentType.IMAGE) {
+                imageByFeedId.putIfAbsent(a.getFeedId(), a);
+            } else if (isEligibleVideo(a)) {
+                videoByFeedId.putIfAbsent(a.getFeedId(), a);
+            }
+        }
+        Map<Long, FeedAttachment> thumbnailByFeedId = new HashMap<>(videoByFeedId);
+        thumbnailByFeedId.putAll(imageByFeedId); // 이미지가 있으면 동영상보다 우선
+        return thumbnailByFeedId;
+    }
+
+    private Map<Long, FeedAttachment> loadThumbnailsByFeedId(List<Long> feedIds) {
+        if (feedIds.isEmpty()) return Map.of();
+        return thumbnailsByFeedId(feedAttachmentRepository.findByFeedIdInAndDeletedFalseOrderByOrderIndex(feedIds));
+    }
+
+    // 썸네일 후보가 될 수 있는 업로드 동영상 파일 (외부 VIDEO_LINK는 미리보기를 만들 수 없어 제외)
+    public static boolean isEligibleVideo(FeedAttachment a) {
+        return a.getType() == AttachmentType.FILE
+            && a.getMimeType() != null
+            && a.getMimeType().startsWith("video/");
+    }
+
+    public static String thumbnailType(FeedAttachment a) {
+        return a.getType() == AttachmentType.IMAGE ? "IMAGE" : "VIDEO";
     }
 
     // 구독 레벨을 접근 가능한 공개범위 목록으로 변환

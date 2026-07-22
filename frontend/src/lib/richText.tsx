@@ -48,7 +48,7 @@ export function renderFormattedContent(content: string): ReactNode {
 	function flushList() {
 		if (listBuffer.length > 0) {
 			blocks.push(
-				<ul key={`ul-${key++}`} className="my-1 list-disc pl-5">
+				<ul key={`ul-${key++}`} className="my-1 list-disc break-words pl-5">
 					{listBuffer}
 				</ul>,
 			);
@@ -67,7 +67,7 @@ export function renderFormattedContent(content: string): ReactNode {
 			blocks.push(<br key={`br-${key++}`} />);
 		} else {
 			blocks.push(
-				<p key={`p-${key++}`} className="whitespace-pre-wrap">
+				<p key={`p-${key++}`} className="whitespace-pre-wrap break-words">
 					{renderInline(line)}
 				</p>,
 			);

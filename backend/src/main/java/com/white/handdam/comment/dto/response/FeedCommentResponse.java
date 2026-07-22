@@ -7,6 +7,7 @@ public record FeedCommentResponse(
         Long id,
         Long memberId,
         String nickname,
+        String profileImageUrl,
         String content,
         int depth,
         Instant createdAt,

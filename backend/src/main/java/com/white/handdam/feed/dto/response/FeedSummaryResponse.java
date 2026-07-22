@@ -14,15 +14,19 @@ public record FeedSummaryResponse(
     Long id, Long projectId, String title,
     String content, Visibility visibility, long likeCount,
     long commentCount, Instant createdAt, Instant updatedAt,
-    CreatorSummary creator, CategorySummary category
+    CreatorSummary creator, CategorySummary category, boolean liked,
+    String thumbnailUrl, String thumbnailType
 ) {
-    public static FeedSummaryResponse from(Feed f, Member member, Category cat) {
+    public static FeedSummaryResponse from(
+        Feed f, Member member, Category cat, boolean liked, String thumbnailUrl, String thumbnailType
+    ) {
         return new FeedSummaryResponse(
             f.getId(), f.getProjectId(), f.getTitle(),
             f.getContent(), f.getVisibility(), f.getLikeCount(),
             f.getCommentCount(), f.getCreatedAt(), f.getUpdatedAt(),
             new CreatorSummary(member.getId(), member.getNickname(), member.getProfileImageUrl()),
-            new CategorySummary(cat.getId(), cat.getName())
+            new CategorySummary(cat.getId(), cat.getName()),
+            liked, thumbnailUrl, thumbnailType
         );
     }
 }

@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { endOfDayToIso } from "@/lib/date";
 import { applyFormat, insertLink, prefixCurrentLine, wrapSelection } from "@/lib/textareaFormatting";
 import { useSubmitState } from "@/features/auth/useSubmitState";
 import { addFeedAttachment, createFeed, deleteFeed } from "@/features/feed/feedApi";
@@ -183,7 +184,7 @@ export function CreatePostPage() {
 				if (pollEnabled) {
 					await createFeedPoll(created.feedId, {
 						question: pollQuestion.trim(),
-						endAt: new Date(pollEndAt).toISOString(),
+						endAt: endOfDayToIso(pollEndAt),
 						options: trimmedPollOptions,
 					});
 				}
@@ -423,12 +424,14 @@ export function CreatePostPage() {
 							+ 선택지 추가
 						</button>
 						<Input
-							label="투표 종료 일시"
-							type="datetime-local"
+							label="투표 종료일"
+							type="date"
 							value={pollEndAt}
 							onChange={(e) => setPollEndAt(e.target.value)}
 						/>
-						<p className="text-caption font-caption text-secondary">유료 구독자는 투표에서 2표가 반영됩니다.</p>
+						<p className="text-caption font-caption text-secondary">
+							선택한 날짜 자정(24시)에 자동으로 마감돼요. 유료 구독자는 투표에서 2표가 반영됩니다.
+						</p>
 					</div>
 				</div>
 			</aside>

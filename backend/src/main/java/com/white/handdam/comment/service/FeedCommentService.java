@@ -56,13 +56,13 @@ public class FeedCommentService {
         List<FeedComment> all = feedCommentRepository
                 .findByFeedIdAndDeletedFalseOrderByCreatedAtAsc(feedId);
 
-        // 작성자 닉네임 한 번에 조회 (댓글마다 따로 조회하면 N+1 문제 발생)
+        // 작성자 정보 한 번에 조회 (댓글마다 따로 조회하면 N+1 문제 발생)
         Set<Long> memberIds = all.stream()
                 .map(c -> c.getMemberId())
                 .collect(Collectors.toSet());
 
-        Map<Long, String> nicknameMap = memberRepository.findAllById(memberIds).stream()
-                .collect(Collectors.toMap(m -> m.getId(), m -> m.getNickname()));
+        Map<Long, Member> memberMap = memberRepository.findAllById(memberIds).stream()
+                .collect(Collectors.toMap(Member::getId, m -> m));
 
         Map<Long, List<FeedComment>> repliesMap = all.stream()
                 .filter(c -> c.getParentCommentId() != null)
@@ -70,27 +70,29 @@ public class FeedCommentService {
 
         return all.stream()
                 .filter(c -> c.getParentCommentId() == null)
-                .map(c -> toResponse(c, repliesMap, nicknameMap))
+                .map(c -> toResponse(c, repliesMap, memberMap))
                 .toList();
     }
 
     private FeedCommentResponse toResponse(
             FeedComment c,
             Map<Long, List<FeedComment>> repliesMap,
-            Map<Long, String> nicknameMap
+            Map<Long, Member> memberMap
     )
     {
         // 이 댓글의 대댓글 꺼내기 (없으면 빈 리스트)
         List<FeedCommentResponse> replies = repliesMap
                 .getOrDefault(c.getId(), List.of())
                 .stream()
-                .map(r -> toResponse(r, Map.of(), nicknameMap))
+                .map(r -> toResponse(r, Map.of(), memberMap))
                 .toList();
 
+        Member author = memberMap.get(c.getMemberId());
         return new FeedCommentResponse(
                 c.getId(),
                 c.getMemberId(),
-                nicknameMap.getOrDefault(c.getMemberId(), "알 수 없음"),
+                author != null ? author.getNickname() : "알 수 없음",
+                author != null ? author.getProfileImageUrl() : null,
                 c.getContent(),
                 c.getDepth(),
                 c.getCreatedAt(),
