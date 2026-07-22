@@ -34,6 +34,7 @@ import { SubscribeCompletePage } from "@/pages/SubscribeCompletePage";
 import { SubscribeFeedPage } from "@/pages/SubscribeFeedPage";
 import { SubscribeSelectPage } from "@/pages/SubscribeSelectPage";
 import { AdminCreatorApplicationsPage } from "@/pages/AdminCreatorApplicationsPage";
+import { AdminCategoryPage } from "@/pages/AdminCategoryPage";
 import { AdminOnlyRoute } from "@/features/auth/AdminOnlyRoute";
 import { paths } from "./paths";
 
@@ -247,6 +248,10 @@ export const router = createBrowserRouter([
       {
         path: paths.adminCreatorApplications,
         element: <AdminCreatorApplicationsPage />,
+      },
+      {
+        path: paths.adminCategories,
+        element: <AdminCategoryPage />,
       },
     ],
   },
