@@ -124,7 +124,7 @@ export function CreatePostPage() {
 	function onList() {
 		const el = bodyRef.current;
 		if (!el) return;
-		applyFormat(el, setBody, prefixCurrentLine(el.value, el.selectionStart, "- "));
+		applyFormat(el, setBody, prefixCurrentLine(el.value, el.selectionStart, el.selectionEnd, "- "));
 	}
 	function onLink() {
 		const el = bodyRef.current;
@@ -138,7 +138,7 @@ export function CreatePostPage() {
 		{ icon: "format_bold", title: "굵게", onClick: onBold },
 		{ icon: "format_italic", title: "기울임", onClick: onItalic },
 		{ icon: "format_list_bulleted", title: "목록", onClick: onList },
-		{ icon: "image", title: "이미지·동영상 추가", onClick: () => fileInputRef.current?.click() },
+		{ icon: "image", title: "이미지·동영상·PDF 추가", onClick: () => fileInputRef.current?.click() },
 		{ icon: "link", title: "링크 추가", onClick: onLink },
 	];
 
@@ -262,6 +262,7 @@ export function CreatePostPage() {
 									type="button"
 									onClick={btn.onClick}
 									title={btn.title}
+									aria-label={btn.title}
 									className="flex h-8 w-8 items-center justify-center rounded text-secondary hover:bg-surface-container"
 								>
 									<Icon name={btn.icon} className="text-[18px]" />
@@ -281,7 +282,7 @@ export function CreatePostPage() {
 							value={body}
 							onChange={(e) => setBody(e.target.value)}
 							rows={10}
-							placeholder="작업 과정을 자유롭게 기록해보세요. 툴바의 이미지 아이콘으로 사진·동영상을 첨부할 수 있어요."
+							placeholder="작업 과정을 자유롭게 기록해보세요. 툴바의 이미지 아이콘으로 사진·동영상·PDF 파일을 첨부할 수 있어요."
 							className={cn(
 								"w-full border-0 bg-transparent p-4 text-body-md focus:outline-none focus:ring-0",
 								attachments.length === 0 && "rounded-b-lg",
