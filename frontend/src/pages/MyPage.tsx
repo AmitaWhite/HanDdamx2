@@ -19,7 +19,7 @@ export function MyPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [application, setApplication] = useState<CreatorApplication | null>(null);
   const [applicationLoading, setApplicationLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -46,6 +46,8 @@ export function MyPage() {
 		let ignore = false;
 
 		const fetchSummary = async () => {
+			setLoading(true);
+			setError(false);
 			try {
 				const data = await getMySummary();
 
@@ -86,7 +88,9 @@ export function MyPage() {
         setApplication(data);
         // 신청은 승인됐는데 토큰의 role이 아직 USER면, 토큰을 갱신해 role 동기화
         if (data?.status === "APPROVED") {
-          refreshAccessToken().catch(() => {});
+          refreshAccessToken().catch(() => {
+            if (!ignore) logout();
+          });
         }
       })
       .catch(() => {
