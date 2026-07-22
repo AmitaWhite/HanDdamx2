@@ -67,7 +67,11 @@ export function DashboardProjectPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!numericId) return;
+    if (!numericId) {
+      setError("잘못된 프로젝트입니다.");
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -87,17 +91,19 @@ export function DashboardProjectPage() {
       cancelled = true;
     };
   }, [numericId]);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const handleLoadMore = async () => {
     if (!feedSlice || !feedSlice.hasNext) return;
     setLoadingMore(true);
+    setLoadMoreError(null);
     try {
       const next = await getProjectFeeds(numericId, feedSlice.page + 1, feedSlice.size);
       setFeedSlice((prev) =>
         prev ? { ...next, content: [...prev.content, ...next.content] } : next,
       );
-    } catch {
-      // 무시
+    } catch (e) {
+      setLoadMoreError(e instanceof Error ? e.message : "게시물을 더 불러오지 못했습니다.");
     } finally {
       setLoadingMore(false);
     }
@@ -268,7 +274,11 @@ export function DashboardProjectPage() {
               type="file"
               accept="image/*"
               className="mb-4 w-full text-body-sm text-on-surface"
-              onChange={(e) => setEditCoverImage(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setEditCoverImage(file);
+                if (file) setRemoveCover(false);
+              }}
             />
             {editError && <p className="mb-3 text-body-sm text-error">{editError}</p>}
             <div className="flex gap-2">

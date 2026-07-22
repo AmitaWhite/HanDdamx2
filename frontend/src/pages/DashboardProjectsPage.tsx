@@ -16,6 +16,7 @@ export function DashboardProjectsPage() {
 
   const [showModal, setShowModal] = useState(false);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
+  const [categoryError, setCategoryError] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
@@ -48,7 +49,13 @@ export function DashboardProjectsPage() {
     setCategoryId("");
     setCoverImage(null);
     setCreateError(null);
-    getCategories().then(setCategories).catch(() => setCategories([]));
+    setCategoryError(false);
+    getCategories()
+      .then(setCategories)
+      .catch(() => {
+        setCategories([]);
+        setCategoryError(true);
+      });
     setShowModal(true);
   };
 
@@ -134,16 +141,32 @@ export function DashboardProjectsPage() {
               onChange={(e) => setTitle(e.target.value)}
               className="mb-3 w-full rounded-lg border border-outline-variant bg-surface-container-low p-3 text-body-md text-on-surface placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
-              className="mb-3 w-full rounded-lg border border-outline-variant bg-surface-container-low p-3 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
-            >
-              <option value="">카테고리 선택 (필수)</option>
-              {categories.map((c) => (
-                <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
-              ))}
-            </select>
+            {categoryError ? (
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-error/30 bg-error/5 p-3">
+                <p className="text-body-sm text-error">카테고리를 불러오지 못했습니다.</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setCategoryError(false);
+                    getCategories().then(setCategories).catch(() => setCategoryError(true));
+                  }}
+                >
+                  재시도
+                </Button>
+              </div>
+            ) : (
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
+                className="mb-3 w-full rounded-lg border border-outline-variant bg-surface-container-low p-3 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <option value="">카테고리 선택 (필수)</option>
+                {categories.map((c) => (
+                  <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
+                ))}
+              </select>
+            )}
             <textarea
               placeholder="프로젝트 설명 (선택)"
               value={description}
@@ -167,7 +190,7 @@ export function DashboardProjectsPage() {
               >
                 {creating ? "생성 중..." : "만들기"}
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => setShowModal(false)}>
+              <Button variant="secondary" size="sm" onClick={() => setShowModal(false)} disabled={creating}>
                 취소
               </Button>
             </div>
