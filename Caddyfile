@@ -39,6 +39,12 @@
 	handle /actuator/* {
 		reverse_proxy backend:8080
 	}
+	# LocalStack에 저장된 이미지/파일을 브라우저가 직접 열 수 있게 공개.
+	# handle_path 는 매칭된 /storage 접두사를 벗겨내고 넘기므로, LocalStack이
+	# 기대하는 path-style 형태(/{bucket}/{key})와 정확히 맞아떨어진다.
+	handle_path /storage/* {
+		reverse_proxy localstack:4566
+	}
 
 	# 나머지 모든 경로 → 프론트엔드 정적 서버
 	handle {
