@@ -9,6 +9,7 @@ import type { CategoryResponse } from "@/features/category/types";
 import { getExploreFeeds } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
+import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
 import { mockImg } from "@/mocks/helpers";
 
 export function HomePage() {
@@ -19,6 +20,9 @@ export function HomePage() {
 	const [feeds, setFeeds] = useState<FeedSummaryResponse[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [page, setPage] = useState(0);
+	const [hasNext, setHasNext] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
 
 	useEffect(() => {
 		getActiveCategories()
@@ -32,12 +36,34 @@ export function HomePage() {
 		setLoading(true);
 		setError(null);
 		getExploreFeeds(activeCategoryId)
-			.then((res) => setFeeds(res.content))
+			.then((res) => {
+				setFeeds(res.content);
+				setHasNext(res.hasNext);
+				setPage(0);
+			})
 			.catch((err) => {
 				setError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
 			})
 			.finally(() => setLoading(false));
 	}, [activeCategoryId]);
+
+	async function loadMore() {
+		if (loadingMore || !hasNext) return;
+		setLoadingMore(true);
+		try {
+			const nextPage = page + 1;
+			const res = await getExploreFeeds(activeCategoryId, nextPage);
+			setFeeds((prev) => [...prev, ...res.content]);
+			setHasNext(res.hasNext);
+			setPage(nextPage);
+		} catch (err) {
+			setError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
+		} finally {
+			setLoadingMore(false);
+		}
+	}
+
+	const sentinelRef = useInfiniteScroll(loadMore, hasNext);
 
 	const sorted = [...feeds].sort((a, b) =>
 		sort === "popular"
@@ -121,6 +147,13 @@ export function HomePage() {
 			{loading && <p className="py-8 text-center text-body-md text-secondary">불러오는 중…</p>}
 			{!loading && !error && sorted.length === 0 && (
 				<p className="py-8 text-center text-body-md text-secondary">게시물이 없어요.</p>
+			)}
+			{hasNext && <div ref={sentinelRef} className="h-1" />}
+			{loadingMore && (
+				<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
+			)}
+			{!loading && !hasNext && sorted.length > 0 && (
+				<p className="py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>
 			)}
 		</div>
 	);

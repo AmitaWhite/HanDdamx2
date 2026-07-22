@@ -18,6 +18,7 @@ import { getProjectFeeds } from "@/features/project/projectApi";
 import { useSubscription } from "@/features/subscription/SubscriptionContext";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
 import { type MockQnaPost, type QnaCategory } from "@/mocks/qna";
 
 const PROJECT_SCROLL_STEP = 220;
@@ -74,6 +75,9 @@ export function CreatorPage() {
   const [posts, setPosts] = useState<FeedSummaryResponse[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
+  const [postsPage, setPostsPage] = useState(0);
+  const [postsHasNext, setPostsHasNext] = useState(false);
+  const [postsLoadingMore, setPostsLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!numericCreatorId) return;
@@ -157,6 +161,8 @@ export function CreatorPage() {
       .then((res) => {
         if (cancelled) return;
         setPosts(res.content);
+        setPostsHasNext(res.hasNext);
+        setPostsPage(0);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -171,6 +177,27 @@ export function CreatorPage() {
       cancelled = true;
     };
   }, [numericCreatorId, selectedProjectId]);
+
+  async function loadMorePosts() {
+    if (postsLoadingMore || !postsHasNext || numericCreatorId === null) return;
+    setPostsLoadingMore(true);
+    try {
+      const nextPage = postsPage + 1;
+      const res =
+        selectedProjectId != null
+          ? await getProjectFeeds(selectedProjectId, nextPage)
+          : await getCreatorFeeds(numericCreatorId, nextPage);
+      setPosts((prev) => [...prev, ...res.content]);
+      setPostsHasNext(res.hasNext);
+      setPostsPage(nextPage);
+    } catch (err) {
+      setPostsError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
+    } finally {
+      setPostsLoadingMore(false);
+    }
+  }
+
+  const postsSentinelRef = useInfiniteScroll(loadMorePosts, postsHasNext);
 
   if (creatorLoading) {
     return <div className="flex min-h-[60vh] items-center justify-center text-secondary">불러오는 중...</div>;
@@ -226,6 +253,13 @@ export function CreatorPage() {
       )}
       {!postsError && !postsLoading && posts.length === 0 && (
         <p className="col-span-full py-8 text-center text-body-md text-secondary">아직 게시물이 없어요.</p>
+      )}
+      {postsHasNext && <div ref={postsSentinelRef} className="col-span-full h-1" />}
+      {postsLoadingMore && (
+        <p className="col-span-full py-4 text-center text-body-md text-secondary">불러오는 중…</p>
+      )}
+      {!postsError && !postsLoading && !postsHasNext && posts.length > 0 && (
+        <p className="col-span-full py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>
       )}
     </div>
   );

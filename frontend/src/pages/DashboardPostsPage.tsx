@@ -32,6 +32,9 @@ export function DashboardPostsPage() {
 	const [comments, setComments] = useState<MyFeedCommentResponse[]>([]);
 	const [commentsLoading, setCommentsLoading] = useState(!!user);
 	const [commentsError, setCommentsError] = useState<string | null>(null);
+	const [commentsPage, setCommentsPage] = useState(0);
+	const [commentsHasNext, setCommentsHasNext] = useState(false);
+	const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
 
 	useEffect(() => {
 		if (!isCreator) return;
@@ -55,13 +58,33 @@ export function DashboardPostsPage() {
 		if (!user) return;
 		setCommentsLoading(true);
 		setCommentsError(null);
-		getMyFeedComments()
-			.then((res) => setComments(res.content))
+		getMyFeedComments(0)
+			.then((res) => {
+				setComments(res.content);
+				setCommentsHasNext(res.hasNext);
+				setCommentsPage(0);
+			})
 			.catch((err) => {
 				setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
 			})
 			.finally(() => setCommentsLoading(false));
 	}, [user]);
+
+	async function loadMoreComments() {
+		if (commentsLoadingMore || !commentsHasNext) return;
+		setCommentsLoadingMore(true);
+		try {
+			const nextPage = commentsPage + 1;
+			const res = await getMyFeedComments(nextPage);
+			setComments((prev) => [...prev, ...res.content]);
+			setCommentsHasNext(res.hasNext);
+			setCommentsPage(nextPage);
+		} catch (err) {
+			setCommentsError(err instanceof ApiError ? err.message : "댓글을 불러오지 못했습니다.");
+		} finally {
+			setCommentsLoadingMore(false);
+		}
+	}
 
 	async function loadMoreFeeds() {
 		if (feedsLoadingMore || !feedsHasNext) return;
@@ -105,6 +128,7 @@ export function DashboardPostsPage() {
 	);
 
 	const feedsSentinelRef = useInfiniteScroll(loadMoreFeeds, feedsHasNext);
+	const commentsSentinelRef = useInfiniteScroll(loadMoreComments, commentsHasNext);
 
 	return (
 		<MyPageShell>
@@ -197,6 +221,9 @@ export function DashboardPostsPage() {
 							{feedsLoadingMore && (
 								<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
 							)}
+							{!feedsLoading && !feedsHasNext && sorted.length > 0 && (
+								<p className="py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>
+							)}
 						</>
 					) : (
 						<div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant py-12 text-center">
@@ -227,6 +254,10 @@ export function DashboardPostsPage() {
 						)}
 						{!commentsLoading && !commentsError && comments.length === 0 && (
 							<p className="text-body-md text-secondary">아직 댓글이 없어요.</p>
+						)}
+						{commentsHasNext && <div ref={commentsSentinelRef} className="h-1" />}
+						{commentsLoadingMore && (
+							<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
 						)}
 					</div>
 				</section>

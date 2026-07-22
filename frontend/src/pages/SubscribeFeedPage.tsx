@@ -127,6 +127,9 @@ export function SubscribeFeedPage() {
 				{loadingMore && (
 					<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
 				)}
+				{!loading && !hasNext && feeds.length > 0 && (
+					<p className="py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>
+				)}
 			</div>
 
 			<aside className="hidden lg:block">
