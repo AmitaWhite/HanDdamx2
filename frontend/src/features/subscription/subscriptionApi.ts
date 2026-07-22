@@ -39,6 +39,34 @@ export interface SubscriptionPlanResponse {
 	benefitsDescription: string | null;
 }
 
+/** Backend MySubscriptionResponse */
+export interface MySubscriptionResponse {
+	subscriptionId: number;
+	creatorId: number;
+	creatorNickname: string;
+	creatorProfileImageUrl: string | null;
+	subscriptionLevel: SubscriptionLevel;
+	status: SubscriptionStatus;
+	startedAt: string;
+	currentPeriodEndAt: string | null;
+	cancelScheduledAt: string | null;
+}
+
+/** Backend SubscriptionDetailResponse */
+export interface SubscriptionDetailResponse {
+	subscriptionId: number;
+	creatorId: number;
+	creatorNickname: string;
+	creatorProfileImageUrl: string | null;
+	subscriptionLevel: SubscriptionLevel;
+	status: SubscriptionStatus;
+	subscriptionPriceSnapshot: number | null;
+	startedAt: string;
+	currentPeriodStartAt: string | null;
+	currentPeriodEndAt: string | null;
+	cancelScheduledAt: string | null;
+}
+
 /**
  * 구독 상태 조회.
  * 백엔드: GET /api/creators/{creatorId}/subscription-status
@@ -58,6 +86,38 @@ export function getSubscriptionPlans(
 ): Promise<SubscriptionPlanResponse[]> {
 	return unwrap<SubscriptionPlanResponse[]>(
 		http.get(`/creators/${creatorId}/subscription-plans`),
+	);
+}
+
+/** Backend: GET /api/subscriptions/me */
+export function getMySubscriptions(): Promise<MySubscriptionResponse[]> {
+	return unwrap<MySubscriptionResponse[]>(http.get("/subscriptions/me"));
+}
+
+/** Backend: GET /api/subscriptions/{subscriptionId} */
+export function getSubscription(
+	subscriptionId: number,
+): Promise<SubscriptionDetailResponse> {
+	return unwrap<SubscriptionDetailResponse>(
+		http.get(`/subscriptions/${subscriptionId}`),
+	);
+}
+
+/** Backend: PATCH /api/subscriptions/{subscriptionId}/cancel-schedule */
+export function scheduleSubscriptionCancellation(
+	subscriptionId: number,
+): Promise<SubscriptionDetailResponse> {
+	return unwrap<SubscriptionDetailResponse>(
+		http.patch(`/subscriptions/${subscriptionId}/cancel-schedule`),
+	);
+}
+
+/** Backend: DELETE /api/subscriptions/{subscriptionId}/cancel-schedule */
+export function revokeSubscriptionCancellation(
+	subscriptionId: number,
+): Promise<SubscriptionDetailResponse> {
+	return unwrap<SubscriptionDetailResponse>(
+		http.delete(`/subscriptions/${subscriptionId}/cancel-schedule`),
 	);
 }
 

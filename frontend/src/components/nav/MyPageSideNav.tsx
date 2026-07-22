@@ -10,7 +10,6 @@ const BASE_NAV_ITEMS = [
 ] as const;
 
 const COMING_SOON_ITEMS = [
-  { label: "구독 내역", icon: "subscriptions" },
   { label: "결제 내역", icon: "payments" },
 ] as const;
 
@@ -26,6 +25,7 @@ export function MyPageSideNav({ onCreatorApply }: MyPageSideNavProps) {
 
   const navItems = [
     ...BASE_NAV_ITEMS,
+    { label: "구독 내역", icon: "subscriptions", to: paths.mySubscriptions },
     ...(isCreator ? [{ label: "프로젝트 관리", icon: "explore", to: paths.dashboardProjects }] : []),
     { label: "게시물 관리", icon: "article", to: paths.dashboardPosts },
     { label: "Q&A 활동 내역", icon: "forum", to: paths.myQna },
