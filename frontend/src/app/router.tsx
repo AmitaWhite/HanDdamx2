@@ -219,9 +219,7 @@ export const router = createBrowserRouter([
 				path: paths.dashboardProject(),
 				element: (
 					<AuthOnlyRoute>
-						<CreatorOnlyRoute>
-							<DashboardProjectPage />
-						</CreatorOnlyRoute>
+            <DashboardProjectPage />
 					</AuthOnlyRoute>
 				),
 			},
