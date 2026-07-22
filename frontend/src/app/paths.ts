@@ -41,5 +41,7 @@ export const paths = {
 		`/dashboard/projects/${id}`,
 	dashboardPosts: "/dashboard/posts",
 	dashboardPostNew: "/dashboard/posts/new",
+	dashboardPostEdit: (id: string | number = ":feedId") =>
+		`/dashboard/posts/${id}/edit`,
   adminCreatorApplications: "/admin/creator-applications",
 } as const;

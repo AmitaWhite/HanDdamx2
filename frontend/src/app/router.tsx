@@ -10,6 +10,7 @@ import { CreatorPage } from "@/pages/CreatorPage";
 import { DashboardPostsPage } from "@/pages/DashboardPostsPage";
 import { DashboardProjectPage } from "@/pages/DashboardProjectPage";
 import { DashboardProjectsPage } from "@/pages/DashboardProjectsPage";
+import { EditPostPage } from "@/pages/EditPostPage";
 import { EmailVerifyPage } from "@/pages/EmailVerifyPage";
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { HomePage } from "@/pages/HomePage";
@@ -219,6 +220,16 @@ export const router = createBrowserRouter([
 					<AuthOnlyRoute>
 						<CreatorOnlyRoute>
 							<CreatePostPage />
+						</CreatorOnlyRoute>
+					</AuthOnlyRoute>
+				),
+			},
+			{
+				path: paths.dashboardPostEdit(),
+				element: (
+					<AuthOnlyRoute>
+						<CreatorOnlyRoute>
+							<EditPostPage />
 						</CreatorOnlyRoute>
 					</AuthOnlyRoute>
 				),
