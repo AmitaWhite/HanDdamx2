@@ -17,10 +17,26 @@ export const http = axios.create({
 
 const ACCESS_TOKEN_KEY = "handdam.accessToken";
 
+type TokenListener = (token: string | null) => void;
+const tokenListeners = new Set<TokenListener>();
+
 export const tokenStore = {
 	get: () => localStorage.getItem(ACCESS_TOKEN_KEY),
-	set: (t: string) => localStorage.setItem(ACCESS_TOKEN_KEY, t),
-	clear: () => localStorage.removeItem(ACCESS_TOKEN_KEY),
+	set: (t: string) => {
+		localStorage.setItem(ACCESS_TOKEN_KEY, t);
+		tokenListeners.forEach((listener) => listener(t));
+	},
+	clear: () => {
+		localStorage.removeItem(ACCESS_TOKEN_KEY);
+		tokenListeners.forEach((listener) => listener(null));
+	},
+	//토큰이 바뀔 때마다 알림(로그인/로그아웃 + 401 인터셉터의 백그라운드 재발급 포함)
+	subscribe: (listener: TokenListener) => {
+		tokenListeners.add(listener);
+		return () => {
+			tokenListeners.delete(listener);
+		};
+	},
 };
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };

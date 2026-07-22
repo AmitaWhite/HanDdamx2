@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useAuth } from "@/features/auth/AuthContext";
 import { updateMyProfile } from "@/features/member/memberApi";
 import type { MemberProfileResponse } from "@/features/member/types";
 import { asApiError } from "@/lib/api";
@@ -12,6 +13,7 @@ interface NicknameFormProps {
 }
 
 export function NicknameForm({ initialNickname, onProfileUpdated }: NicknameFormProps) {
+	const { updateUser } = useAuth();
 	const [nickname, setNickname] = useState(initialNickname);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export function NicknameForm({ initialNickname, onProfileUpdated }: NicknameForm
 			setNickname(updated.nickname);
 			setError(null);
 			onProfileUpdated(updated);
+			updateUser({ nickname: updated.nickname });
 			setSaved(true);
 		} catch (err) {
 			const apiErr = asApiError(err);
