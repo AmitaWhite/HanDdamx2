@@ -6,7 +6,8 @@ import type { CategoryResponse } from "./types";
  * 백엔드: GET /api/categories
  */
 export function getActiveCategories() {
-	return unwrap<CategoryResponse[]>(http.get("/categories"));
+  return unwrap<CategoryResponse[]>(http.get("/categories"));
+}
 
 export interface CategorySummary {
   categoryId: number;
