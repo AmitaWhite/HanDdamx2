@@ -19,6 +19,9 @@ import com.white.handdam.feed.entity.Visibility;
 import com.white.handdam.feed.exception.FeedErrorCode;
 import com.white.handdam.feed.repository.FeedAttachmentRepository;
 import com.white.handdam.feed.repository.FeedRepository;
+import com.white.handdam.like.repository.FeedLikeRepository;
+import com.white.handdam.poll.entity.Poll;
+import com.white.handdam.poll.repository.PollRepository;
 import com.white.handdam.global.exception.CustomException;
 import com.white.handdam.member.entity.Member;
 import com.white.handdam.member.repository.MemberRepository;
@@ -50,6 +53,8 @@ public class FeedService {
     private final ObjectStorage objectStorage;
     private final MemberRepository memberRepository;
     private final CategoryRepository categoryRepository;
+    private final PollRepository pollRepository;
+    private final FeedLikeRepository feedLikeRepository;
 
     // [LYJ-001] 피드 작성
     @Transactional
@@ -79,9 +84,11 @@ public class FeedService {
         String level = (memberId != null && !isOwner)
                 ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
                 : null;
+        Long pollId = pollRepository.findByFeedId(feedId).map(Poll::getId).orElse(null);
+        boolean liked = memberId != null && feedLikeRepository.existsByFeedIdAndMemberId(feedId, memberId);
         return canAccess(feed.getVisibility(), level, isOwner)
-            ? FeedDetailResponse.visible(feed, creator, category)
-            : FeedDetailResponse.locked(feed, creator, category);
+            ? FeedDetailResponse.visible(feed, creator, category, pollId, liked)
+            : FeedDetailResponse.locked(feed, creator, category, pollId, liked);
     }
 
     // [LYJ-030] 피드 공개범위
