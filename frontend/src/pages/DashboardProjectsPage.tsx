@@ -49,7 +49,9 @@ export function DashboardProjectsPage() {
     setCategoryId("");
     setCoverImage(null);
     setCreateError(null);
-    getCategories().then(setCategories).catch(() => setCategories([]));
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCreateError("카테고리 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."));
     setShowModal(true);
   };
 
@@ -167,7 +169,7 @@ export function DashboardProjectsPage() {
               >
                 {creating ? "생성 중..." : "만들기"}
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => setShowModal(false)}>
+              <Button variant="secondary" size="sm" onClick={() => setShowModal(false)} disabled={creating}>
                 취소
               </Button>
             </div>

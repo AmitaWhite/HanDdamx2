@@ -1,4 +1,4 @@
-import { http, unwrap } from "@/lib/api";
+import { http, unwrap, unwrapVoid } from "@/lib/api";
 import type { CreatorProfile, ProjectSummary } from "./types";
 
 /** GET /api/creators/{creatorId} — 크리에이터 공개 프로필 조회 */
@@ -55,5 +55,5 @@ export function updateProject(
 
 /** DELETE /api/projects/{projectId} — 빈 프로젝트 삭제 */
 export function deleteProject(projectId: number): Promise<void> {
-  return unwrap(http.delete(`/projects/${projectId}`));
+  return unwrapVoid(http.delete(`/projects/${projectId}`));
 }
