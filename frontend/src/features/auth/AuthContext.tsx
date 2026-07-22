@@ -49,8 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				if (!token) return null;
 				const next = userFromToken(token);
 				if (!next) return null;
-				// 새 토큰엔 닉네임이 없으니 기존 값을 유지
-				return prev ? { ...next, nickname: prev.nickname } : next;
+				// 새 토큰엔 닉네임/프로필 이미지가 없으니 기존 값을 유지 — 단, 동일 회원일 때만
+				if (prev && prev.memberId === next.memberId) {
+					return { ...next, nickname: prev.nickname, profileImageUrl: prev.profileImageUrl };
+				}
+				return next;
 			});
 		});
 	}, []);
