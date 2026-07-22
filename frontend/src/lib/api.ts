@@ -10,6 +10,25 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 /** 백엔드 origin (OAuth 풀페이지 리다이렉트 등 /api 밖 경로용). 예: http://localhost:8080 */
 export const backendOrigin = apiBaseUrl.replace(/\/api\/?$/, "");
 
+/**
+ * SockJS STOMP 접속 URL (HTTP/HTTPS — ws:// 아님).
+ * 1) VITE_WS_BASE_URL 이 있으면 사용 (ws:// → http:// 정규화)
+ * 2) backendOrigin 이 있으면 {origin}/ws
+ * 3) 없으면 /ws (Vite dev proxy)
+ */
+function resolveWsBaseUrl(): string {
+	const configured = import.meta.env.VITE_WS_BASE_URL;
+	if (configured) {
+		return configured
+			.replace(/^ws(s?):\/\//, "http$1://")
+			.replace(/\/$/, "");
+	}
+	if (backendOrigin) return `${backendOrigin}/ws`;
+	return "/ws";
+}
+
+export const wsBaseUrl = resolveWsBaseUrl();
+
 export const http = axios.create({
 	baseURL: apiBaseUrl,
 	withCredentials: true,

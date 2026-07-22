@@ -103,6 +103,7 @@ jobs:
         env:
           # 백엔드와 같은 도메인 + /api. Caddy가 /api·/ws 를 백엔드로 라우팅한다.
           VITE_API_BASE_URL: ${{ vars.SITE_DOMAIN != '' && format('https://{0}/api', vars.SITE_DOMAIN) || '/api' }}
+          VITE_WS_BASE_URL: ${{ vars.SITE_DOMAIN != '' && format('https://{0}/ws', vars.SITE_DOMAIN) || '' }}
         run: bun run build
 
       - name: Set up QEMU (arm64 emulation)

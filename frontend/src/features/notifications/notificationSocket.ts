@@ -1,6 +1,6 @@
 import { Client, type IMessage } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import { backendOrigin } from "@/lib/api";
+import { wsBaseUrl } from "@/lib/api";
 import type { NotificationResponse } from "./notificationsApi";
 
 /**
@@ -16,7 +16,7 @@ export function connectNotificationSocket(
 	const client = new Client({
 		webSocketFactory: () =>
 			new SockJS(
-				`${backendOrigin}/ws?access_token=${encodeURIComponent(accessToken)}`,
+				`${wsBaseUrl}?access_token=${encodeURIComponent(accessToken)}`,
 			),
 		reconnectDelay: 5000,
 		onConnect: () => {

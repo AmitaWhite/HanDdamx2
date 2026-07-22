@@ -1,6 +1,6 @@
 import { Client, type IMessage } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import { backendOrigin } from "@/lib/api";
+import { wsBaseUrl } from "@/lib/api";
 import type { ChatMessageResponse } from "./chatApi";
 
 /** 백엔드 ChatWebSocketErrorResponse */
@@ -17,7 +17,7 @@ export interface ChatSocketHandle {
 /**
  * 채팅방 STOMP WebSocket.
  *
- * - 연결: GET SockJS `${backendOrigin}/ws?access_token=...`
+ * - 연결: GET SockJS `${wsBaseUrl}?access_token=...`
  * - 구독: `/sub/chat-rooms/{chatRoomId}` (수신)
  * - 송신: `/pub/chat-rooms/{chatRoomId}/messages` (TEXT)
  * - 에러: `/user/queue/errors`
@@ -34,7 +34,7 @@ export function connectChatSocket(options: {
 	const client = new Client({
 		webSocketFactory: () =>
 			new SockJS(
-				`${backendOrigin}/ws?access_token=${encodeURIComponent(accessToken)}`,
+				`${wsBaseUrl}?access_token=${encodeURIComponent(accessToken)}`,
 			),
 		reconnectDelay: 5000,
 		connectHeaders: {
