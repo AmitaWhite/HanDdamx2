@@ -95,12 +95,12 @@ public class ProjectController {
      * 권한: 전체 (구독 등급에 따라 공개범위 적용)
      */
     @GetMapping("/{projectId}/feeds")
-    public SliceResponse<FeedSummaryResponse> getProjectFeeds(
+    public ApiResponse<SliceResponse<FeedSummaryResponse>> getProjectFeeds(
             @PathVariable Long projectId,
             @AuthenticationPrincipal AuthMember member,
             Pageable pageable
     ) {
         Long requesterId = member != null ? member.id() : null;
-        return SliceResponse.from(projectService.getProjectFeeds(projectId, requesterId, pageable));
+        return ApiResponse.success(SliceResponse.from(projectService.getProjectFeeds(projectId, requesterId, pageable)));
     }
 }

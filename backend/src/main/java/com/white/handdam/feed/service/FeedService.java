@@ -300,6 +300,25 @@ public class FeedService {
         attachment.softDelete();
     }
 
+    // 피드 첨부파일 목록 조회 — 공개범위 접근 규칙은 피드 상세 조회와 동일하게 적용
+    public List<AttachmentResponse> getAttachments(Long feedId, Long memberId) {
+        Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)
+            .orElseThrow(() -> new CustomException(FeedErrorCode.FEED_NOT_FOUND));
+        Project project = projectRepository.findByIdAndDeletedFalse(feed.getProjectId())
+            .orElseThrow(() -> new CustomException(ProjectErrorCode.PROJECT_NOT_FOUND));
+
+        boolean isOwner = memberId != null && project.getCreatorId().equals(memberId);
+        String level = (!isOwner && memberId != null)
+            ? subscriptionLevelChecker.getLevel(memberId, project.getCreatorId())
+            : null;
+        validateAccess(feed.getVisibility(), level, isOwner);
+
+        return feedAttachmentRepository.findByFeedIdAndDeletedFalseOrderByOrderIndex(feedId)
+            .stream()
+            .map(AttachmentResponse::from)
+            .toList();
+    }
+
     // [LYJ-014] 첨부파일 다운로드 URL 조회
     public DownloadResponse getDownloadUrl(Long feedId, Long attachmentId, Long memberId) {
         Feed feed = feedRepository.findByIdAndDeletedFalse(feedId)

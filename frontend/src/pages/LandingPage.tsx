@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Footer } from "@/components/nav/Footer";
@@ -9,19 +10,29 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { useAuth } from "@/features/auth/AuthContext";
+import { getPublicFeeds } from "@/features/feed/feedApi";
+import type { FeedSummaryResponse } from "@/features/feed/types";
 // 실험(lab): 히어로 물방울 글래스모피즘. 실험 종료 시 이 import 와 아래 사용처를 원복.
 import { WaterHero } from "@/lab/WaterHero";
-import { findCreator, mockCreators } from "@/mocks/creators";
+import { mockCreators } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
-import { mockPosts } from "@/mocks/posts";
 
 const featuredCreators = mockCreators.filter((c) =>
 	["seoyeon", "doyoon", "minjae", "jiwoo"].includes(c.id),
 );
-const recentRecords = mockPosts.slice(0, 6);
 
 export function LandingPage() {
 	const { isAuthenticated } = useAuth();
+
+	const [recentRecords, setRecentRecords] = useState<FeedSummaryResponse[]>([]);
+
+	useEffect(() => {
+		getPublicFeeds()
+			.then((res) => setRecentRecords(res.content.slice(0, 6)))
+			.catch(() => {
+				// 랜딩 페이지 미리보기는 부가 기능 — 실패해도 섹션만 비우고 나머지는 그대로 노출
+			});
+	}, []);
 
 	return (
 		<>
@@ -116,39 +127,35 @@ export function LandingPage() {
 					최근 업로드된 작업 기록
 				</h2>
 				<div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-3">
-					{recentRecords.map((post) => {
-						const author = findCreator(post.creatorId);
-						return (
-							<PostCard
-								key={post.id}
-								href={paths.postDetail(post.id)}
-								imageSeed={post.imageSeed}
-								imageAlt={post.title}
-								overlay={
-									post.isPaid && (
-										<Chip active size="sm" className="absolute right-4 top-4">
-											유료
-										</Chip>
-									)
-								}
-							>
-								<div className="p-6">
-									<div className="mb-4 flex items-center gap-3">
-										<Avatar src={mockImg(author.avatarSeed, 80, 80)} size={32} />
-										<span className="text-label-md font-label-md text-on-surface">
-											{author.name}
-										</span>
-									</div>
-									<h4 className="mb-2 text-headline-md font-display text-on-surface">
-										{post.title}
-									</h4>
-									<span className="text-caption font-caption text-secondary">
-										#{post.category}
+					{recentRecords.map((post) => (
+						<PostCard
+							key={post.id}
+							href={paths.postDetail(post.id)}
+							imageSeed={`feed-${post.id}`}
+							imageAlt={post.title}
+						>
+							<div className="p-6">
+								<div className="mb-4 flex items-center gap-3">
+									<Avatar
+										src={
+											post.creator.profileImageUrl ??
+											mockImg(`creator-${post.creator.creatorId}`, 80, 80)
+										}
+										size={32}
+									/>
+									<span className="text-label-md font-label-md text-on-surface">
+										{post.creator.nickname}
 									</span>
 								</div>
-							</PostCard>
-						);
-					})}
+								<h4 className="mb-2 text-headline-md font-display text-on-surface">
+									{post.title}
+								</h4>
+								<span className="text-caption font-caption text-secondary">
+									#{post.category.name}
+								</span>
+							</div>
+						</PostCard>
+					))}
 				</div>
 			</section>
 

@@ -45,8 +45,12 @@ export function EditPostPage() {
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	useEffect(() => {
+		let cancelled = false;
+		setLoading(true);
+		setLoadError(null);
 		Promise.all([getFeed(feedId), getMyProjects()])
 			.then(([feed, projectList]) => {
+				if (cancelled) return;
 				setTitle(feed.title);
 				setContent(feed.content ?? "");
 				setVisibility(feed.visibility);
@@ -55,9 +59,15 @@ export function EditPostPage() {
 				setCurrentProjectId(feed.projectId);
 			})
 			.catch((err) => {
+				if (cancelled) return;
 				setLoadError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
 			})
-			.finally(() => setLoading(false));
+			.finally(() => {
+				if (!cancelled) setLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
 	}, [feedId]);
 
 	async function onSubmit(e: FormEvent) {

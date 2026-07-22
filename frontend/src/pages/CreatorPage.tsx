@@ -11,21 +11,16 @@ import { LinkButton } from "@/components/ui/LinkButton";
 import { type BoardPostType, getPremiumBoardPosts } from "@/features/board/boardApi";
 import { getCreatorProfile, getCreatorProjects } from "@/features/creator/creatorApi";
 import type { CreatorProfile, ProjectSummary } from "@/features/creator/types";
+import { getCreatorFeeds } from "@/features/feed/feedApi";
+import type { FeedSummaryResponse } from "@/features/feed/types";
+import { getProjectFeeds } from "@/features/project/projectApi";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
 import { type MockQnaPost, type QnaCategory } from "@/mocks/qna";
 
 const PROJECT_SCROLL_STEP = 220;
 const QNA_PREVIEW_SIZE = 5;
-
-/** 피드 API 연동 전까지의 임시 게시물 카드 형태. 실제 API 응답 타입으로 교체 예정. */
-interface PlaceholderPost {
-  id: number;
-  imageSeed: string;
-  title: string;
-  likeCount: number;
-  commentCount: number;
-}
 
 const TYPE_TO_CATEGORY: Record<BoardPostType, QnaCategory> = {
   QUESTION: "제작 질문",
@@ -70,6 +65,14 @@ export function CreatorPage() {
   const [remoteQna, setRemoteQna] = useState<MockQnaPost[]>([]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaError, setQnaError] = useState<string | null>(null);
+
+  const [posts, setPosts] = useState<FeedSummaryResponse[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [postsError, setPostsError] = useState<string | null>(null);
+  const [postsPage, setPostsPage] = useState(0);
+  const [postsHasNext, setPostsHasNext] = useState(false);
+  const [postsLoadingMore, setPostsLoadingMore] = useState(false);
+  const postsLoadMoreInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!numericCreatorId) return;
@@ -136,15 +139,69 @@ export function CreatorPage() {
     };
   }, [numericCreatorId]);
 
+  // 프로젝트를 선택하지 않았으면 크리에이터 전체 피드(LYJ-009), 선택했으면 그 프로젝트의 피드만(LYJ-011)
+  useEffect(() => {
+    if (numericCreatorId === null) return;
+
+    let cancelled = false;
+    setPostsLoading(true);
+    setPostsError(null);
+
+    const request =
+      selectedProjectId != null
+        ? getProjectFeeds(selectedProjectId)
+        : getCreatorFeeds(numericCreatorId);
+
+    request
+      .then((res) => {
+        if (cancelled) return;
+        setPosts(res.content);
+        setPostsHasNext(res.hasNext);
+        setPostsPage(0);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPosts([]);
+        setPostsError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setPostsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericCreatorId, selectedProjectId]);
+
+  async function loadMorePosts() {
+    if (postsLoadMoreInFlightRef.current || !postsHasNext || numericCreatorId === null) return;
+    postsLoadMoreInFlightRef.current = true;
+    setPostsLoadingMore(true);
+    try {
+      const nextPage = postsPage + 1;
+      const res =
+        selectedProjectId != null
+          ? await getProjectFeeds(selectedProjectId, nextPage)
+          : await getCreatorFeeds(numericCreatorId, nextPage);
+      setPosts((prev) => [...prev, ...res.content]);
+      setPostsHasNext(res.hasNext);
+      setPostsPage(nextPage);
+    } catch (err) {
+      setPostsError(err instanceof ApiError ? err.message : "게시물을 불러오지 못했습니다.");
+    } finally {
+      postsLoadMoreInFlightRef.current = false;
+      setPostsLoadingMore(false);
+    }
+  }
+
+  const postsSentinelRef = useInfiniteScroll(loadMorePosts, postsHasNext);
+
   if (creatorLoading) {
     return <div className="flex min-h-[60vh] items-center justify-center text-secondary">불러오는 중...</div>;
   }
   if (creatorError || !creator) {
     return <div className="flex min-h-[60vh] items-center justify-center text-secondary">{creatorError ?? "크리에이터를 찾을 수 없습니다."}</div>;
   }
-
-  // posts는 피드 API 연동 전까지 빈 배열
-  const posts: PlaceholderPost[] = [];
 
   function scrollProjects(direction: "left" | "right") {
     projectsRef.current?.scrollBy({
@@ -155,24 +212,40 @@ export function CreatorPage() {
 
   const postsGrid = (
     <div className="grid grid-cols-2 gap-gutter sm:grid-cols-3">
-      {posts.map((post) => (
-        <PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={post.imageSeed} imageAlt={post.title}>
-          <div className="p-4">
-            <h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
-            <div className="flex items-center gap-3 text-caption font-caption text-secondary">
-							<span className="flex items-center gap-1">
-								<Icon name="favorite" className="text-[14px]" />
-                {post.likeCount}
-							</span>
-              <span className="flex items-center gap-1">
-								<Icon name="chat_bubble_outline" className="text-[14px]" />
-                {post.commentCount}
-							</span>
+      {postsError && (
+        <p className="col-span-full py-8 text-center text-body-md text-secondary">{postsError}</p>
+      )}
+      {!postsError &&
+        posts.map((post) => (
+          <PostCard key={post.id} href={paths.postDetail(post.id)} imageSeed={`feed-${post.id}`} imageAlt={post.title}>
+            <div className="p-4">
+              <h3 className="mb-1 truncate text-label-md font-label-md text-on-surface">{post.title}</h3>
+              <div className="flex items-center gap-3 text-caption font-caption text-secondary">
+								<span className="flex items-center gap-1">
+									<Icon name="favorite" className="text-[14px]" />
+                  {post.likeCount}
+								</span>
+                <span className="flex items-center gap-1">
+									<Icon name="chat_bubble_outline" className="text-[14px]" />
+                  {post.commentCount}
+								</span>
+              </div>
             </div>
-          </div>
-        </PostCard>
-      ))}
-      {posts.length === 0 && <p className="col-span-full py-8 text-center text-body-md text-secondary">아직 게시물이 없어요.</p>}
+          </PostCard>
+        ))}
+      {!postsError && postsLoading && (
+        <p className="col-span-full py-8 text-center text-body-md text-secondary">불러오는 중…</p>
+      )}
+      {!postsError && !postsLoading && posts.length === 0 && (
+        <p className="col-span-full py-8 text-center text-body-md text-secondary">아직 게시물이 없어요.</p>
+      )}
+      {postsHasNext && <div ref={postsSentinelRef} className="col-span-full h-1" />}
+      {postsLoadingMore && (
+        <p className="col-span-full py-4 text-center text-body-md text-secondary">불러오는 중…</p>
+      )}
+      {!postsError && !postsLoading && !postsHasNext && posts.length > 0 && (
+        <p className="col-span-full py-4 text-center text-caption font-caption text-secondary">마지막 게시물입니다</p>
+      )}
     </div>
   );
 

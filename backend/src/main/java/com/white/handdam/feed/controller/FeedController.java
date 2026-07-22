@@ -20,6 +20,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/feeds")
 @RequiredArgsConstructor
@@ -146,6 +148,16 @@ public class FeedController {
     ) {
         feedService.deleteAttachment(feedId, attachmentId, member.id());
         return ApiResponse.noContent();
+    }
+
+    // GET /api/feeds/{feedId}/attachments — 첨부파일 목록 조회
+    @GetMapping("/{feedId}/attachments")
+    public ApiResponse<List<AttachmentResponse>> getAttachments(
+        @PathVariable Long feedId,
+        @AuthenticationPrincipal AuthMember member
+    ) {
+        Long memberId = member != null ? member.id() : null;
+        return ApiResponse.success(feedService.getAttachments(feedId, memberId));
     }
 
     // [LYJ-014] GET /api/feeds/{feedId}/attachments/{attachmentId}/download
