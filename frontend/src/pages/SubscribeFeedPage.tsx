@@ -9,6 +9,7 @@ import { getHomeFeed } from "@/features/feed/feedApi";
 import type { FeedSummaryResponse } from "@/features/feed/types";
 import { ApiError } from "@/lib/api";
 import { formatDateLabel } from "@/lib/date";
+import { useInfiniteScroll } from "@/lib/useInfiniteScroll";
 import { mockCreators } from "@/mocks/creators";
 import { mockImg } from "@/mocks/helpers";
 
@@ -19,15 +20,40 @@ export function SubscribeFeedPage() {
 	const [feeds, setFeeds] = useState<FeedSummaryResponse[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [page, setPage] = useState(0);
+	const [hasNext, setHasNext] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
 
 	useEffect(() => {
 		getHomeFeed()
-			.then((res) => setFeeds(res.content))
+			.then((res) => {
+				setFeeds(res.content);
+				setHasNext(res.hasNext);
+				setPage(0);
+			})
 			.catch((err) => {
 				setError(err instanceof ApiError ? err.message : "피드를 불러오지 못했습니다.");
 			})
 			.finally(() => setLoading(false));
 	}, []);
+
+	async function loadMore() {
+		if (loadingMore || !hasNext) return;
+		setLoadingMore(true);
+		try {
+			const nextPage = page + 1;
+			const res = await getHomeFeed(undefined, nextPage);
+			setFeeds((prev) => [...prev, ...res.content]);
+			setHasNext(res.hasNext);
+			setPage(nextPage);
+		} catch (err) {
+			setError(err instanceof ApiError ? err.message : "피드를 불러오지 못했습니다.");
+		} finally {
+			setLoadingMore(false);
+		}
+	}
+
+	const sentinelRef = useInfiniteScroll(loadMore, hasNext);
 
 	return (
 		<div className="container-page grid grid-cols-1 gap-gutter py-6 lg:grid-cols-[1fr_280px]">
@@ -96,6 +122,10 @@ export function SubscribeFeedPage() {
 					<p className="py-8 text-center text-body-md text-secondary">
 						구독 중인 작가의 새 게시물이 없어요.
 					</p>
+				)}
+				{hasNext && <div ref={sentinelRef} className="h-1" />}
+				{loadingMore && (
+					<p className="py-4 text-center text-body-md text-secondary">불러오는 중…</p>
 				)}
 			</div>
 

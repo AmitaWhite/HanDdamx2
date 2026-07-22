@@ -138,12 +138,13 @@ class FeedServiceTest {
         given(projectRepository.findByIdAndDeletedFalse(1L)).willReturn(Optional.of(sampleProject(99L)));
         given(memberRepository.findById(99L)).willReturn(Optional.of(sampleMember(99L)));
         given(categoryRepository.findById(1L)).willReturn(Optional.of(sampleCategory(1L)));
+        given(pollRepository.findByFeedId(1L)).willReturn(Optional.of(samplePoll(1L, 7L)));
 
         FeedDetailResponse result = feedService.getFeed(1L, null);
 
         assertThat(result.locked()).isFalse();
-        // 비로그인이면 poll 존재 여부와 무관하게 liked는 기본값 false, pollId는 조회되지 않은 기본값(null)이어야 한다
-        assertThat(result.pollId()).isNull();
+        // pollId 조회는 memberId와 무관하므로 비로그인이어도 투표가 있으면 채워진다. liked만 memberId=null이라 기본값 false.
+        assertThat(result.pollId()).isEqualTo(7L);
         assertThat(result.liked()).isFalse();
     }
 
