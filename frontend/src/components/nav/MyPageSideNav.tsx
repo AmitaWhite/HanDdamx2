@@ -9,10 +9,6 @@ const BASE_NAV_ITEMS = [
   { label: "프로필 수정", icon: "settings", to: paths.mypageSettings },
 ] as const;
 
-const COMING_SOON_ITEMS = [
-  { label: "결제 내역", icon: "payments" },
-] as const;
-
 interface MyPageSideNavProps {
   onCreatorApply?: () => void;
 }
@@ -26,6 +22,7 @@ export function MyPageSideNav({ onCreatorApply }: MyPageSideNavProps) {
   const navItems = [
     ...BASE_NAV_ITEMS,
     { label: "구독 내역", icon: "subscriptions", to: paths.mySubscriptions },
+    { label: "결제 내역", icon: "payments", to: paths.myPayments },
     ...(isCreator ? [{ label: "프로젝트 관리", icon: "explore", to: paths.dashboardProjects }] : []),
     { label: "게시물 관리", icon: "article", to: paths.dashboardPosts },
     { label: "Q&A 활동 내역", icon: "forum", to: paths.myQna },
@@ -52,15 +49,6 @@ export function MyPageSideNav({ onCreatorApply }: MyPageSideNavProps) {
           <Icon name={item.icon} />
           {item.label}
         </NavLink>
-      ))}
-      {COMING_SOON_ITEMS.map((item) => (
-        <div
-          key={item.label}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-label-md font-label-md text-outline"
-        >
-          <Icon name={item.icon} />
-          {item.label}
-        </div>
       ))}
       {isUser && onCreatorApply && (
         <button

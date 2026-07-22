@@ -22,6 +22,7 @@ export const paths = {
 	mypage: "/mypage",
 	mypageSettings: "/mypage/settings",
 	mySubscriptions: "/mypage/subscriptions",
+	myPayments: "/mypage/payments",
 	myQna: "/mypage/qna",
 
 	creator: (id: string | number = ":creatorId") => `/creators/${id}`,
