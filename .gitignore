@@ -16,6 +16,7 @@ Thumbs.db
 .env
 .env.*
 !.env.sample
+!.env.deploy.sample
 
 ######################################
 # IDE - VSCode
@@ -52,6 +53,7 @@ bin/
 # Backend - Java / Gradle / Spring Boot
 ######################################
 .gradle/
+.gradle-user-home/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
@@ -72,6 +74,8 @@ dist/
 .vite/
 coverage/
 *.local
+*.tsbuildinfo
+package-lock.json
 
 ######################################
 # Logs

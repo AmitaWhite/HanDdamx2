@@ -1,0 +1,161 @@
+# =========================================================
+# HanDdamx2 - 공유 dev 서버(OCI ARM)용 compose
+#
+# 성격: 실제 프로덕션이 아니라, 팀원들의 로컬 개발 환경을 하나의 화면에서
+#       함께 보기 위한 "공유 미리보기 서버". 그래서 프로파일은 local 이고
+#       S3도 실제 AWS가 아닌 LocalStack을 그대로 쓴다. (데이터 휘발성 OK)
+#
+# 사용:
+#   서버(OCI)에서만 사용한다. 로컬 개발은 기존 docker-compose.yml 을 쓴다.
+#   $ docker compose -f docker-compose.deploy.yml --env-file .env.deploy pull
+#   $ docker compose -f docker-compose.deploy.yml --env-file .env.deploy up -d
+#
+#   주의: docker compose는 정확히 ".env" 라는 파일만 자동으로 읽는다. 이 파일은
+#   의도적으로 이름을 ".env.deploy" 로 다르게 지었으므로, --env-file 을 빼먹으면
+#   SITE_DOMAIN 등이 빈 값으로 치환되어(예: caddy 라우팅이 깨짐) 조용히 실패한다.
+#
+# 값 주입:
+#   - 앱 시크릿/외부 키는 같은 폴더의 .env.deploy 에서 주입한다(git 미추적).
+#   - 컨테이너 간 네트워킹 값(DB_HOST 등)은 아래 environment 에서 고정한다.
+#   - 이미지 태그는 IMAGE_TAG(기본 dev)로 교체 가능.
+# =========================================================
+
+services:
+  # ---------- 리버스 프록시 (고정 도메인 + 자동 HTTPS) ----------
+  caddy:
+    image: caddy:2-alpine
+    container_name: handdam-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # 발급받은 Let's Encrypt 인증서 영속화 (재시작해도 재발급 안 하도록)
+      - caddy_config:/config
+    environment:
+      # Caddyfile 안에서 {$SITE_DOMAIN} 으로 참조 → .env.deploy 에서 도메인 주입
+      SITE_DOMAIN: ${SITE_DOMAIN}
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - handdam-net
+
+  # ---------- 프론트엔드 (정적 서빙) ----------
+  frontend:
+    image: ghcr.io/amitawhite/handdamx2-frontend:${IMAGE_TAG:-dev}
+    container_name: handdam-frontend
+    restart: unless-stopped
+    # 외부 포트 노출 없음 — Caddy 를 통해서만 접근.
+    expose:
+      - "80"
+    networks:
+      - handdam-net
+
+  # ---------- 백엔드 (Spring Boot, local 프로파일) ----------
+  backend:
+    image: ghcr.io/amitawhite/handdamx2-backend:${IMAGE_TAG:-dev}
+    container_name: handdam-backend
+    restart: unless-stopped
+    expose:
+      - "8080"
+    env_file:
+      - .env.deploy # GOOGLE_CLIENT_ID/SECRET, JWT_SECRET, TOSS_*, MAIL_*, FRONTEND_BASE_URL 등
+    environment:
+      # 공유 미리보기 = local 프로파일
+      SPRING_PROFILES_ACTIVE: local
+      # 컨테이너 네트워크 상의 서비스 이름으로 연결 (localhost 아님)
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-handdam}
+      DB_USERNAME: ${POSTGRES_USER:-handdam}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-handdam1234_local_only}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # S3는 LocalStack 컨테이너로
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_S3_ENDPOINT: http://localstack:4566
+      # 브라우저가 실제로 열 공개 주소. Caddy의 /storage 라우팅(handle_path)과 짝을 이룸.
+      AWS_S3_PUBLIC_URL: https://${SITE_DOMAIN}/storage
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-handdam-local}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - handdam-net
+
+  # ---------- PostgreSQL ----------
+  postgres:
+    image: postgres:16-alpine
+    container_name: handdam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-handdam}
+      POSTGRES_USER: ${POSTGRES_USER:-handdam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-handdam1234_local_only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-handdam} -d ${POSTGRES_DB:-handdam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - handdam-net
+
+  # ---------- Redis ----------
+  redis:
+    image: redis:7-alpine
+    container_name: handdam-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - handdam-net
+
+  # ---------- LocalStack (S3 에뮬레이션) ----------
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: handdam-localstack
+    restart: unless-stopped
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=${AWS_REGION:-ap-northeast-2}
+      - PERSISTENCE=1
+      - DEBUG=0
+      # 준비 완료 훅(init-s3.sh)이 만들 버킷 이름
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-handdam-local}
+    volumes:
+      - localstack_data:/var/lib/localstack
+      # 기동 후 S3 버킷을 자동 생성하는 훅
+      - ./deploy/localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"\\|\"s3\": \"running\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - handdam-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  localstack_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  handdam-net:
+    driver: bridge
