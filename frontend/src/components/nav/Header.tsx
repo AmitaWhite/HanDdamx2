@@ -1,4 +1,5 @@
-import { Link, NavLink } from "react-router-dom";
+import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/paths";
 import { Icon } from "@/components/ui/Icon";
 import { LinkButton } from "@/components/ui/LinkButton";
@@ -43,6 +44,16 @@ function GuestHeader() {
 }
 
 function AuthedHeader() {
+	const navigate = useNavigate();
+	const [query, setQuery] = useState("");
+
+	// 검색 실행 → 둘러보기 페이지로 keyword 전달. 빈 값이면 keyword 없이 이동.
+	function onSearchSubmit(e: React.FormEvent) {
+		e.preventDefault();
+		const q = query.trim();
+		navigate(q ? `${paths.home}?q=${encodeURIComponent(q)}` : paths.home);
+	}
+
 	return (
 		<header className="fixed top-0 z-50 w-full border-b border-outline-variant bg-surface/95 backdrop-blur-[10px]">
 			<nav className="container-page flex h-[72px] items-center justify-between">
@@ -60,19 +71,22 @@ function AuthedHeader() {
 					</div>
 				</div>
 
-				{/* 중: 검색 (데스크톱만) */}
+				{/* 중: 검색 (데스크톱만) — 태그는 이 서비스에서 카테고리로 대체되어 작가/작품만 검색 */}
 				<div className="mx-8 hidden max-w-md flex-1 lg:block">
-					<div className="relative">
+					<form onSubmit={onSearchSubmit} className="relative" role="search">
 						<Icon
 							name="search"
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-outline"
 						/>
 						<input
 							className="w-full rounded-full border border-outline-variant bg-surface-container-low py-2 pl-10 pr-4 text-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-							placeholder="작가, 작품, 태그 검색"
+							placeholder="작가, 작품 검색"
 							type="search"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							aria-label="작가, 작품 검색"
 						/>
-					</div>
+					</form>
 				</div>
 
 				{/* 우: 아이콘 액션 */}
