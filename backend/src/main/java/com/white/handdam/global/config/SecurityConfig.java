@@ -56,6 +56,7 @@ public class SecurityConfig {
                         "/api/feeds/public",
                         "/api/categories",
                         "/api/creators/*/projects",
+                        "/api/search/**",
         };
 
     @Bean

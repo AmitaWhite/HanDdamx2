@@ -224,7 +224,8 @@ public class FeedService {
     }
 
     // 리스트 공통 변환 헬퍼 — N+1 방지 배치 조회. memberId가 null이면(비로그인) liked는 전부 false.
-    private Slice<FeedSummaryResponse> toSummarySlice(Slice<Feed> feeds, Long memberId) {
+    // SearchService 가 검색 결과 피드 매핑에 재사용하므로 public.
+    public Slice<FeedSummaryResponse> toSummarySlice(Slice<Feed> feeds, Long memberId) {
         List<Long> projectIds = feeds.getContent().stream()
             .map(Feed::getProjectId).distinct().toList();
         Map<Long, Project> projectMap = projectRepository.findAllById(projectIds).stream()
