@@ -16,7 +16,9 @@ import com.white.handdam.auth.service.LoginService;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.global.security.jwt.JwtProperties;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -105,8 +107,22 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@AuthenticationPrincipal AuthMember authMember, HttpServletResponse response) {
+    public ApiResponse<Void> logout(@AuthenticationPrincipal AuthMember authMember,
+                                     HttpServletRequest request, HttpServletResponse response) {
         loginService.logout(authMember.id());
+
+        // 세션 무효화
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        ResponseCookie jsessionCookie = ResponseCookie.from("JSESSIONID", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(0)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, jsessionCookie.toString());
 
         response.addHeader(HttpHeaders.SET_COOKIE, createRefreshTokenCookie("", 0).toString()); // 브라우저 쿠키 삭제
 
