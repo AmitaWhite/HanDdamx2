@@ -16,11 +16,14 @@ import com.white.handdam.auth.service.LoginService;
 import com.white.handdam.global.response.ApiResponse;
 import com.white.handdam.global.security.AuthMember;
 import com.white.handdam.global.security.jwt.JwtProperties;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -38,6 +41,9 @@ public class AuthController {
     private final LoginService loginService;
     private final JwtProperties jwtProperties;
     private final PasswordService passwordService;
+
+    @Value("${app.cookie-secure}")
+    private boolean cookieSecure;
 
     // KSY-001
     @GetMapping("/email-availability")
@@ -101,8 +107,22 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@AuthenticationPrincipal AuthMember authMember, HttpServletResponse response) {
+    public ApiResponse<Void> logout(@AuthenticationPrincipal AuthMember authMember,
+                                     HttpServletRequest request, HttpServletResponse response) {
         loginService.logout(authMember.id());
+
+        // 세션 무효화
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        ResponseCookie jsessionCookie = ResponseCookie.from("JSESSIONID", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(0)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, jsessionCookie.toString());
 
         response.addHeader(HttpHeaders.SET_COOKIE, createRefreshTokenCookie("", 0).toString()); // 브라우저 쿠키 삭제
 
@@ -112,7 +132,7 @@ public class AuthController {
     private ResponseCookie createRefreshTokenCookie (String refreshToken, long maxAgeSeconds) {
         return ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true) // JS 접근 X
-                .secure(false) // TODO: 배포 시 true 변경 (https)
+                .secure(cookieSecure) // local=false, 배포/prod=true
                 .sameSite("Strict") // Cross Site 요청 X
                 .path("/")
                 .maxAge(maxAgeSeconds)
