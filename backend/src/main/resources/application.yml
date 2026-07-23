@@ -108,6 +108,7 @@ toss:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  cookie-secure: ${COOKIE_SECURE:false}
 
 subscription:
   expiration:
@@ -169,6 +170,7 @@ jwt:
 
 app:
   frontend-base-url: http://localhost:3000
+  cookie-secure: false
 
 subscription:
   expiration:
@@ -254,6 +256,7 @@ jwt:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL}
+  cookie-secure: ${COOKIE_SECURE:true}
 
 cloud:
   aws:

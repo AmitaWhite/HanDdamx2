@@ -13,7 +13,7 @@ Thumbs.db
 # Environment variables
 # (.env.sample 만 커밋 대상으로 남긴다)
 ######################################
-.env
+.env.deploy
 .env.*
 !.env.sample
 !.env.deploy.sample
